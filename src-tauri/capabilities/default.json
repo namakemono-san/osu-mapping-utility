@@ -1,0 +1,107 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Capability for the main window",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:default",
+    "core:window:allow-close",
+    "core:window:allow-minimize",
+    "core:window:allow-toggle-maximize",
+    "core:window:allow-start-dragging",
+    "dialog:default",
+    "fs:allow-read-dir",
+    "fs:allow-read-file",
+    "fs:allow-read-text-file",
+    "fs:allow-write-file",
+    "fs:allow-write-text-file",
+    "fs:allow-copy-file",
+    "fs:allow-exists",
+    {
+      "identifier": "fs:scope",
+      "allow": [
+        {
+          "path": "**"
+        }
+      ]
+    },
+    {
+      "identifier": "shell:allow-execute",
+      "allow": [
+        {
+          "name": "yt-dlp",
+          "sidecar": true,
+          "args": [
+            "-x",
+            "--audio-format",
+            {
+              "validator": "^(mp3|vorbis)$"
+            },
+            "--audio-quality",
+            {
+              "validator": "^(192K|6)$"
+            },
+            "--no-playlist",
+            "--windows-filenames",
+            "--trim-filenames",
+            {
+              "validator": "^[0-9]{1,3}$"
+            },
+            "--path",
+            {
+              "validator": ".+"
+            },
+            "--output",
+            "%(title)s-audio.%(ext)s",
+            {
+              "validator": "^https?://.+"
+            }
+          ]
+        },
+        {
+          "name": "yt-dlp",
+          "sidecar": true,
+          "args": [
+            "--no-playlist",
+            "--windows-filenames",
+            "--trim-filenames",
+            {
+              "validator": "^[0-9]{1,3}$"
+            },
+            "-f",
+            "bestvideo[ext=mp4]/bestvideo",
+            "--path",
+            {
+              "validator": ".+"
+            },
+            "--output",
+            "%(title)s-background-src.%(ext)s",
+            {
+              "validator": "^https?://.+"
+            }
+          ]
+        },
+        {
+          "name": "ffmpeg",
+          "sidecar": true,
+          "args": [
+            "-y",
+            "-i",
+            {
+              "validator": ".+"
+            },
+            "-an",
+            "-c:v",
+            "copy",
+            {
+              "validator": ".+"
+            }
+          ]
+        }
+      ]
+    },
+    "shell:default"
+  ]
+}

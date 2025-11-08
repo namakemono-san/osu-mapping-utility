@@ -1,0 +1,74 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "osu-mapping-utility",
+  "version": "0.3.0",
+  "identifier": "moe.nmkmn.osu-mapping-utility",
+  "build": {
+    "beforeDevCommand": "yarn dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "yarn build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "title": "osu! mapping utility",
+        "decorations": false,
+        "transparent": false,
+        "fullscreen": false,
+        "resizable": false,
+        "dragDropEnabled": true,
+        "width": 1024,
+        "height": 600
+      }
+    ],
+    "security": {
+      "csp": {
+        "default-src": "'self' ipc: http://ipc.localhost",
+        "connect-src": "'self' ipc: http://ipc.localhost https://ipc.localhost",
+        "img-src": "'self' asset: http://asset.localhost https://asset.localhost data: blob:",
+        "style-src": "'self' 'unsafe-inline' https://fonts.googleapis.com",
+        "font-src": "'self' https://fonts.gstatic.com",
+        "script-src": "'self' 'unsafe-inline'"
+      },
+      "assetProtocol": {
+        "enable": true,
+        "scope": {
+          "allow": [
+            "**"
+          ],
+          "deny": []
+        }
+      },
+      "capabilities": []
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "nsis"
+    ],
+    "externalBin": [
+      "binaries/yt-dlp",
+      "binaries/ffmpeg"
+    ],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "dialog": true,
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDdFRUFFQUE5MDkzQjhFM0QKUldROWpqc0pxZXJxZmxwTmI2dU5Xdm1OT3I3cFUyZFl3MDZJNlBNSDk2ZWZrejhvT3dZTm4vdXUK",
+      "endpoints": [
+        "https://github.com/namakemono-san/osu-mapping-utility/releases/latest/download/latest.json"
+      ]
+    }
+  }
+}
