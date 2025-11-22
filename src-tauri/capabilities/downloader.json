@@ -1,0 +1,86 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "downloader",
+  "description": "Permissions for video/audio downloader (yt-dlp, ffmpeg)",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "shell:default",
+    {
+      "identifier": "shell:allow-execute",
+      "allow": [
+        {
+          "name": "yt-dlp",
+          "sidecar": true,
+          "args": [
+            "-x",
+            "--audio-format",
+            {
+              "validator": "^(mp3|vorbis)$"
+            },
+            "--audio-quality",
+            {
+              "validator": "^(192K|6)$"
+            },
+            "--no-playlist",
+            "--windows-filenames",
+            "--trim-filenames",
+            {
+              "validator": "^[0-9]{1,3}$"
+            },
+            "--path",
+            {
+              "validator": ".+"
+            },
+            "--output",
+            "%(title)s-audio.%(ext)s",
+            {
+              "validator": "^https?://.+"
+            }
+          ]
+        },
+        {
+          "name": "yt-dlp",
+          "sidecar": true,
+          "args": [
+            "--no-playlist",
+            "--windows-filenames",
+            "--trim-filenames",
+            {
+              "validator": "^[0-9]{1,3}$"
+            },
+            "-f",
+            "bestvideo[ext=mp4]/bestvideo",
+            "--path",
+            {
+              "validator": ".+"
+            },
+            "--output",
+            "%(title)s-background-src.%(ext)s",
+            {
+              "validator": "^https?://.+"
+            }
+          ]
+        },
+        {
+          "name": "ffmpeg",
+          "sidecar": true,
+          "args": [
+            "-y",
+            "-i",
+            {
+              "validator": ".+"
+            },
+            "-an",
+            "-c:v",
+            "copy",
+            {
+              "validator": ".+"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
