@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { FiCheckCircle, FiAlertCircle, FiRefreshCw, FiChevronDown, FiChevronUp } from "react-icons/fi";
-import { readTextFile, writeTextFile, copyFile } from "@tauri-apps/plugin-fs";
+import { readTextFile, writeTextFile, copyFile, mkdir, BaseDirectory } from "@tauri-apps/plugin-fs";
 
 import { Button } from "../components/common/Button";
 import { Card } from "../components/common/Card";
@@ -132,6 +132,36 @@ function extractDifficultyName(fileName: string): string {
     return match ? match[1] : fileName.replace('.osu', '');
 }
 
+function extractMetadata(osuText: string): { beatmapId?: string; beatmapSetId?: string } {
+    const lines = osuText.split(/\r?\n/);
+    let inMetadata = false;
+    let beatmapId: string | undefined;
+    let beatmapSetId: string | undefined;
+
+    for (const raw of lines) {
+        if (/^\s*\[Metadata\]\s*$/i.test(raw)) {
+            inMetadata = true;
+            continue;
+        }
+        if (/^\s*\[[A-Za-z]+\]\s*$/.test(raw)) {
+            inMetadata = false;
+            continue;
+        }
+        if (!inMetadata) continue;
+
+        const trimmed = raw.trim();
+        if (trimmed.startsWith("BeatmapID:")) {
+            beatmapId = trimmed.split(":")[1]?.trim();
+        } else if (trimmed.startsWith("BeatmapSetID:")) {
+            beatmapSetId = trimmed.split(":")[1]?.trim();
+        }
+
+        if (beatmapId && beatmapSetId) break;
+    }
+
+    return { beatmapId, beatmapSetId };
+}
+
 export function BeatmapCustomizer({ selectedBeatmap }: BeatmapCustomizerProps) {
     const [osuFiles, setOsuFiles] = useState<string[]>([]);
     const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
@@ -207,19 +237,42 @@ export function BeatmapCustomizer({ selectedBeatmap }: BeatmapCustomizerProps) {
             const beatmapPath = `${songsFolder}\\${selectedBeatmap.folder_name}`;
             let successCount = 0;
 
+            const now = new Date();
+            const timestamp = now.getFullYear().toString() +
+                (now.getMonth() + 1).toString().padStart(2, '0') +
+                now.getDate().toString().padStart(2, '0') +
+                now.getHours().toString().padStart(2, '0') +
+                now.getMinutes().toString().padStart(2, '0') +
+                now.getSeconds().toString().padStart(2, '0');
+
             for (const fileName of selectedFiles) {
                 const filePath = `${beatmapPath}\\${fileName}`;
 
+                let text = await readTextFile(filePath);
+
                 if (createBackup) {
-                    const backupPath = `${filePath}.backup`;
-                    try {
-                        await copyFile(filePath, backupPath);
-                    } catch (err) {
-                        console.warn(`Failed to create backup for ${fileName}:`, err);
+                    const metadata = extractMetadata(text);
+
+                    if (metadata.beatmapSetId && metadata.beatmapId) {
+                        const backupDir = `backup/${metadata.beatmapSetId}/${metadata.beatmapId}`;
+
+                        try {
+                            await mkdir(backupDir, {
+                                baseDir: BaseDirectory.AppData,
+                                recursive: true
+                            });
+                            const backupPath = `${backupDir}/${timestamp}_${fileName}`;
+                            await copyFile(filePath, backupPath, {
+                                toPathBaseDir: BaseDirectory.AppData
+                            });
+                            console.log(`Backup created: ${backupPath}`);
+                        } catch (err) {
+                            console.warn(`Failed to create backup for ${fileName}:`, err);
+                        }
+                    } else {
+                        console.warn(`Could not extract metadata from ${fileName}, skipping backup`);
                     }
                 }
-
-                let text = await readTextFile(filePath);
 
                 if (centerOn) text = rewriteCenter(text, 256, 192);
                 if (rmBookmarks) text = removeEditorBookmarks(text);
@@ -272,35 +325,30 @@ export function BeatmapCustomizer({ selectedBeatmap }: BeatmapCustomizerProps) {
 
                     {osuFiles.length > 0 && (
                         <Card className="overflow-hidden">
-                            <button
-                                onClick={() => setIsDiffExpanded(!isDiffExpanded)}
-                                className="w-full flex items-center justify-between p-3 hover:bg-[#222] transition-colors"
-                            >
-                                <div className="flex items-center gap-2">
+                            <div className="w-full flex items-center justify-between p-3">
+                                <button
+                                    onClick={() => setIsDiffExpanded(!isDiffExpanded)}
+                                    className="flex items-center gap-2 hover:text-[#eeeeee] transition-colors"
+                                >
                                     <h3 className="font-semibold text-sm">Select Difficulties</h3>
                                     <span className="text-xs text-[#7b7b7b]">
                                         ({selectedFiles.size}/{osuFiles.length})
                                     </span>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            toggleAll();
-                                        }}
-                                        className="h-auto px-0 text-[#2563eb] hover:text-[#1f56cc] hover:bg-transparent"
-                                    >
-                                        {selectedFiles.size === osuFiles.length ? "Deselect All" : "Select All"}
-                                    </Button>
                                     {isDiffExpanded ? (
                                         <FiChevronUp className="text-[#7b7b7b]" />
                                     ) : (
                                         <FiChevronDown className="text-[#7b7b7b]" />
                                     )}
-                                </div>
-                            </button>
+                                </button>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={toggleAll}
+                                    className="h-auto px-0 text-[#2563eb] hover:text-[#1f56cc] hover:bg-transparent"
+                                >
+                                    {selectedFiles.size === osuFiles.length ? "Deselect All" : "Select All"}
+                                </Button>
+                            </div>
 
                             {isDiffExpanded && (
                                 <div className="p-3 pt-0 border-t border-[#2a2a2a]">

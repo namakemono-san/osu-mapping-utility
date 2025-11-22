@@ -8,7 +8,10 @@ import {
     MdContentCopy,
     MdRemoveRedEye,
     MdEdit,
+    MdFolderOpen,
 } from "react-icons/md";
+import { appDataDir } from "@tauri-apps/api/path";
+import { openPath } from '@tauri-apps/plugin-opener';
 
 export type SidebarKey =
     | "beatmap_clone"
@@ -63,6 +66,15 @@ export function Sidebar({
 }: SidebarProps) {
     const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
+    const handleOpenAppFolder = async () => {
+        try {
+            const appDir = await appDataDir();
+            await openPath(appDir);
+        } catch (err) {
+            console.error("Failed to open app folder:", err);
+        }
+    };
+
     return (
         <aside
             className={`h-full shrink-0 bg-[#191919] text-[#eeeeee] border-r border-[#2a2a2a] flex flex-col transition-all duration-300 ease-in-out ${isExpanded ? "w-56" : "w-16"
@@ -82,7 +94,7 @@ export function Sidebar({
                 </button>
             </div>
 
-            <nav className="px-2 py-2 space-y-4 overflow-y-auto">
+            <nav className="flex-1 px-2 py-2 space-y-4 overflow-y-auto">
                 {CATEGORIES.map((category, categoryIndex) => (
                     <div key={category.title}>
                         {isExpanded && (
@@ -134,6 +146,22 @@ export function Sidebar({
                     </div>
                 ))}
             </nav>
+
+            <div className="px-2 py-2 border-t border-[#2a2a2a]">
+                <button
+                    onClick={handleOpenAppFolder}
+                    title={!isExpanded ? "Open App Folder" : undefined}
+                    className={`group w-full h-10 rounded-lg flex items-center text-[#eeeeee] hover:bg-[#2a2a2a] transition-all duration-200 ease-out active:scale-95 ${isExpanded ? "px-3 gap-3" : "justify-center"
+                        }`}
+                >
+                    <MdFolderOpen className="text-xl text-[#7b7b7b] group-hover:text-[#eeeeee] transition-colors duration-200 flex-shrink-0" />
+                    {isExpanded && (
+                        <span className="font-semibold text-sm text-[#e0e0e0] group-hover:text-[#eeeeee] transition-colors duration-200">
+                            Open App Folder
+                        </span>
+                    )}
+                </button>
+            </div>
         </aside>
     );
 }

@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Capability for the main window",
+  "description": "Basic window and file system permissions",
   "windows": [
     "main"
   ],
@@ -19,89 +19,17 @@
     "fs:allow-write-text-file",
     "fs:allow-copy-file",
     "fs:allow-exists",
+    "fs:allow-mkdir",
     {
       "identifier": "fs:scope",
       "allow": [
         {
           "path": "**"
-        }
-      ]
-    },
-    {
-      "identifier": "shell:allow-execute",
-      "allow": [
-        {
-          "name": "yt-dlp",
-          "sidecar": true,
-          "args": [
-            "-x",
-            "--audio-format",
-            {
-              "validator": "^(mp3|vorbis)$"
-            },
-            "--audio-quality",
-            {
-              "validator": "^(192K|6)$"
-            },
-            "--no-playlist",
-            "--windows-filenames",
-            "--trim-filenames",
-            {
-              "validator": "^[0-9]{1,3}$"
-            },
-            "--path",
-            {
-              "validator": ".+"
-            },
-            "--output",
-            "%(title)s-audio.%(ext)s",
-            {
-              "validator": "^https?://.+"
-            }
-          ]
         },
         {
-          "name": "yt-dlp",
-          "sidecar": true,
-          "args": [
-            "--no-playlist",
-            "--windows-filenames",
-            "--trim-filenames",
-            {
-              "validator": "^[0-9]{1,3}$"
-            },
-            "-f",
-            "bestvideo[ext=mp4]/bestvideo",
-            "--path",
-            {
-              "validator": ".+"
-            },
-            "--output",
-            "%(title)s-background-src.%(ext)s",
-            {
-              "validator": "^https?://.+"
-            }
-          ]
-        },
-        {
-          "name": "ffmpeg",
-          "sidecar": true,
-          "args": [
-            "-y",
-            "-i",
-            {
-              "validator": ".+"
-            },
-            "-an",
-            "-c:v",
-            "copy",
-            {
-              "validator": ".+"
-            }
-          ]
+          "path": "$APPDATA/**"
         }
       ]
-    },
-    "shell:default"
+    }
   ]
 }
