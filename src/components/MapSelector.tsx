@@ -81,7 +81,9 @@ export function MapSelector({ onSelect, selectedBeatmap, className = "" }: MapSe
     const [currentIndex, setCurrentIndex] = useState(0);
     const [hasMore, setHasMore] = useState(true);
 
-    const searchTimerRef = useRef<number | null>(null);
+    const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const currentRequestRef = useRef<number>(0);
+    const isInitialMount = useRef(true);
 
     const autoDetectOsuFolder = async (): Promise<string | null> => {
         setDetectStatus("Detecting osu! installation...");
@@ -108,6 +110,8 @@ export function MapSelector({ onSelect, selectedBeatmap, className = "" }: MapSe
         });
 
         if (selected && typeof selected === "string") {
+            await invoke("clear_beatmap_cache");
+
             setSongsFolder(selected);
             localStorage.setItem("songsFolder", selected);
             setDetectStatus(`Selected: ${selected}`);
@@ -116,11 +120,23 @@ export function MapSelector({ onSelect, selectedBeatmap, className = "" }: MapSe
         return null;
     };
 
+    useEffect(() => {
+        if (isInitialMount.current) {
+            isInitialMount.current = false;
+            return;
+        }
+
+        if (songsFolder) {
+            reloadSearch(search);
+        }
+    }, [songsFolder]);
+
     const loadStep = async (
         folder: string,
         searchQuery: string = "",
         startIndex: number = 0,
-        append: boolean = false
+        append: boolean = false,
+        requestId: number
     ) => {
         setIsScanning(true);
 
@@ -131,6 +147,10 @@ export function MapSelector({ onSelect, selectedBeatmap, className = "" }: MapSe
                 stepSize: STEP_SIZE,
                 searchQuery,
             });
+
+            if (requestId !== currentRequestRef.current) {
+                return;
+            }
 
             const [newBeatmaps, nextIndex, more] = result;
 
@@ -143,20 +163,27 @@ export function MapSelector({ onSelect, selectedBeatmap, className = "" }: MapSe
             setCurrentIndex(nextIndex);
             setHasMore(more);
         } catch (err) {
-            console.error("[loadStep] Error:", err);
-            setDetectStatus(`Error: ${err}`);
+            if (requestId === currentRequestRef.current) {
+                console.error("[loadStep] Error:", err);
+                setDetectStatus(`Error: ${err}`);
+            }
         } finally {
-            setIsScanning(false);
+            if (requestId === currentRequestRef.current) {
+                setIsScanning(false);
+            }
         }
     };
 
     const reloadSearch = async (searchQuery: string = "") => {
         if (!songsFolder) return;
 
+        currentRequestRef.current += 1;
+        const requestId = currentRequestRef.current;
+
         setBeatmaps([]);
         setCurrentIndex(0);
         setHasMore(true);
-        await loadStep(songsFolder, searchQuery, 0, false);
+        await loadStep(songsFolder, searchQuery, 0, false, requestId);
     };
 
     const handleSearchChange = (value: string) => {
@@ -168,7 +195,7 @@ export function MapSelector({ onSelect, selectedBeatmap, className = "" }: MapSe
 
         searchTimerRef.current = setTimeout(() => {
             reloadSearch(value);
-        }, 300) as unknown as number;
+        }, 300);
     };
 
     const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
@@ -179,7 +206,9 @@ export function MapSelector({ onSelect, selectedBeatmap, className = "" }: MapSe
             Math.abs(element.scrollHeight - element.scrollTop - element.clientHeight) < 10;
 
         if (bottom) {
-            loadStep(songsFolder, search, currentIndex, true);
+            currentRequestRef.current += 1;
+            const requestId = currentRequestRef.current;
+            loadStep(songsFolder, search, currentIndex, true, requestId);
         }
     };
 
@@ -197,6 +226,12 @@ export function MapSelector({ onSelect, selectedBeatmap, className = "" }: MapSe
 
             await reloadSearch();
         })();
+
+        return () => {
+            if (searchTimerRef.current) {
+                clearTimeout(searchTimerRef.current);
+            }
+        };
     }, []);
 
     return (

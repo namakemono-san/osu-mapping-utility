@@ -57,8 +57,10 @@ pub fn run() {
             commands::run_download,
             commands::detect_osu_path,
             commands::scan_songs_step,
+            commands::clear_beatmap_cache,
             commands::list_osu_files,
             commands::read_osu_file,
+            commands::read_audio_file,
             commands::clone_beatmap,
         ])
         .run(tauri::generate_context!())
