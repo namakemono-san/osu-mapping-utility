@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";;
+import { getVersion } from '@tauri-apps/api/app';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { FiX, FiMinus, FiMaximize, FiMinimize, FiBookOpen } from 'react-icons/fi';
 
@@ -28,6 +29,7 @@ function ToolButton({ icon, label, onClick }: { icon: React.ReactNode; label: st
 export function Titlebar() {
     const appWindow = getCurrentWindow();
     const [isMax, setIsMax] = useState(false);
+    const [version, setVersion] = useState<string>("");
 
     // const { lang, setLang } = useI18n();
 
@@ -35,6 +37,7 @@ export function Titlebar() {
         let unlisten: (() => void) | undefined;
         (async () => {
             setIsMax(await appWindow.isMaximized());
+            setVersion(await getVersion());
             unlisten = await appWindow.onResized(async () => {
                 setIsMax(await appWindow.isMaximized());
             });
@@ -46,9 +49,12 @@ export function Titlebar() {
         <div
             data-tauri-drag-region
             onDoubleClick={() => appWindow.toggleMaximize()}
-            className="fixed top-0 left-0 w-full h-[40px] z-50 flex items-center pl-4 text-zinc-200 bg-[#131313] border-b border-zinc-800/70 select-none rounded-t-lg"
+            className={`fixed top-0 left-0 w-full h-[40px] z-50 flex items-center pl-4 text-zinc-200 bg-[#131313] border-b border-zinc-800/70 select-none ${isMax ? '' : 'rounded-t-lg'}`}
         >
-            <span className="text-sm font-medium tracking-wide truncate">osu! mapping utility</span>
+            <span className="text-sm font-medium tracking-wide truncate">
+                osu! mapping utility
+            </span>
+            {version && <span className="text-xs text-zinc-500 ml-2">v{version}</span>}
 
             <div className="flex-1" />
 
