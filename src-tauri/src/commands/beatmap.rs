@@ -1,9 +1,15 @@
 use crate::models::beatmapset::Beatmapset;
 use crate::utils::parser::scrape;
+use once_cell::sync::Lazy;
 use rayon::prelude::*;
+use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
+use std::sync::Mutex;
+
+static BEATMAP_CACHE: Lazy<Mutex<HashMap<String, Vec<Beatmapset>>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
 
 #[tauri::command]
 pub fn detect_osu_path() -> Result<String, String> {
@@ -53,14 +59,8 @@ pub fn detect_osu_path() -> Result<String, String> {
     }
 }
 
-#[tauri::command]
-pub fn scan_songs_step(
-    base_path: String,
-    start_index: usize,
-    step_size: usize,
-    search_query: String,
-) -> Result<(Vec<Beatmapset>, usize, bool), String> {
-    let base = Path::new(&base_path);
+fn load_all_beatmaps(base_path: &str) -> Result<Vec<Beatmapset>, String> {
+    let base = Path::new(base_path);
 
     if !base.exists() {
         return Err(format!("Folder not found: {}", base_path));
@@ -79,23 +79,14 @@ pub fn scan_songs_step(
 
     folders_with_time.par_sort_by(|a, b| b.1.cmp(&a.1));
 
-    let total = folders_with_time.len();
-    let mut results = Vec::new();
-    let mut found = 0;
-    let mut current_index = start_index;
+    let results: Vec<Beatmapset> = folders_with_time
+        .par_iter()
+        .filter_map(|(entry, _modified)| {
+            let folder_path = entry.path();
+            let folder_name = entry.file_name().to_string_lossy().to_string();
 
-    for (idx, (entry, _modified)) in folders_with_time.iter().enumerate().skip(start_index) {
-        if found >= step_size {
-            current_index = idx;
-            break;
-        }
+            let files = fs::read_dir(&folder_path).ok()?;
 
-        current_index = idx + 1;
-
-        let folder_path = entry.path();
-        let folder_name = entry.file_name().to_string_lossy().to_string();
-
-        if let Ok(files) = fs::read_dir(&folder_path) {
             for file in files.filter_map(|f| f.ok()) {
                 let path = file.path();
                 if let Some(ext) = path.extension() {
@@ -108,60 +99,99 @@ pub fn scan_songs_step(
                             let beatmapset_id = scrape(&data, "BeatmapSetID:", "\n");
                             let bg_file = scrape(&data, "0,0,\"", "\"");
 
-                            let searchable = format!(
-                                "{} - {} | {} ({} {})",
-                                title, artist, creator, beatmap_id, beatmapset_id
-                            );
+                            let display_title = if !title.is_empty() && !artist.is_empty() {
+                                format!("{} - {}", artist, title)
+                            } else {
+                                folder_name
+                                    .split_once(' ')
+                                    .map(|(_, rest)| rest.to_string())
+                                    .unwrap_or(folder_name.clone())
+                            };
 
-                            if search_query.is_empty()
-                                || searchable
-                                    .to_lowercase()
-                                    .contains(&search_query.to_lowercase())
-                            {
-                                let display_title = if !title.is_empty() && !artist.is_empty() {
-                                    format!("{} - {}", artist, title)
+                            let beatmap = Beatmapset {
+                                folder_name: folder_name.clone(),
+                                title: display_title,
+                                artist: if artist.is_empty() {
+                                    "Unknown".to_string()
                                 } else {
-                                    folder_name
-                                        .split_once(' ')
-                                        .map(|(_, rest)| rest.to_string())
-                                        .unwrap_or(folder_name.clone())
-                                };
+                                    artist
+                                },
+                                creator: if creator.is_empty() {
+                                    "Unknown".to_string()
+                                } else {
+                                    creator
+                                },
+                                background_path: if !bg_file.is_empty() {
+                                    Some(format!("{}/{}", folder_path.display(), bg_file))
+                                } else {
+                                    None
+                                },
+                                beatmap_id,
+                                beatmap_set_id: beatmapset_id,
+                            };
 
-                                let beatmap = Beatmapset {
-                                    folder_name: folder_name.clone(),
-                                    title: display_title,
-                                    artist: if artist.is_empty() {
-                                        "Unknown".to_string()
-                                    } else {
-                                        artist
-                                    },
-                                    creator: if creator.is_empty() {
-                                        "Unknown".to_string()
-                                    } else {
-                                        creator
-                                    },
-                                    background_path: if !bg_file.is_empty() {
-                                        Some(format!("{}/{}", folder_path.display(), bg_file))
-                                    } else {
-                                        None
-                                    },
-                                    beatmap_id,
-                                    beatmap_set_id: beatmapset_id,
-                                };
-
-                                results.push(beatmap);
-                                found += 1;
-                            }
+                            return Some(beatmap);
                         }
                         break;
                     }
                 }
             }
-        }
-    }
+            None
+        })
+        .collect();
 
-    let has_more = current_index < total;
-    Ok((results, current_index, has_more))
+    Ok(results)
+}
+
+#[tauri::command]
+pub fn scan_songs_step(
+    base_path: String,
+    start_index: usize,
+    step_size: usize,
+    search_query: String,
+) -> Result<(Vec<Beatmapset>, usize, bool), String> {
+    let mut cache = BEATMAP_CACHE.lock().unwrap();
+
+    let all_beatmaps = if let Some(cached) = cache.get(&base_path) {
+        cached.clone()
+    } else {
+        eprintln!("[scan] Loading beatmaps for the first time...");
+        let loaded = load_all_beatmaps(&base_path)?;
+        cache.insert(base_path.clone(), loaded.clone());
+        loaded
+    };
+
+    drop(cache);
+
+    let filtered: Vec<Beatmapset> = if search_query.is_empty() {
+        all_beatmaps
+    } else {
+        let query_lower = search_query.to_lowercase();
+        all_beatmaps
+            .into_iter()
+            .filter(|b| {
+                let searchable = format!(
+                    "{} {} {} {} {}",
+                    b.title, b.artist, b.creator, b.beatmap_id, b.beatmap_set_id
+                );
+                searchable.to_lowercase().contains(&query_lower)
+            })
+            .collect()
+    };
+
+    let total = filtered.len();
+    let end_index = (start_index + step_size).min(total);
+    let results = filtered[start_index..end_index].to_vec();
+    let has_more = end_index < total;
+
+    Ok((results, end_index, has_more))
+}
+
+#[tauri::command]
+pub fn clear_beatmap_cache() {
+    let mut cache = BEATMAP_CACHE.lock().unwrap();
+    cache.clear();
+    eprintln!("[cache] Cleared beatmap cache");
 }
 
 #[tauri::command]
@@ -192,4 +222,9 @@ pub fn list_osu_files(beatmap_folder: String) -> Result<Vec<String>, String> {
 #[tauri::command]
 pub fn read_osu_file(file_path: String) -> Result<String, String> {
     fs::read_to_string(&file_path).map_err(|e| format!("Failed to read file: {}", e))
+}
+
+#[tauri::command]
+pub fn read_audio_file(file_path: String) -> Result<Vec<u8>, String> {
+    fs::read(&file_path).map_err(|e| format!("Failed to read audio file: {}", e))
 }
