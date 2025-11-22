@@ -9,12 +9,15 @@ import { MapSelector } from "./components/MapSelector";
 import { UpdateChecker } from "./components/UpdateChecker";
 
 import { OffsetCalibrator } from "./pages/OffsetCalibrator";
+import { BeatmapPreview } from "./pages/BeatmapPreview";
 import { BeatmapCustomizer } from "./pages/BeatmapCustomizer";
 import { Downloader } from "./pages/Downloader";
 import { BeatmapClone } from "./pages/BeatmapClone";
 
+
 const MAP_TOOLS: SidebarKey[] = [
   "beatmap_clone",
+  "beatmap_preview",
   "beatmap_customizer",
   "metadata_editor",
 ];
@@ -51,6 +54,8 @@ function App() {
     switch (activeTool) {
       case "beatmap_clone":
         return <BeatmapClone selectedBeatmap={selectedBeatmap} />;
+      case "beatmap_preview":
+        return <BeatmapPreview selectedBeatmap={selectedBeatmap} />
       case "beatmap_customizer":
         return <BeatmapCustomizer selectedBeatmap={selectedBeatmap} />;
       case "metadata_editor":

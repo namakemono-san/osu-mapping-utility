@@ -6,11 +6,13 @@ import {
     MdChevronRight,
     MdChevronLeft,
     MdContentCopy,
+    MdRemoveRedEye,
     MdEdit,
 } from "react-icons/md";
 
 export type SidebarKey =
     | "beatmap_clone"
+    | "beatmap_preview"
     | "beatmap_customizer"
     | "offset_calibrator"
     | "metadata_editor"
@@ -39,6 +41,7 @@ const CATEGORIES: SidebarCategory[] = [
         title: "Map Tools",
         items: [
             { key: "beatmap_clone", label: "Beatmap Clone", Icon: MdContentCopy },
+            { key: "beatmap_preview", label: "Beatmap Preview", Icon: MdRemoveRedEye },
             { key: "beatmap_customizer", label: "Beatmap Customizer", Icon: MdContentCut },
             { key: "metadata_editor", label: "Metadata Editor", Icon: MdEdit },
         ],
