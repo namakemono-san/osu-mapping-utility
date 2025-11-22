@@ -43,11 +43,7 @@ yarn tauri build
 
 | Category                       | Summary                                                       | Status                 |
 | ------------------------------ | ------------------------------------------------------------- | ---------------------- |
-| **.osu Difficulty Viewer**     | Visualization of hitobjects and timing elements on a timeline | 🔴 Not started         |
-| **Batch Metadata Fixer**       | Apply metadata corrections across multiple difficulties       | 🔴 Not started         |
-| **Beatmap Comparison Tools**   | Compare differences between diffs, versions, or revisions     | 🔴 Not started         |
 | **Plugin / Extension Support** | Support for external utility extensions                       | 🟡 Concept stage       |
-| **Preset Mapping Utilities**   | Quick-access presets for commonly used preprocessing tasks    | 🟡 Concept stage       |
 
 ## Issue Reporting
 
