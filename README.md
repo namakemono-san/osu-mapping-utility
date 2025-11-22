@@ -10,14 +10,14 @@ It provides a streamlined environment for operations such as duplicating beatmap
 ## Download
 
 The latest stable builds can be found here:
-[https://github.com/your-org/osu-mapping-utility/releases/latest](https://github.com/your-org/osu-mapping-utility/releases/latest)
+[github.com/namakemono-san/osu-mapping-utility/releases/latest](https://github.com/namakemono-san/osu-mapping-utility/releases/latest)
 
 ## Development
 
 To build from source, use the following commands:
 
 ```
-git clone https://github.com/your-org/osu-mapping-utility.git
+git clone https://github.com/namakemono-san/osu-mapping-utility.git
 cd osu-mapping-utility
 
 yarn install
@@ -47,8 +47,7 @@ yarn tauri build
 
 ## Issue Reporting
 
-Bug reports and feature requests can be submitted via GitHub Issues:
-[https://github.com/your-org/osu-mapping-utility/issues](https://github.com/your-org/osu-mapping-utility/issues)
+Bug reports and feature requests can be submitted via [GitHub Issues](https://github.com/namakemono-san/osu-mapping-utility/issues)
 
 ## License
 
