@@ -140,6 +140,8 @@ export function MapSelector({ onSelect, selectedBeatmap, className = "" }: MapSe
     ) => {
         setIsScanning(true);
 
+        await invoke("clear_beatmap_cache");
+
         try {
             const result = await invoke<[Beatmapset[], number, boolean]>("scan_songs_step", {
                 basePath: folder,
