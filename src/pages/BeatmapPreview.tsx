@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { FiPlay, FiPause, FiRefreshCw, FiMusic, FiAlertCircle, FiVolume2, FiVolumeX, FiSkipBack, FiEdit2, FiCheck, FiX } from "react-icons/fi";
+import { FiPlay, FiPause, FiRefreshCw, FiMusic, FiAlertCircle, FiVolume2, FiVolumeX, FiSkipBack, FiEdit2, FiCheck, FiX, FiEdit, FiHeadphones, FiBarChart2, FiEye, FiEyeOff } from "react-icons/fi";
 
 import { Button } from "../components/common/Button";
 import { Card } from "../components/common/Card";
@@ -132,6 +132,7 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
     const [timeInput, setTimeInput] = useState("");
 
     const [isGameplayMode, setIsGameplayMode] = useState(true);
+    const [isViewSVLine, setViewSVLine] = useState(true);
 
     const audioContextRef = useRef<AudioContext | null>(null);
     const audioBufferRef = useRef<AudioBuffer | null>(null);
@@ -626,13 +627,31 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
         }));
 
         const allTicks: Tick[] = [];
-        for (let i = 0; i < difficulty.timingPoints.length; i++) {
-            const tp = difficulty.timingPoints[i];
-            if (!tp.uninherited) continue;
 
-            const nextTime = i < difficulty.timingPoints.length - 1
-                ? difficulty.timingPoints[i + 1].time
-                : duration || Number.MAX_SAFE_INTEGER;
+        if (!duration || duration === 0) {
+            return {
+                hitObjects: hitObjectsWithStart,
+                ticks: []
+            };
+        }
+
+        const uninheritedPoints = difficulty.timingPoints.filter(tp => tp.uninherited);
+
+        if (uninheritedPoints.length === 0) {
+            return {
+                hitObjects: hitObjectsWithStart,
+                ticks: []
+            };
+        }
+
+        for (let i = 0; i < uninheritedPoints.length; i++) {
+            const tp = uninheritedPoints[i];
+
+            if (tp.time >= duration) continue;
+
+            const nextTime = i < uninheritedPoints.length - 1
+                ? Math.min(uninheritedPoints[i + 1].time, duration)
+                : duration;
 
             const sectionTicks = generateTicks(tp, nextTime, difficulty.timingPoints);
             allTicks.push(...sectionTicks);
@@ -998,13 +1017,21 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
         }
     }, [isPlaying, musicVolume, duration]);
 
+    const togglePlayMode = useCallback(() => {
+        setIsGameplayMode(prev => !prev);
+    }, [])
+
+    const toggleViewSVLine = useCallback(() => {
+        setViewSVLine(prev => !prev);
+    }, [])
+
     const restartFromBeginning = useCallback(() => {
         seekTo(0);
         setDebugInfo([]);
-        if (!isPlaying) {
+        if (isPlaying) {
             togglePlayPause();
         }
-    }, [seekTo, isPlaying, togglePlayPause]);
+    }, [seekTo, isPlaying]);
 
     useEffect(() => {
         if (audioGainNodeRef.current) {
@@ -1071,7 +1098,6 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
         const centerY = yOffset + 50;
 
         const DRUMROLL_LEFT = JUDGMENT_LINE_X - 50;
-        const SPINNER_LEFT = JUDGMENT_LINE_X - 25;
         const RIGHT_LIMIT = PLAYFIELD_WIDTH + 100;
 
         if (obj.type === "drumroll" && obj.endTime) {
@@ -1110,9 +1136,9 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
             const leftX = Math.min(headX, tailX);
             const rightX = Math.max(headX, tailX);
 
-            if (rightX < SPINNER_LEFT || leftX > RIGHT_LIMIT) return null;
+            if (rightX < DRUMROLL_LEFT || leftX > RIGHT_LIMIT) return null;
 
-            const displayX = Math.max(leftX, SPINNER_LEFT);
+            const displayX = Math.max(leftX, DRUMROLL_LEFT);
             const displayEndX = Math.min(rightX, RIGHT_LIMIT);
             const displayWidth = displayEndX - displayX;
 
@@ -1152,6 +1178,51 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
         }
     }, [getObjectX, calculateObjectEndPosition, PLAYFIELD_WIDTH, JUDGMENT_LINE_X]);
 
+
+    const renderSVLines = useCallback((difficulty: Difficulty, yOffset: number) => {
+        if (isGameplayMode || !isViewSVLine) return null;
+
+        const lines: JSX.Element[] = [];
+        const centerY = yOffset + 50;
+        const height = 70;
+
+        const svPoints = difficulty.timingPoints.filter(tp => !tp.uninherited && tp.svMultiplier !== undefined);
+
+        svPoints.forEach((svPoint, index) => {
+            const gameplayStart = calculateGameplayStart(svPoint.time, difficulty.timingPoints);
+            const x = getObjectX(svPoint.time, gameplayStart);
+
+            if (x < -50 || x > PLAYFIELD_WIDTH + 50) return;
+
+            const startY = centerY - height / 2;
+
+            lines.push(
+                <g key={`sv-${index}`}>
+                    <line
+                        x1={x}
+                        y1={startY}
+                        x2={x}
+                        y2={startY + height}
+                        stroke="#22c55e"
+                        strokeWidth={2}
+                        opacity={0.8}
+                    />
+                    <text
+                        x={x + 2}
+                        y={yOffset + 25}
+                        fill="#fff"
+                        fontSize="10"
+                        fontWeight="semibold"
+                    >
+                        {svPoint.svMultiplier?.toFixed(2)}x
+                    </text>
+                </g>
+            );
+        });
+
+        return lines;
+    }, [currentTime, getObjectX, PLAYFIELD_WIDTH, isGameplayMode, calculateGameplayStart, isViewSVLine]);
+
     const renderTicks = useCallback((difficulty: Difficulty, yOffset: number) => {
         const ticks: JSX.Element[] = [];
         const centerY = yOffset + 50;
@@ -1160,12 +1231,9 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
         if (!processedData) return ticks;
 
         processedData.ticks.forEach((tick, tickIndex) => {
-            if (currentTime < tick.gameplayStart - 100) return;
-            if (currentTime > tick.time + 500) return;
-
             const x = getObjectX(tick.time, tick.gameplayStart);
 
-            if (x < -10 || x > PLAYFIELD_WIDTH + 10) return;
+            if (x < -50 || x > PLAYFIELD_WIDTH + 50) return;
 
             let height = 10;
             let color = "#ffffff";
@@ -1179,12 +1247,6 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
                         color = "#ffffff";
                         opacity = 0.8;
                         strokeWidth = 2;
-                        break;
-                    case "beat":
-                        height = 30;
-                        color = "#ffffff";
-                        opacity = 0.5;
-                        strokeWidth = 1.5;
                         break;
                     default:
                         return;
@@ -1376,6 +1438,8 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
                                                     strokeWidth={2}
                                                     opacity={0.3}
                                                 />
+
+                                                {renderSVLines(diff, yOffset)}
                                             </g>
                                         );
                                     })}
@@ -1414,43 +1478,53 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
                         </div>
 
                         <div className="space-y-4">
-                            <div className="flex items-center gap-4">
-                                <Button
-                                    variant="primary"
-                                    size="sm"
-                                    icon={isPlaying ? <FiPause /> : <FiPlay />}
-                                    onClick={togglePlayPause}
-                                >
-                                    {isPlaying ? "Pause" : "Play"}
-                                </Button>
-
-                                <button
-                                    onClick={restartFromBeginning}
-                                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors text-sm font-medium"
-                                >
-                                    <FiSkipBack className="w-4 h-4" />
-                                    Restart
-                                </button>
-
-                                <div className="inline-flex rounded-lg border border-[#2a2a2a] bg-[#1a1a1a] p-0.5">
+                            <div className="flex items-center gap-2">
+                                <div className="relative group">
                                     <button
-                                        onClick={() => setIsGameplayMode(true)}
-                                        className={`px-2 py-1 rounded-md text-xs font-medium transition-all ${isGameplayMode
-                                            ? "bg-[#2563eb] text-white"
-                                            : "text-[#7b7b7b] hover:text-white"
-                                            }`}
+                                        onClick={togglePlayPause}
+                                        className="flex items-center h-8 px-2 py-1.5 rounded-lg bg-[#2563eb] hover:bg-[#1f56cc] text-white shadow-lg transition-colors text-sm font-medium"
                                     >
-                                        Gameplay
+                                        {isPlaying ? <FiPause className="w-4 h-4" /> : <FiPlay className="w-4 h-4" />}
                                     </button>
+                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+                                        {isPlaying ? "Pause" : "Play"}
+                                    </div>
+                                </div>
+
+                                <div className="relative group">
                                     <button
-                                        onClick={() => setIsGameplayMode(false)}
-                                        className={`px-2 py-1 rounded-md text-xs font-medium transition-all ${!isGameplayMode
-                                            ? "bg-[#2563eb] text-white"
-                                            : "text-[#7b7b7b] hover:text-white"
-                                            }`}
+                                        onClick={restartFromBeginning}
+                                        className="flex items-center h-8 px-2 py-1.5 rounded-lg border border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors text-sm font-medium"
                                     >
-                                        Edit
+                                        <FiSkipBack className="w-4 h-4" />
                                     </button>
+                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+                                        Restart
+                                    </div>
+                                </div>
+
+                                <div className="relative group">
+                                    <button
+                                        onClick={togglePlayMode}
+                                        className="flex items-center h-8 px-2 py-1.5 rounded-lg border border-purple-500/30 bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 transition-colors text-sm font-medium"
+                                    >
+                                        {isGameplayMode ? <FiHeadphones className="w-4 h-4" /> : <FiEdit className="w-4 h-4" />}
+                                    </button>
+                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+                                        {isGameplayMode ? "Edit mode" : "Gameplay mode"}
+                                    </div>
+                                </div>
+
+                                <div className="relative group">
+                                    <button
+                                        onClick={toggleViewSVLine}
+                                        className="flex items-center h-8 px-2 py-1.5 rounded-lg border border-green-500/30 bg-green-500/10 text-green-400 hover:bg-green-500/20 transition-colors text-sm font-medium"
+                                    >
+                                        {isViewSVLine ? <FiEye className="w-4 h-4" /> : <FiEyeOff className="w-4 h-4" />}
+                                    </button>
+                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+                                        {isViewSVLine ? "Hide SV lines" : "Show SV lines"}
+                                    </div>
                                 </div>
 
                                 <Button
@@ -1461,7 +1535,7 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
                                     {debugMode ? "Hide Debug" : "Show Debug"}
                                 </Button>
 
-                                <div className="flex items-center gap-2 text-sm font-mono">
+                                <div className="flex items-center gap-2 text-sm font-mono ml-auto">
                                     {isEditingTime ? (
                                         <div className="flex items-center gap-1">
                                             <input
