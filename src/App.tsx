@@ -13,6 +13,7 @@ import { BeatmapPreview } from "./pages/BeatmapPreview";
 import { BeatmapCustomizer } from "./pages/BeatmapCustomizer";
 import { Downloader } from "./pages/Downloader";
 import { BeatmapClone } from "./pages/BeatmapClone";
+import { MetadataEditor } from "./pages/MetadataEditor";
 
 
 const MAP_TOOLS: SidebarKey[] = [
@@ -59,14 +60,7 @@ function App() {
       case "beatmap_customizer":
         return <BeatmapCustomizer selectedBeatmap={selectedBeatmap} />;
       case "metadata_editor":
-        return (
-          <div className="max-w-4xl mx-auto">
-            <h1 className="text-2xl font-bold mb-4">Metadata Editor</h1>
-            <div className="bg-[#191919] p-6 rounded-lg border border-[#2a2a2a]">
-              <p className="text-[#7b7b7b]">Coming soon...</p>
-            </div>
-          </div>
-        );
+        return <MetadataEditor selectedBeatmap={selectedBeatmap} />
       case "offset_calibrator":
         return <OffsetCalibrator />;
       case "downloader":
