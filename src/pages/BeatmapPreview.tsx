@@ -81,6 +81,11 @@ interface HitAnimation {
     timestamp: number;
 }
 
+interface ModState {
+    isDT: boolean;
+    isHR: boolean;
+}
+
 const DIFFICULTY_ORDER = [
     "Kantan",
     "Futsuu",
@@ -150,6 +155,11 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
     const [isGameplayMode, setIsGameplayMode] = useState(true);
     const [isViewSVLine, setViewSVLine] = useState(true);
 
+    const [mods, setMods] = useState<ModState>({
+        isDT: false,
+        isHR: false
+    });
+
     const audioContextRef = useRef<AudioContext | null>(null);
     const audioBufferRef = useRef<AudioBuffer | null>(null);
     const audioSourceRef = useRef<AudioBufferSourceNode | null>(null);
@@ -165,14 +175,34 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
 
     const processedDifficultiesRef = useRef<Map<string, { hitObjects: HitObjectWithStart[], ticks: Tick[] }>>(new Map());
 
-    const SPEED_CONSTANT = 175;
     const APPROACH_TIME = 2000;
     const PLAYFIELD_WIDTH = 800;
     const JUDGMENT_LINE_X = 100;
     const VISIBLE_LENGTH = PLAYFIELD_WIDTH - JUDGMENT_LINE_X;
     const HIT_WINDOW = 50;
 
-    const EDIT_PIXELS_PER_MS = VISIBLE_LENGTH / APPROACH_TIME;
+    const getModMultipliers = useCallback(() => {
+        const speedRate = mods.isDT ? 1.5 : 1.0;
+        const arMultiplier = mods.isHR ? 1.4 : 1.0;
+        const odMultiplier = mods.isHR ? 1.4 : 1.0;
+        const svMultiplier = mods.isHR ? 1.4 : 1.0;
+
+        return { speedRate, arMultiplier, odMultiplier, svMultiplier };
+    }, [mods]);
+
+    const toggleDT = useCallback(() => {
+        setMods(prev => ({
+            ...prev,
+            isDT: !prev.isDT
+        }));
+    }, []);
+
+    const toggleHR = useCallback(() => {
+        setMods(prev => ({
+            ...prev,
+            isHR: !prev.isHR
+        }));
+    }, []);
 
     const createDonSound = () => {
         const audioContext = new AudioContext();
@@ -345,6 +375,7 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
     }, []);
 
     const getCurrentSV = useCallback((time: number, timingPoints: TimingPoint[]): number => {
+        const { svMultiplier: hrMultiplier } = getModMultipliers();
         let svMultiplier = 1.0;
 
         for (const tp of timingPoints) {
@@ -357,79 +388,84 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
             }
         }
 
-        return svMultiplier;
-    }, []);
+        return svMultiplier * hrMultiplier;
+    }, [getModMultipliers]);
 
     const calculateGameplayStart = useCallback((objectTime: number, timingPoints: TimingPoint[]): number => {
+        const { arMultiplier, svMultiplier: hrSVMultiplier } = getModMultipliers();
+
         if (isGameplayMode) {
             let currentBeatLength = 500;
-            let svMultiplier = 1.0;
+            let baseSvMultiplier = 1.0;
 
             for (const tp of timingPoints) {
                 if (tp.time > objectTime) break;
 
                 if (tp.uninherited) {
                     currentBeatLength = tp.beatLength;
-                    svMultiplier = 1.0;
+                    baseSvMultiplier = 1.0;
                 } else if (tp.svMultiplier !== undefined) {
-                    svMultiplier = tp.svMultiplier;
+                    baseSvMultiplier = tp.svMultiplier;
                 }
             }
-            const approachTime = (4 * currentBeatLength) / svMultiplier;
+
+            const finalSV = baseSvMultiplier * hrSVMultiplier;
+            const approachTime = (4 * currentBeatLength) / (finalSV * arMultiplier);
             return objectTime - approachTime;
         } else {
             return objectTime - APPROACH_TIME;
         }
-    }, [isGameplayMode, APPROACH_TIME]);
+    }, [isGameplayMode, APPROACH_TIME, getModMultipliers]);
 
-    const calculateObjectEndPosition = useCallback((
-        startTime: number,
-        endTime: number,
-        timingPoints: TimingPoint[]
-    ): number => {
-        if (isGameplayMode) {
-            let currentTime = startTime;
-            let visualLength = 0;
+    // const calculateObjectEndPosition = useCallback((
+    //     startTime: number,
+    //     endTime: number,
+    //     timingPoints: TimingPoint[]
+    // ): number => {
+    //     if (isGameplayMode) {
+    //         const { svMultiplier: hrSVMultiplier } = getModMultipliers();
+    //         let currentTime = startTime;
+    //         let visualLength = 0;
 
-            let currentBeatLength = 500;
-            let svMultiplier = 1.0;
+    //         let currentBeatLength = 500;
+    //         let svMultiplier = 1.0;
 
-            for (const tp of timingPoints) {
-                if (tp.time > startTime) break;
-                if (tp.uninherited) {
-                    currentBeatLength = tp.beatLength;
-                    svMultiplier = 1.0;
-                } else if (tp.svMultiplier !== undefined) {
-                    svMultiplier = tp.svMultiplier;
-                }
-            }
+    //         for (const tp of timingPoints) {
+    //             if (tp.time > startTime) break;
+    //             if (tp.uninherited) {
+    //                 currentBeatLength = tp.beatLength;
+    //                 svMultiplier = 1.0;
+    //             } else if (tp.svMultiplier !== undefined) {
+    //                 svMultiplier = tp.svMultiplier;
+    //             }
+    //         }
 
-            const relevantPoints = timingPoints.filter(tp => tp.time > startTime && tp.time < endTime);
+    //         const relevantPoints = timingPoints.filter(tp => tp.time > startTime && tp.time < endTime);
 
-            for (const tp of relevantPoints) {
-                const duration = tp.time - currentTime;
-                const speed = (SPEED_CONSTANT * svMultiplier) / currentBeatLength;
-                visualLength += duration * speed;
+    //         for (const tp of relevantPoints) {
+    //             const duration = tp.time - currentTime;
+    //             const speed = (SPEED_CONSTANT * svMultiplier * hrSVMultiplier) / currentBeatLength;
+    //             visualLength += duration * speed;
 
-                currentTime = tp.time;
-                if (tp.uninherited) {
-                    currentBeatLength = tp.beatLength;
-                    svMultiplier = 1.0;
-                } else if (tp.svMultiplier !== undefined) {
-                    svMultiplier = tp.svMultiplier;
-                }
-            }
+    //             currentTime = tp.time;
+    //             if (tp.uninherited) {
+    //                 currentBeatLength = tp.beatLength;
+    //                 svMultiplier = 1.0;
+    //             } else if (tp.svMultiplier !== undefined) {
+    //                 svMultiplier = tp.svMultiplier;
+    //             }
+    //         }
 
-            const finalDuration = endTime - currentTime;
-            const finalSpeed = (SPEED_CONSTANT * svMultiplier) / currentBeatLength;
-            visualLength += finalDuration * finalSpeed;
+    //         const finalDuration = endTime - currentTime;
+    //         const finalSpeed = (SPEED_CONSTANT * svMultiplier * hrSVMultiplier) / currentBeatLength;
+    //         visualLength += finalDuration * finalSpeed;
 
-            return visualLength;
-        } else {
-            const duration = endTime - startTime;
-            return duration * EDIT_PIXELS_PER_MS;
-        }
-    }, [isGameplayMode, EDIT_PIXELS_PER_MS, SPEED_CONSTANT]);
+    //         return visualLength;
+    //     } else {
+    //         const duration = endTime - startTime;
+    //         return duration * EDIT_PIXELS_PER_MS;
+    //     }
+    // }, [isGameplayMode, EDIT_PIXELS_PER_MS, SPEED_CONSTANT, getModMultipliers]);
 
     const generateTicks = useCallback((timingPoint: TimingPoint, nextTime: number, timingPoints: TimingPoint[]): Tick[] => {
         const ticks: Tick[] = [];
@@ -692,7 +728,30 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
         });
 
         processedDifficultiesRef.current = newProcessed;
-    }, [beatmapData, processDifficulty, isGameplayMode]);
+    }, [beatmapData, processDifficulty, isGameplayMode, mods]);
+
+    useEffect(() => {
+        if (isPlaying && audioContextRef.current) {
+            const { speedRate } = getModMultipliers();
+
+            if (audioSourceRef.current) {
+                const elapsedMs = (audioContextRef.current.currentTime - audioStartTimeRef.current) * 1000 * speedRate;
+                audioOffsetRef.current = audioOffsetRef.current + elapsedMs;
+
+                try {
+                    audioSourceRef.current.stop();
+                } catch (e) {
+                    // エラーを握りつぶす
+                }
+                audioSourceRef.current.disconnect();
+                audioSourceRef.current = null;
+                audioGainNodeRef.current = null;
+            }
+
+            setIsPlaying(false);
+            setCurrentTime(audioOffsetRef.current);
+        }
+    }, [mods]);
 
     const cleanupAudio = useCallback(() => {
         if (audioSourceRef.current) {
@@ -709,6 +768,8 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
         audioStartTimeRef.current = 0;
         setIsPlaying(false);
         setCurrentTime(0);
+        setIsGameplayMode(true);
+        setViewSVLine(true);
         lastHitTimeRef.current.clear();
         setDebugInfo([]);
         setHitAnimations([]);
@@ -843,14 +904,38 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
         lastHitTimeRef.current.clear();
     }, [selectedDifficulties]);
 
+    const createAudioSource = useCallback((startOffsetSec: number) => {
+        if (!audioContextRef.current || !audioBufferRef.current) return null;
+
+        const source = audioContextRef.current.createBufferSource();
+        const gainNode = audioContextRef.current.createGain();
+
+        source.buffer = audioBufferRef.current;
+
+        if (mods.isDT) {
+            source.playbackRate.value = 1.5;
+        }
+
+        source.connect(gainNode);
+        gainNode.connect(audioContextRef.current.destination);
+        gainNode.gain.value = musicVolume;
+
+        if (startOffsetSec < audioBufferRef.current.duration) {
+            source.start(0, startOffsetSec);
+        }
+
+        return { source, gainNode };
+    }, [musicVolume, mods]);
+
     const getCurrentTimeMs = useCallback((): number => {
         if (!audioContextRef.current || !isPlaying) {
             return audioOffsetRef.current;
         }
 
-        const elapsedMs = (audioContextRef.current.currentTime - audioStartTimeRef.current) * 1000;
+        const { speedRate } = getModMultipliers();
+        const elapsedMs = (audioContextRef.current.currentTime - audioStartTimeRef.current) * 1000 * speedRate;
         return audioOffsetRef.current + elapsedMs;
-    }, [isPlaying]);
+    }, [isPlaying, getModMultipliers]);
 
     const updateTime = useCallback(() => {
         if (!isPlaying) return;
@@ -967,34 +1052,24 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
                 audioSourceRef.current.disconnect();
             }
 
-            const elapsedMs = (audioContextRef.current.currentTime - audioStartTimeRef.current) * 1000;
+            const { speedRate } = getModMultipliers();
+            const elapsedMs = (audioContextRef.current.currentTime - audioStartTimeRef.current) * 1000 * speedRate;
             audioOffsetRef.current = audioOffsetRef.current + elapsedMs;
 
             audioSourceRef.current = null;
             audioGainNodeRef.current = null;
             setIsPlaying(false);
         } else {
-            const source = audioContextRef.current.createBufferSource();
-            const gainNode = audioContextRef.current.createGain();
+            const audioNodes = createAudioSource(audioOffsetRef.current / 1000);
 
-            source.buffer = audioBufferRef.current;
-            source.connect(gainNode);
-            gainNode.connect(audioContextRef.current.destination);
-            gainNode.gain.value = musicVolume;
-
-            const startOffsetSec = audioOffsetRef.current / 1000;
-
-            if (startOffsetSec < audioBufferRef.current.duration) {
-                source.start(0, startOffsetSec);
-
-                audioSourceRef.current = source;
-                audioGainNodeRef.current = gainNode;
+            if (audioNodes) {
+                audioSourceRef.current = audioNodes.source;
+                audioGainNodeRef.current = audioNodes.gainNode;
                 audioStartTimeRef.current = audioContextRef.current.currentTime;
-
                 setIsPlaying(true);
             }
         }
-    }, [isPlaying, musicVolume]);
+    }, [isPlaying, createAudioSource, getModMultipliers]);
 
     const seekTo = useCallback((timeMs: number) => {
         if (!audioContextRef.current || !audioBufferRef.current) return;
@@ -1013,25 +1088,15 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
         lastHitTimeRef.current.clear();
 
         if (wasPlaying) {
-            const source = audioContextRef.current.createBufferSource();
-            const gainNode = audioContextRef.current.createGain();
+            const audioNodes = createAudioSource(audioOffsetRef.current / 1000);
 
-            source.buffer = audioBufferRef.current;
-            source.connect(gainNode);
-            gainNode.connect(audioContextRef.current.destination);
-            gainNode.gain.value = musicVolume;
-
-            const startOffsetSec = audioOffsetRef.current / 1000;
-
-            if (startOffsetSec < audioBufferRef.current.duration) {
-                source.start(0, startOffsetSec);
-
-                audioSourceRef.current = source;
-                audioGainNodeRef.current = gainNode;
+            if (audioNodes) {
+                audioSourceRef.current = audioNodes.source;
+                audioGainNodeRef.current = audioNodes.gainNode;
                 audioStartTimeRef.current = audioContextRef.current.currentTime;
             }
         }
-    }, [isPlaying, musicVolume, duration]);
+    }, [isPlaying, duration, createAudioSource]);
 
     const togglePlayMode = useCallback(() => {
         setIsGameplayMode(prev => !prev);
@@ -1047,7 +1112,7 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
         if (isPlaying) {
             togglePlayPause();
         }
-    }, [seekTo, isPlaying]);
+    }, [seekTo, isPlaying, togglePlayPause]);
 
     useEffect(() => {
         if (audioGainNodeRef.current) {
@@ -1192,7 +1257,7 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
                 />
             );
         }
-    }, [getObjectX, calculateObjectEndPosition, PLAYFIELD_WIDTH, JUDGMENT_LINE_X]);
+    }, [getObjectX, calculateGameplayStart, PLAYFIELD_WIDTH, JUDGMENT_LINE_X]);
 
 
     const renderSVLines = useCallback((difficulty: Difficulty, yOffset: number) => {
@@ -1543,6 +1608,36 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
                                     </div>
                                 </div>
 
+                                <div className="relative group">
+                                    <button
+                                        onClick={toggleDT}
+                                        className={`flex items-center h-8 px-2 py-1.5 rounded-lg border text-sm font-bold transition-all ${mods.isDT
+                                            ? "border-[#2563eb] bg-[#2563eb]/20 text-white"
+                                            : "border-[#2a2a2a] bg-[#171717] text-[#7b7b7b] hover:border-[#3a3a3a]"
+                                            }`}
+                                    >
+                                        DT
+                                    </button>
+                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+                                        {mods.isHR ? "Disable DT" : "Enable DT"}
+                                    </div>
+                                </div>
+
+                                <div className="relative group">
+                                    <button
+                                        onClick={toggleHR}
+                                        className={`flex items-center h-8 px-2 py-1.5 rounded-lg border text-sm font-bold transition-all ${mods.isHR
+                                            ? "border-red-500 bg-red-500/20 text-white"
+                                            : "border-[#2a2a2a] bg-[#171717] text-[#7b7b7b] hover:border-[#3a3a3a]"
+                                            }`}
+                                    >
+                                        HR
+                                    </button>
+                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+                                        {mods.isHR ? "Disable HR" : "Enable HR"}
+                                    </div>
+                                </div>
+
                                 <Button
                                     variant="ghost"
                                     size="sm"
@@ -1607,6 +1702,10 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
                                     <div className="text-xs font-mono text-[#7b7b7b] space-y-1">
                                         <div className="text-[#e0e0e0] mb-2">Debug Info:</div>
                                         <div>Mode: {isGameplayMode ? "Gameplay" : "Edit"}</div>
+                                        <div>Mods: {[
+                                            mods.isDT && "DT",
+                                            mods.isHR && "HR"
+                                        ].filter(Boolean).join(", ") || "None"}</div>
                                         <div>Current Time: {currentTime.toFixed(1)}ms</div>
                                         <div>Raw Audio Time: {getCurrentTimeMs().toFixed(1)}ms</div>
                                         <div>AudioLeadIn: {audioLeadIn}ms</div>
