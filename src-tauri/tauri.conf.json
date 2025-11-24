@@ -47,8 +47,7 @@
   "bundle": {
     "active": true,
     "targets": [
-      "nsis",
-      "msi"
+      "nsis"
     ],
     "externalBin": [
       "binaries/yt-dlp",
