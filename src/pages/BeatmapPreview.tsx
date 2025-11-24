@@ -1,6 +1,22 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { FiPlay, FiPause, FiRefreshCw, FiMusic, FiAlertCircle, FiVolume2, FiVolumeX, FiSkipBack, FiEdit2, FiCheck, FiX, FiEdit, FiHeadphones, FiBarChart2, FiEye, FiEyeOff } from "react-icons/fi";
+import {
+    FiPlay,
+    FiPause,
+    FiRefreshCw,
+    FiMusic,
+    FiAlertCircle,
+    FiVolume2,
+    FiVolumeX,
+    FiSkipBack,
+    FiEdit2,
+    FiCheck,
+    FiX,
+    FiEdit,
+    FiHeadphones,
+    FiEye,
+    FiEyeOff
+} from "react-icons/fi";
 
 import { Button } from "../components/common/Button";
 import { Card } from "../components/common/Card";
