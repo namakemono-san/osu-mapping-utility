@@ -228,3 +228,8 @@ pub fn read_osu_file(file_path: String) -> Result<String, String> {
 pub fn read_audio_file(file_path: String) -> Result<Vec<u8>, String> {
     fs::read(&file_path).map_err(|e| format!("Failed to read audio file: {}", e))
 }
+
+#[tauri::command]
+pub fn write_osu_file(file_path: String, content: String) -> Result<(), String> {
+    std::fs::write(&file_path, content).map_err(|e| format!("Failed to write file: {}", e))
+}
