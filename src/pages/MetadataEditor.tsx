@@ -324,7 +324,6 @@ export function MetadataEditor({ selectedBeatmap }: MetadataEditorProps) {
         let inMetadata = false;
         let inEvents = false;
         let backgroundProcessed = false;
-        let videoProcessed = false;
 
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
@@ -366,11 +365,6 @@ export function MetadataEditor({ selectedBeatmap }: MetadataEditorProps) {
             }
 
             if (inEvents) {
-                if (trimmed.startsWith("Video,") || trimmed.startsWith("Video ")) {
-                    videoProcessed = true;
-                    continue;
-                }
-
                 if (trimmed.startsWith("0,0,") || trimmed.startsWith("Background,")) {
                     if (!backgroundProcessed && background.filename) {
                         result.push(`0,0,"${background.filename}",${background.xOffset},${background.yOffset}`);
