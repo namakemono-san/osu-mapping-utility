@@ -318,11 +318,13 @@ export function MetadataEditor({ selectedBeatmap }: MetadataEditorProps) {
     }, [selectedBeatmap, files, mergedData]);
 
     const updateMetadata = (content: string, newData: Metadata, background: BackgroundData): string => {
+        const lineBreak = content.includes('\r\n') ? '\r\n' : '\n';
         const lines = content.split(/\r?\n/);
         const result: string[] = [];
         let inMetadata = false;
         let inEvents = false;
-        let backgroundAdded = false;
+        let backgroundProcessed = false;
+        let videoProcessed = false;
 
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
@@ -364,26 +366,40 @@ export function MetadataEditor({ selectedBeatmap }: MetadataEditorProps) {
             }
 
             if (inEvents) {
-                if (trimmed.startsWith("0,0,") || trimmed.startsWith("//Background")) {
-                    if (!backgroundAdded && background.filename) {
+                if (trimmed.startsWith("Video,") || trimmed.startsWith("Video ")) {
+                    videoProcessed = true;
+                    continue;
+                }
+
+                if (trimmed.startsWith("0,0,") || trimmed.startsWith("Background,")) {
+                    if (!backgroundProcessed && background.filename) {
                         result.push(`0,0,"${background.filename}",${background.xOffset},${background.yOffset}`);
-                        backgroundAdded = true;
+                        backgroundProcessed = true;
                     }
                     continue;
                 }
 
-                if (!backgroundAdded && background.filename && i > 0 && /^\[Events\]$/i.test(lines[i - 1].trim())) {
-                    result.push("//Background and Video events");
+                if (trimmed === "//Background and Video events") {
+                    result.push(line);
+
+                    if (!backgroundProcessed && background.filename) {
+                        result.push(`0,0,"${background.filename}",${background.xOffset},${background.yOffset}`);
+                        backgroundProcessed = true;
+                    }
+
+                    continue;
+                }
+
+                if (trimmed === "//Break Periods" && !backgroundProcessed && background.filename) {
                     result.push(`0,0,"${background.filename}",${background.xOffset},${background.yOffset}`);
-                    result.push("//Break Periods");
-                    backgroundAdded = true;
+                    backgroundProcessed = true;
                 }
             }
 
             result.push(line);
         }
 
-        return result.join("\n");
+        return result.join(lineBreak);
     };
 
     if (!selectedBeatmap) {
@@ -575,8 +591,8 @@ export function MetadataEditor({ selectedBeatmap }: MetadataEditorProps) {
                                                     key={value}
                                                     onClick={() => setMergedData({ ...mergedData, [conflict.field]: value })}
                                                     className={`block w-full text-left px-2 py-1.5 rounded border transition-colors ${mergedData[conflict.field] === value
-                                                            ? "bg-[#2563eb]/20 border-[#2563eb] text-white"
-                                                            : "bg-[#101010] border-[#2a2a2a] text-[#7b7b7b] hover:border-[#4a4a4a]"
+                                                        ? "bg-[#2563eb]/20 border-[#2563eb] text-white"
+                                                        : "bg-[#101010] border-[#2a2a2a] text-[#7b7b7b] hover:border-[#4a4a4a]"
                                                         }`}
                                                 >
                                                     <div className="font-mono">"{value || "(empty)"}"</div>
@@ -620,8 +636,8 @@ export function MetadataEditor({ selectedBeatmap }: MetadataEditorProps) {
                     {result && (
                         <Card
                             className={`flex items-center gap-2.5 px-3 py-2.5 ${result.success
-                                    ? "bg-green-500/10 border-green-500/30 text-green-400"
-                                    : "bg-red-500/10 border-red-500/30 text-red-400"
+                                ? "bg-green-500/10 border-green-500/30 text-green-400"
+                                : "bg-red-500/10 border-red-500/30 text-red-400"
                                 }`}
                         >
                             {result.success ? (

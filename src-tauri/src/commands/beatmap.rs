@@ -4,6 +4,7 @@ use once_cell::sync::Lazy;
 use rayon::prelude::*;
 use std::collections::HashMap;
 use std::fs;
+use std::io::Write;
 use std::path::Path;
 use std::process::Command;
 use std::sync::Mutex;
@@ -231,5 +232,11 @@ pub fn read_audio_file(file_path: String) -> Result<Vec<u8>, String> {
 
 #[tauri::command]
 pub fn write_osu_file(file_path: String, content: String) -> Result<(), String> {
-    std::fs::write(&file_path, content).map_err(|e| format!("Failed to write file: {}", e))
+    let mut file = std::fs::File::create(&file_path)
+        .map_err(|e| format!("Failed to create file: {}", e))?;
+    
+    file.write_all(content.as_bytes())
+        .map_err(|e| format!("Failed to write file: {}", e))?;
+    
+    Ok(())
 }
