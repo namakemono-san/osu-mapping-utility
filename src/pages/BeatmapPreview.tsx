@@ -134,8 +134,8 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
     const [selectedDifficulties, setSelectedDifficulties] = useState<Set<string>>(new Set());
 
     const [isPlaying, setIsPlaying] = useState(false);
-    const [musicVolume, setMusicVolume] = useState(0.35);
-    const [hitsoundVolume, setHitsoundVolume] = useState(0.30);
+    const [musicVolume, setMusicVolume] = useState(0.20);
+    const [hitsoundVolume, setHitsoundVolume] = useState(0.15);
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
     const [hitAnimations, setHitAnimations] = useState<HitAnimation[]>([]);
