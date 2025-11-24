@@ -1113,7 +1113,7 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
         const size = obj.type.includes("big") ? 60 : 40;
         const centerY = yOffset + 50;
 
-        const DRUMROLL_LEFT = JUDGMENT_LINE_X - 50;
+        const DRUMROLL_LEFT = JUDGMENT_LINE_X - 25;
         const RIGHT_LIMIT = PLAYFIELD_WIDTH + 100;
 
         if (obj.type === "drumroll" && obj.endTime) {
