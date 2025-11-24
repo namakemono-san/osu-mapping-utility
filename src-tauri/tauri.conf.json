@@ -65,7 +65,7 @@
   "plugins": {
     "updater": {
       "dialog": true,
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDdFRUFFQUE5MDkzQjhFM0QKUldROWpqc0pxZXJxZmxwTmI2dU5Xdm1OT3I3cFUyZFl3MDZJNlBNSDk2ZWZrejhvT3dZTm4vdXUK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IERERTQ2MzI4REExMTUyRQpSV1F1RmFHTk1rYmVEWUh2RkhEcUp2SXEybFgrZ0xLVktpaW1nMVNhUU5ZTFFnclFUVGVKZjRkbgo=",
       "endpoints": [
         "https://github.com/namakemono-san/osu-mapping-utility/releases/latest/download/latest.json"
       ]
