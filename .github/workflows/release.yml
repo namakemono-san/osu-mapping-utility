@@ -35,5 +35,6 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "osu! mapping utility v__VERSION__"
-          releaseDraft: false
+          releaseBody: "See the assets to download this version and install."
+          releaseDraft: true
           prerelease: false
