@@ -8,16 +8,7 @@ import { convertFileSrc } from "@tauri-apps/api/core";
 import { openPath } from "@tauri-apps/plugin-opener";
 
 import { Button } from "./common/Button";
-
-interface Beatmapset {
-    folder_name: string;
-    title: string;
-    artist: string;
-    creator: string;
-    background_path: string | null;
-    beatmapID: string;
-    beatmapSetID: string;
-}
+import { Beatmapset } from "../types/beatmap";
 
 type MapSelectorProps = {
     onSelect?: (beatmap: Beatmapset) => void;

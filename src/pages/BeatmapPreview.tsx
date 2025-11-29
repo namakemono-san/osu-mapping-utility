@@ -21,13 +21,10 @@ import {
 import { Button } from "../components/common/Button";
 import { Card } from "../components/common/Card";
 
+import { Beatmapset } from "../types/beatmap";
+
 interface BeatmapPreviewProps {
-    selectedBeatmap?: {
-        folder_name: string;
-        title: string;
-        artist: string;
-        creator: string;
-    };
+    selectedBeatmap?: Beatmapset | null;
 }
 
 interface HitObject {

@@ -7,13 +7,10 @@ import { Input } from "../components/common/Input";
 import { Select } from "../components/common/Select";
 import { StatusMessage } from "../components/common/StatusMessage";
 
+import { Beatmapset } from "../types/beatmap";
+
 interface BeatmapCloneProps {
-    selectedBeatmap?: {
-        folder_name: string;
-        title: string;
-        artist: string;
-        creator: string;
-    };
+    selectedBeatmap?: Beatmapset | null;
 }
 
 type GameMode = "osu" | "taiko" | "catch" | "mania";

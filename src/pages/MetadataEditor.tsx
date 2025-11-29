@@ -9,12 +9,10 @@ import { Modal } from "../components/common/Modal";
 import { Button } from "../components/common/Button";
 import { StatusMessage } from "../components/common/StatusMessage";
 
+import { Beatmapset } from "../types/beatmap";
+
 interface MetadataEditorProps {
-    selectedBeatmap?: {
-        folder_name: string;
-        title: string;
-        artist: string;
-    };
+    selectedBeatmap?: Beatmapset | null;
 }
 
 interface Metadata {
