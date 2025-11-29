@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { useEffect, useRef, useCallback, useMemo } from "react";
 import { FiLink, FiFolder, FiDownload, FiFilm, FiMusic, FiTrash2 } from "react-icons/fi";
 
 import { invoke } from "@tauri-apps/api/core";
@@ -12,16 +12,23 @@ import { Select } from "../components/common/Select";
 import { Switch } from "../components/common/Switch";
 import { Chip } from "../components/common/Chip";
 
-type AudioFormat = "mp3" | "ogg";
+import { useDownloaderSettings } from "../hooks/useStorage";
+import { useState } from "react";
 
 export function Downloader() {
     const [url, setUrl] = useState("");
-    const [outDir, setOutDir] = useState("");
-    const [audioFormat, setAudioFormat] = useState<AudioFormat>("mp3");
-    const [includeVideo, setIncludeVideo] = useState(false);
     const [busy, setBusy] = useState(false);
     const [log, setLog] = useState("");
     const logRef = useRef<HTMLPreElement | null>(null);
+
+    const {
+        audioFormat,
+        setAudioFormat,
+        includeVideo,
+        setIncludeVideo,
+        outDir,
+        setOutDir,
+    } = useDownloaderSettings();
 
     const appendLog = useCallback((payload: string) => {
         const line = typeof payload === "string" ? payload : JSON.stringify(payload);
@@ -33,11 +40,12 @@ export function Downloader() {
             directory: true,
             multiple: false,
             title: "Select output folder",
+            defaultPath: outDir || undefined,
         });
         if (typeof dir === "string") {
             setOutDir(dir);
         }
-    }, []);
+    }, [outDir, setOutDir]);
 
     const startDownload = useCallback(async () => {
         if (!url.trim()) {
@@ -104,7 +112,7 @@ export function Downloader() {
 
                 <Select
                     value={audioFormat}
-                    onChange={(e) => setAudioFormat(e.target.value as AudioFormat)}
+                    onChange={(e) => setAudioFormat(e.target.value as "mp3" | "ogg")}
                     disabled={busy}
                     icon={<FiMusic />}
                     className="min-w-[220px]"

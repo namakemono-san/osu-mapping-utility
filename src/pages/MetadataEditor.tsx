@@ -10,6 +10,7 @@ import { Button } from "../components/common/Button";
 import { StatusMessage } from "../components/common/StatusMessage";
 
 import { Beatmapset } from "../types/beatmap";
+import { useSongsFolder } from "../hooks/useStorage";
 
 interface MetadataEditorProps {
     selectedBeatmap?: Beatmapset | null;
@@ -56,6 +57,8 @@ const FIELD_LABELS: Record<ConflictField, string> = {
 };
 
 export function MetadataEditor({ selectedBeatmap }: MetadataEditorProps) {
+    const [songsFolder] = useSongsFolder();
+
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [files, setFiles] = useState<FileMetadata[]>([]);
@@ -223,7 +226,6 @@ export function MetadataEditor({ selectedBeatmap }: MetadataEditorProps) {
         setResult(null);
 
         try {
-            const songsFolder = localStorage.getItem("songsFolder");
             if (!songsFolder) {
                 throw new Error("Songs folder not found");
             }
@@ -317,7 +319,6 @@ export function MetadataEditor({ selectedBeatmap }: MetadataEditorProps) {
             setLoading(true);
             setResult(null);
             try {
-                const songsFolder = localStorage.getItem("songsFolder");
                 if (!songsFolder) {
                     throw new Error("Songs folder not found");
                 }

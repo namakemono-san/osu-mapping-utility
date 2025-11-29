@@ -8,7 +8,9 @@ import { convertFileSrc } from "@tauri-apps/api/core";
 import { openPath } from "@tauri-apps/plugin-opener";
 
 import { Button } from "./common/Button";
+
 import { Beatmapset } from "../types/beatmap";
+import { useSongsFolder } from "../hooks/useStorage";
 
 type MapSelectorProps = {
     onSelect?: (beatmap: Beatmapset) => void;
@@ -147,9 +149,7 @@ export function MapSelector({
     const [beatmaps, setBeatmaps] = useState<Beatmapset[]>([]);
     const [search, setSearch] = useState("");
     const [isScanning, setIsScanning] = useState(false);
-    const [songsFolder, setSongsFolder] = useState<string | null>(() =>
-        localStorage.getItem("songsFolder")
-    );
+    const [songsFolder, setSongsFolder] = useSongsFolder();
     const [detectStatus, setDetectStatus] = useState<string>("");
     const [currentIndex, setCurrentIndex] = useState(0);
     const [hasMore, setHasMore] = useState(true);
@@ -184,7 +184,6 @@ export function MapSelector({
             const path = await invoke<string>("detect_osu_path");
             setDetectStatus(`Found: ${path}`);
             setSongsFolder(path);
-            localStorage.setItem("songsFolder", path);
             return path;
         } catch (err) {
             console.error("[detect] Auto-detection failed:", err);
@@ -205,7 +204,6 @@ export function MapSelector({
             await invoke("invalidate_cache_for_path", { basePath: selected });
 
             setSongsFolder(selected);
-            localStorage.setItem("songsFolder", selected);
             setDetectStatus(`Selected: ${selected}`);
             return selected;
         }
