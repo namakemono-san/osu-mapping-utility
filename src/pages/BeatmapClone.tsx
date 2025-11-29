@@ -8,6 +8,7 @@ import { Select } from "../components/common/Select";
 import { StatusMessage } from "../components/common/StatusMessage";
 
 import { Beatmapset } from "../types/beatmap";
+import { useSongsFolder } from "../hooks/useStorage";
 
 interface BeatmapCloneProps {
     selectedBeatmap?: Beatmapset | null;
@@ -33,6 +34,8 @@ export function BeatmapClone({ selectedBeatmap }: BeatmapCloneProps) {
     const [processing, setProcessing] = useState(false);
     const [result, setResult] = useState<{ success: boolean; message: string } | null>(null);
     const [loading, setLoading] = useState(false);
+
+    const [songsFolder] = useSongsFolder();
 
     const [gameMode, setGameMode] = useState<GameMode>("taiko");
     const [selectedDifficulties, setSelectedDifficulties] = useState<Set<string>>(new Set());
@@ -107,7 +110,6 @@ export function BeatmapClone({ selectedBeatmap }: BeatmapCloneProps) {
         setResult(null);
 
         try {
-            const songsFolder = localStorage.getItem("songsFolder");
             if (!songsFolder) {
                 throw new Error("Songs folder not found");
             }
@@ -172,7 +174,6 @@ export function BeatmapClone({ selectedBeatmap }: BeatmapCloneProps) {
         (async () => {
             setLoading(true);
             try {
-                const songsFolder = localStorage.getItem("songsFolder");
                 if (!songsFolder) {
                     console.error("Songs folder not found");
                     return;
@@ -313,8 +314,8 @@ export function BeatmapClone({ selectedBeatmap }: BeatmapCloneProps) {
                                     key={diff}
                                     onClick={() => toggleDifficulty(diff)}
                                     className={`px-3 py-2 rounded-lg border text-sm font-medium transition-all duration-200 hover:scale-105 active:scale-95 ${selectedDifficulties.has(diff)
-                                            ? "bg-[#2563eb]/20 border-[#2563eb] text-white shadow-lg shadow-[#2563eb]/20"
-                                            : "bg-[#171717] border-[#2a2a2a] text-[#e0e0e0]"
+                                        ? "bg-[#2563eb]/20 border-[#2563eb] text-white shadow-lg shadow-[#2563eb]/20"
+                                        : "bg-[#171717] border-[#2a2a2a] text-[#e0e0e0]"
                                         }`}
                                 >
                                     {diff}
@@ -413,8 +414,8 @@ export function BeatmapClone({ selectedBeatmap }: BeatmapCloneProps) {
                             <button
                                 onClick={() => setKeepTimingPoints(!keepTimingPoints)}
                                 className={`flex flex-col gap-1 px-3 py-2.5 rounded-lg border text-left transition-all duration-200 hover:scale-105 active:scale-95 w-full ${keepTimingPoints
-                                        ? "bg-[#2563eb]/20 border-[#2563eb] shadow-lg shadow-[#2563eb]/20"
-                                        : "bg-[#171717] border-[#2a2a2a]"
+                                    ? "bg-[#2563eb]/20 border-[#2563eb] shadow-lg shadow-[#2563eb]/20"
+                                    : "bg-[#171717] border-[#2a2a2a]"
                                     }`}
                             >
                                 <div className="font-medium text-sm">
@@ -428,8 +429,8 @@ export function BeatmapClone({ selectedBeatmap }: BeatmapCloneProps) {
                             <button
                                 onClick={() => setRemoveSkinFiles(!removeSkinFiles)}
                                 className={`flex flex-col gap-1 px-3 py-2.5 rounded-lg border text-left transition-all duration-200 hover:scale-105 active:scale-95 w-full ${removeSkinFiles
-                                        ? "bg-[#2563eb]/20 border-[#2563eb] shadow-lg shadow-[#2563eb]/20"
-                                        : "bg-[#171717] border-[#2a2a2a]"
+                                    ? "bg-[#2563eb]/20 border-[#2563eb] shadow-lg shadow-[#2563eb]/20"
+                                    : "bg-[#171717] border-[#2a2a2a]"
                                     }`}
                             >
                                 <div className="font-medium text-sm">Remove Skin Files</div>
@@ -441,8 +442,8 @@ export function BeatmapClone({ selectedBeatmap }: BeatmapCloneProps) {
                             <button
                                 onClick={() => setResetSampleSet(!resetSampleSet)}
                                 className={`flex flex-col gap-1 px-3 py-2.5 rounded-lg border text-left transition-all duration-200 hover:scale-105 active:scale-95 w-full ${resetSampleSet
-                                        ? "bg-[#2563eb]/20 border-[#2563eb] shadow-lg shadow-[#2563eb]/20"
-                                        : "bg-[#171717] border-[#2a2a2a]"
+                                    ? "bg-[#2563eb]/20 border-[#2563eb] shadow-lg shadow-[#2563eb]/20"
+                                    : "bg-[#171717] border-[#2a2a2a]"
                                     }`}
                             >
                                 <div className="font-medium text-sm">
@@ -456,8 +457,8 @@ export function BeatmapClone({ selectedBeatmap }: BeatmapCloneProps) {
                             <button
                                 onClick={() => setResetDifficulty(!resetDifficulty)}
                                 className={`flex flex-col gap-1 px-3 py-2.5 rounded-lg border text-left transition-all duration-200 hover:scale-105 active:scale-95 w-full ${resetDifficulty
-                                        ? "bg-[#2563eb]/20 border-[#2563eb] shadow-lg shadow-[#2563eb]/20"
-                                        : "bg-[#171717] border-[#2a2a2a]"
+                                    ? "bg-[#2563eb]/20 border-[#2563eb] shadow-lg shadow-[#2563eb]/20"
+                                    : "bg-[#171717] border-[#2a2a2a]"
                                     }`}
                             >
                                 <div className="font-medium text-sm">Reset Difficulty Settings</div>
@@ -469,8 +470,8 @@ export function BeatmapClone({ selectedBeatmap }: BeatmapCloneProps) {
                             <button
                                 onClick={() => setRemoveColours(!removeColours)}
                                 className={`flex flex-col gap-1 px-3 py-2.5 rounded-lg border text-left transition-all duration-200 hover:scale-105 active:scale-95 w-full ${removeColours
-                                        ? "bg-[#2563eb]/20 border-[#2563eb] shadow-lg shadow-[#2563eb]/20"
-                                        : "bg-[#171717] border-[#2a2a2a]"
+                                    ? "bg-[#2563eb]/20 border-[#2563eb] shadow-lg shadow-[#2563eb]/20"
+                                    : "bg-[#171717] border-[#2a2a2a]"
                                     }`}
                             >
                                 <div className="font-medium text-sm">Remove Colours Section</div>

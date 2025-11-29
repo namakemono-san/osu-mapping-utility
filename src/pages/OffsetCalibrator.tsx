@@ -4,6 +4,8 @@ import {
     FiZoomIn, FiZoomOut, FiVolume2, FiMaximize, FiRefreshCw
 } from "react-icons/fi";
 
+import { useCalibratorSettings } from "../hooks/useStorage";
+
 type Props = {
     defaultBpm?: number;
 };
@@ -22,10 +24,15 @@ export function OffsetCalibrator({ defaultBpm = 120 }: Props) {
     const [isPlaying, setPlaying] = useState(false);
     const [playStartAt, setPlayStartAt] = useState(0);
     const [playStartCtxTime, setPlayStartCtxTime] = useState(0);
-    const [playVol, setPlayVol] = useState(0.35);
 
-    const [metroOn, setMetroOn] = useState(true);
-    const [metroVol, setMetroVol] = useState(0.25);
+    const {
+        playVolume: playVol,
+        setPlayVolume: setPlayVol,
+        metroVolume: metroVol,
+        setMetroVolume: setMetroVol,
+        metroOn,
+        setMetroOn,
+    } = useCalibratorSettings();
 
     const [zoom, setZoom] = useState(1);
     const [viewStartMs, setViewStartMs] = useState(0);

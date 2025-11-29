@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {
     FiPlay,
@@ -22,6 +22,7 @@ import { Button } from "../components/common/Button";
 import { Card } from "../components/common/Card";
 
 import { Beatmapset } from "../types/beatmap";
+import { useSongsFolder, usePreviewSettings } from "../hooks/useStorage";
 
 interface BeatmapPreviewProps {
     selectedBeatmap?: Beatmapset | null;
@@ -129,28 +130,38 @@ function sortDifficulties(difficulties: Difficulty[]): { sorted: Difficulty[], e
 }
 
 export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
+    const [songsFolder] = useSongsFolder();
+
     const [loading, setLoading] = useState(false);
     const [loadingStep, setLoadingStep] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [beatmapData, setBeatmapData] = useState<BeatmapData | null>(null);
     const [selectedDifficulties, setSelectedDifficulties] = useState<Set<string>>(new Set());
 
+    const {
+        musicVolume,
+        setMusicVolume,
+        hitsoundVolume,
+        setHitsoundVolume,
+        isGameplayMode,
+        setIsGameplayMode,
+        isViewSVLine,
+        setViewSVLine,
+        debugMode,
+        setDebugMode,
+    } = usePreviewSettings();
+
     const [isPlaying, setIsPlaying] = useState(false);
-    const [musicVolume, setMusicVolume] = useState(0.20);
-    const [hitsoundVolume, setHitsoundVolume] = useState(0.15);
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
     const [hitAnimations, setHitAnimations] = useState<HitAnimation[]>([]);
 
     const [audioLeadIn, setAudioLeadIn] = useState(0);
-    const [debugMode, setDebugMode] = useState(false);
     const [debugInfo, setDebugInfo] = useState<string[]>([]);
 
     const [isEditingTime, setIsEditingTime] = useState(false);
     const [timeInput, setTimeInput] = useState("");
 
-    const [isGameplayMode, setIsGameplayMode] = useState(true);
-    const [isViewSVLine, setViewSVLine] = useState(true);
 
     const [mods, setMods] = useState<ModState>({
         isDT: false,
@@ -357,6 +368,21 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
         setHitAnimations(prev => [...prev, { id, x, y, color, timestamp: Date.now() }]);
     }, []);
 
+    useEffect(() => {
+        if (hitAnimations.length === 0) return;
+
+        const cleanup = () => {
+            const now = Date.now();
+            setHitAnimations(prev => {
+                const filtered = prev.filter(a => now - a.timestamp < 300);
+                return filtered.length === prev.length ? prev : filtered;
+            });
+        };
+
+        const id = requestAnimationFrame(cleanup);
+        return () => cancelAnimationFrame(id);
+    }, [hitAnimations]);
+
     const getCurrentBPM = useCallback((time: number, timingPoints: TimingPoint[]): number => {
         let currentBeatLength = 500;
 
@@ -413,56 +439,6 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
             return objectTime - APPROACH_TIME;
         }
     }, [isGameplayMode, APPROACH_TIME, getModMultipliers]);
-
-    // const calculateObjectEndPosition = useCallback((
-    //     startTime: number,
-    //     endTime: number,
-    //     timingPoints: TimingPoint[]
-    // ): number => {
-    //     if (isGameplayMode) {
-    //         const { svMultiplier: hrSVMultiplier } = getModMultipliers();
-    //         let currentTime = startTime;
-    //         let visualLength = 0;
-
-    //         let currentBeatLength = 500;
-    //         let svMultiplier = 1.0;
-
-    //         for (const tp of timingPoints) {
-    //             if (tp.time > startTime) break;
-    //             if (tp.uninherited) {
-    //                 currentBeatLength = tp.beatLength;
-    //                 svMultiplier = 1.0;
-    //             } else if (tp.svMultiplier !== undefined) {
-    //                 svMultiplier = tp.svMultiplier;
-    //             }
-    //         }
-
-    //         const relevantPoints = timingPoints.filter(tp => tp.time > startTime && tp.time < endTime);
-
-    //         for (const tp of relevantPoints) {
-    //             const duration = tp.time - currentTime;
-    //             const speed = (SPEED_CONSTANT * svMultiplier * hrSVMultiplier) / currentBeatLength;
-    //             visualLength += duration * speed;
-
-    //             currentTime = tp.time;
-    //             if (tp.uninherited) {
-    //                 currentBeatLength = tp.beatLength;
-    //                 svMultiplier = 1.0;
-    //             } else if (tp.svMultiplier !== undefined) {
-    //                 svMultiplier = tp.svMultiplier;
-    //             }
-    //         }
-
-    //         const finalDuration = endTime - currentTime;
-    //         const finalSpeed = (SPEED_CONSTANT * svMultiplier * hrSVMultiplier) / currentBeatLength;
-    //         visualLength += finalDuration * finalSpeed;
-
-    //         return visualLength;
-    //     } else {
-    //         const duration = endTime - startTime;
-    //         return duration * EDIT_PIXELS_PER_MS;
-    //     }
-    // }, [isGameplayMode, EDIT_PIXELS_PER_MS, SPEED_CONSTANT, getModMultipliers]);
 
     const generateTicks = useCallback((timingPoint: TimingPoint, nextTime: number, timingPoints: TimingPoint[]): Tick[] => {
         const ticks: Tick[] = [];
@@ -789,7 +765,6 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
             setAudioLeadIn(0);
 
             try {
-                const songsFolder = localStorage.getItem("songsFolder");
                 if (!songsFolder) {
                     throw new Error("Songs folder not found");
                 }
@@ -1377,6 +1352,24 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
         return ticks;
     }, [currentTime, getObjectX, PLAYFIELD_WIDTH, isGameplayMode]);
 
+    const filteredDifficulties = useMemo(() => {
+        if (!beatmapData) return [];
+        return beatmapData.difficulties.filter(d => selectedDifficulties.has(d.version));
+    }, [beatmapData, selectedDifficulties]);
+
+    const currentSVBPMMap = useMemo(() => {
+        if (!isGameplayMode || !beatmapData) return new Map<string, { sv: number; bpm: number }>();
+
+        const map = new Map<string, { sv: number; bpm: number }>();
+        for (const diff of filteredDifficulties) {
+            map.set(diff.version, {
+                sv: getCurrentSV(currentTime, diff.timingPoints),
+                bpm: getCurrentBPM(currentTime, diff.timingPoints),
+            });
+        }
+        return map;
+    }, [isGameplayMode, beatmapData, filteredDifficulties, currentTime, getCurrentSV, getCurrentBPM]);
+
     if (!selectedBeatmap) {
         return (
             <div className="flex items-center justify-center h-full">
@@ -1419,10 +1412,6 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
     if (!beatmapData) {
         return null;
     }
-
-    const filteredDifficulties = beatmapData.difficulties.filter(d =>
-        selectedDifficulties.has(d.version)
-    );
 
     return (
         <div className="h-full flex flex-col">
@@ -1472,8 +1461,9 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
                                         const yOffset = diffIndex * 100;
                                         const centerY = yOffset + 50;
                                         const processedData = processedDifficultiesRef.current.get(diff.version);
-                                        const currentSV = isGameplayMode ? getCurrentSV(currentTime, diff.timingPoints) : null;
-                                        const currentBPM = isGameplayMode ? getCurrentBPM(currentTime, diff.timingPoints) : null;
+                                        const svBpm = currentSVBPMMap.get(diff.version);
+                                        const currentSV = svBpm?.sv ?? null;
+                                        const currentBPM = svBpm?.bpm ?? null;
 
                                         return (
                                             <g key={diff.version}>
