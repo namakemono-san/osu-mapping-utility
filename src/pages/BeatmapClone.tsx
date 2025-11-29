@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { FiCheckCircle, FiAlertCircle, FiRefreshCw, FiCopy } from "react-icons/fi";
-
+import { FiRefreshCw, FiCopy } from "react-icons/fi";
 import { Button } from "../components/common/Button";
 import { Card } from "../components/common/Card";
 import { Input } from "../components/common/Input";
 import { Select } from "../components/common/Select";
+import { StatusMessage } from "../components/common/StatusMessage";
 
 interface BeatmapCloneProps {
     selectedBeatmap?: {
@@ -54,90 +54,32 @@ export function BeatmapClone({ selectedBeatmap }: BeatmapCloneProps) {
     const [resetDifficulty, setResetDifficulty] = useState(true);
     const [removeColours, setRemoveColours] = useState(true);
 
-    useEffect(() => {
-        if (!selectedBeatmap) return;
+    const currentDifficulties = useMemo(() => DIFFICULTIES[gameMode], [gameMode]);
 
-        (async () => {
-            setLoading(true);
-            try {
-                const songsFolder = localStorage.getItem("songsFolder");
-                if (!songsFolder) {
-                    console.error("Songs folder not found");
-                    return;
-                }
+    const allSelected = useMemo(
+        () => selectedDifficulties.size === currentDifficulties.length,
+        [selectedDifficulties.size, currentDifficulties.length]
+    );
 
-                const beatmapPath = `${songsFolder}\\${selectedBeatmap.folder_name}`;
+    const previewFolderName = useMemo(() => {
+        const artistName = (artist || selectedBeatmap?.artist || "").replace(/ /g, "_");
+        const titleName = (title || selectedBeatmap?.title || "").replace(/ /g, "_");
+        return `beatmap-###-${artistName}_${titleName}`;
+    }, [artist, title, selectedBeatmap]);
 
-                const osuFiles = await invoke<string[]>("list_osu_files", {
-                    beatmapFolder: beatmapPath
-                });
+    const previewCreator = useMemo(
+        () => creator || selectedBeatmap?.creator || "",
+        [creator, selectedBeatmap?.creator]
+    );
 
-                if (osuFiles.length === 0) {
-                    console.error("No .osu files found");
-                    return;
-                }
+    const buttonText = useMemo(() => {
+        if (processing) return "Creating...";
+        const count = selectedDifficulties.size;
+        return `Create ${count} Beatmap${count !== 1 ? "s" : ""}`;
+    }, [processing, selectedDifficulties.size]);
 
-                const firstFile = `${beatmapPath}\\${osuFiles[0]}`;
-                const content = await invoke<string>("read_osu_file", { filePath: firstFile });
-
-                const lines = content.split(/\r?\n/);
-                let inMetadata = false;
-
-                for (const line of lines) {
-                    const trimmed = line.trim();
-
-                    if (/^\[Metadata\]$/i.test(trimmed)) {
-                        inMetadata = true;
-                        continue;
-                    }
-
-                    if (/^\[[A-Za-z]+\]$/.test(trimmed)) {
-                        inMetadata = false;
-                        continue;
-                    }
-
-                    if (!inMetadata || !trimmed || trimmed.startsWith("//")) continue;
-
-                    const colonIndex = trimmed.indexOf(":");
-                    if (colonIndex === -1) continue;
-
-                    const key = trimmed.substring(0, colonIndex).trim();
-                    const value = trimmed.substring(colonIndex + 1).trim();
-
-                    switch (key) {
-                        case "Title":
-                            setTitle(value);
-                            break;
-                        case "TitleUnicode":
-                            setTitleUnicode(value);
-                            break;
-                        case "Artist":
-                            setArtist(value);
-                            break;
-                        case "ArtistUnicode":
-                            setArtistUnicode(value);
-                            break;
-                        case "Creator":
-                            setCreator(value);
-                            break;
-                        case "Source":
-                            setSource(value);
-                            break;
-                        case "Tags":
-                            setTags(value);
-                            break;
-                    }
-                }
-            } catch (err) {
-                console.error("[Clone] Failed to load metadata:", err);
-            } finally {
-                setLoading(false);
-            }
-        })();
-    }, [selectedBeatmap]);
-
-    const toggleDifficulty = (diff: string) => {
-        setSelectedDifficulties(prev => {
+    const toggleDifficulty = useCallback((diff: string) => {
+        setSelectedDifficulties((prev) => {
             const newSet = new Set(prev);
             if (newSet.has(diff)) {
                 newSet.delete(diff);
@@ -146,16 +88,20 @@ export function BeatmapClone({ selectedBeatmap }: BeatmapCloneProps) {
             }
             return newSet;
         });
-    };
+    }, []);
 
-    const toggleAllDifficulties = () => {
-        const allDiffs = DIFFICULTIES[gameMode];
-        if (selectedDifficulties.size === allDiffs.length) {
+    const toggleAllDifficulties = useCallback(() => {
+        if (allSelected) {
             setSelectedDifficulties(new Set());
         } else {
-            setSelectedDifficulties(new Set(allDiffs));
+            setSelectedDifficulties(new Set(currentDifficulties));
         }
-    };
+    }, [allSelected, currentDifficulties]);
+
+    const handleGameModeChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+        setGameMode(e.target.value as GameMode);
+        setSelectedDifficulties(new Set());
+    }, []);
 
     const onClone = useCallback(async () => {
         if (!selectedBeatmap || selectedDifficulties.size === 0) return;
@@ -203,7 +149,114 @@ export function BeatmapClone({ selectedBeatmap }: BeatmapCloneProps) {
         } finally {
             setProcessing(false);
         }
-    }, [selectedBeatmap, selectedDifficulties, gameMode, title, titleUnicode, artist, artistUnicode, creator, source, tags, keepTimingPoints, removeSkinFiles, resetSampleSet, resetDifficulty, removeColours]);
+    }, [
+        selectedBeatmap,
+        selectedDifficulties,
+        gameMode,
+        title,
+        titleUnicode,
+        artist,
+        artistUnicode,
+        creator,
+        source,
+        tags,
+        keepTimingPoints,
+        removeSkinFiles,
+        resetSampleSet,
+        resetDifficulty,
+        removeColours,
+    ]);
+
+    useEffect(() => {
+        if (!selectedBeatmap) return;
+
+        let mounted = true;
+
+        (async () => {
+            setLoading(true);
+            try {
+                const songsFolder = localStorage.getItem("songsFolder");
+                if (!songsFolder) {
+                    console.error("Songs folder not found");
+                    return;
+                }
+
+                const beatmapPath = `${songsFolder}\\${selectedBeatmap.folder_name}`;
+                const osuFiles = await invoke<string[]>("list_osu_files", {
+                    beatmapFolder: beatmapPath,
+                });
+
+                if (osuFiles.length === 0) {
+                    console.error("No .osu files found");
+                    return;
+                }
+
+                const firstFile = `${beatmapPath}\\${osuFiles[0]}`;
+                const content = await invoke<string>("read_osu_file", { filePath: firstFile });
+
+                const lines = content.split(/\r?\n/);
+                let inMetadata = false;
+
+                for (const line of lines) {
+                    const trimmed = line.trim();
+
+                    if (/^\[Metadata\]$/i.test(trimmed)) {
+                        inMetadata = true;
+                        continue;
+                    }
+
+                    if (/^\[[A-Za-z]+\]$/.test(trimmed)) {
+                        inMetadata = false;
+                        continue;
+                    }
+
+                    if (!inMetadata || !trimmed || trimmed.startsWith("//")) continue;
+
+                    const colonIndex = trimmed.indexOf(":");
+                    if (colonIndex === -1) continue;
+
+                    const key = trimmed.substring(0, colonIndex).trim();
+                    const value = trimmed.substring(colonIndex + 1).trim();
+
+                    if (!mounted) return;
+
+                    switch (key) {
+                        case "Title":
+                            setTitle(value);
+                            break;
+                        case "TitleUnicode":
+                            setTitleUnicode(value);
+                            break;
+                        case "Artist":
+                            setArtist(value);
+                            break;
+                        case "ArtistUnicode":
+                            setArtistUnicode(value);
+                            break;
+                        case "Creator":
+                            setCreator(value);
+                            break;
+                        case "Source":
+                            setSource(value);
+                            break;
+                        case "Tags":
+                            setTags(value);
+                            break;
+                    }
+                }
+            } catch (err) {
+                console.error("[Clone] Failed to load metadata:", err);
+            } finally {
+                if (mounted) {
+                    setLoading(false);
+                }
+            }
+        })();
+
+        return () => {
+            mounted = false;
+        };
+    }, [selectedBeatmap]);
 
     if (!selectedBeatmap) {
         return (
@@ -232,7 +285,9 @@ export function BeatmapClone({ selectedBeatmap }: BeatmapCloneProps) {
             <div className="flex-1 overflow-y-auto pb-20">
                 <div className="max-w-5xl mx-auto space-y-3 p-3">
                     <Card className="p-3">
-                        <h2 className="text-lg font-bold mb-1.5">Clone: {title || selectedBeatmap.title}</h2>
+                        <h2 className="text-lg font-bold mb-1.5">
+                            Clone: {title || selectedBeatmap.title}
+                        </h2>
                         <div className="text-xs text-[#7b7b7b]">
                             Original by {creator || selectedBeatmap.creator}
                         </div>
@@ -240,13 +295,7 @@ export function BeatmapClone({ selectedBeatmap }: BeatmapCloneProps) {
 
                     <Card className="p-3">
                         <h3 className="font-semibold text-sm mb-3">Game Mode</h3>
-                        <Select
-                            value={gameMode}
-                            onChange={(e) => {
-                                setGameMode(e.target.value as GameMode);
-                                setSelectedDifficulties(new Set());
-                            }}
-                        >
+                        <Select value={gameMode} onChange={handleGameModeChange}>
                             <option value="osu">osu!</option>
                             <option value="taiko">osu!taiko</option>
                             <option value="catch">osu!catch</option>
@@ -257,44 +306,34 @@ export function BeatmapClone({ selectedBeatmap }: BeatmapCloneProps) {
                     <Card className="p-3">
                         <div className="flex items-center justify-between mb-3">
                             <h3 className="font-semibold text-sm">Difficulties</h3>
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={toggleAllDifficulties}
-                                className="h-auto px-0 text-[#2563eb] hover:text-[#1f56cc] hover:bg-transparent"
-                            >
-                                {selectedDifficulties.size === DIFFICULTIES[gameMode].length ? "Deselect All" : "Select All"}
+                            <Button variant="ghost" size="sm" onClick={toggleAllDifficulties}>
+                                {allSelected ? "Deselect All" : "Select All"}
                             </Button>
                         </div>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-                            {DIFFICULTIES[gameMode].map((diff) => {
-                                const isSelected = selectedDifficulties.has(diff);
-
-                                return (
-                                    <button
-                                        key={diff}
-                                        onClick={() => toggleDifficulty(diff)}
-                                        className={`px-3 py-2 rounded-lg border text-sm font-medium transition-all duration-200 hover:scale-105 active:scale-95 ${isSelected
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
+                            {currentDifficulties.map((diff) => (
+                                <button
+                                    key={diff}
+                                    onClick={() => toggleDifficulty(diff)}
+                                    className={`px-3 py-2 rounded-lg border text-sm font-medium transition-all duration-200 hover:scale-105 active:scale-95 ${selectedDifficulties.has(diff)
                                             ? "bg-[#2563eb]/20 border-[#2563eb] text-white shadow-lg shadow-[#2563eb]/20"
                                             : "bg-[#171717] border-[#2a2a2a] text-[#e0e0e0]"
-                                            }`}
-                                    >
-                                        {diff}
-                                    </button>
-                                );
-                            })}
-                        </div>
-                        <div className="mt-2 text-xs text-[#7b7b7b]">
-                            {selectedDifficulties.size} selected
+                                        }`}
+                                >
+                                    {diff}
+                                </button>
+                            ))}
                         </div>
                     </Card>
 
                     <Card className="p-3">
                         <h3 className="font-semibold text-sm mb-3">Metadata</h3>
                         <div className="space-y-3">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="block text-xs text-[#7b7b7b] mb-1">Title</label>
+                                    <label className="block text-xs text-[#7b7b7b] mb-1">
+                                        Title
+                                    </label>
                                     <Input
                                         value={title}
                                         onChange={(e) => setTitle(e.target.value)}
@@ -302,7 +341,9 @@ export function BeatmapClone({ selectedBeatmap }: BeatmapCloneProps) {
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-xs text-[#7b7b7b] mb-1">Title (Unicode)</label>
+                                    <label className="block text-xs text-[#7b7b7b] mb-1">
+                                        Title (Unicode)
+                                    </label>
                                     <Input
                                         value={titleUnicode}
                                         onChange={(e) => setTitleUnicode(e.target.value)}
@@ -311,9 +352,11 @@ export function BeatmapClone({ selectedBeatmap }: BeatmapCloneProps) {
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="block text-xs text-[#7b7b7b] mb-1">Artist</label>
+                                    <label className="block text-xs text-[#7b7b7b] mb-1">
+                                        Artist
+                                    </label>
                                     <Input
                                         value={artist}
                                         onChange={(e) => setArtist(e.target.value)}
@@ -321,7 +364,9 @@ export function BeatmapClone({ selectedBeatmap }: BeatmapCloneProps) {
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-xs text-[#7b7b7b] mb-1">Artist (Unicode)</label>
+                                    <label className="block text-xs text-[#7b7b7b] mb-1">
+                                        Artist (Unicode)
+                                    </label>
                                     <Input
                                         value={artistUnicode}
                                         onChange={(e) => setArtistUnicode(e.target.value)}
@@ -331,7 +376,9 @@ export function BeatmapClone({ selectedBeatmap }: BeatmapCloneProps) {
                             </div>
 
                             <div>
-                                <label className="block text-xs text-[#7b7b7b] mb-1">Creator</label>
+                                <label className="block text-xs text-[#7b7b7b] mb-1">
+                                    Creator
+                                </label>
                                 <Input
                                     value={creator}
                                     onChange={(e) => setCreator(e.target.value)}
@@ -340,7 +387,9 @@ export function BeatmapClone({ selectedBeatmap }: BeatmapCloneProps) {
                             </div>
 
                             <div>
-                                <label className="block text-xs text-[#7b7b7b] mb-1">Source</label>
+                                <label className="block text-xs text-[#7b7b7b] mb-1">
+                                    Source
+                                </label>
                                 <Input
                                     value={source}
                                     onChange={(e) => setSource(e.target.value)}
@@ -367,11 +416,13 @@ export function BeatmapClone({ selectedBeatmap }: BeatmapCloneProps) {
                             <button
                                 onClick={() => setKeepTimingPoints(!keepTimingPoints)}
                                 className={`flex flex-col gap-1 px-3 py-2.5 rounded-lg border text-left transition-all duration-200 hover:scale-105 active:scale-95 w-full ${keepTimingPoints
-                                    ? "bg-[#2563eb]/20 border-[#2563eb] shadow-lg shadow-[#2563eb]/20"
-                                    : "bg-[#171717] border-[#2a2a2a]"
+                                        ? "bg-[#2563eb]/20 border-[#2563eb] shadow-lg shadow-[#2563eb]/20"
+                                        : "bg-[#171717] border-[#2a2a2a]"
                                     }`}
                             >
-                                <div className="font-medium text-sm">Keep Timing Points (BPM + Kiai)</div>
+                                <div className="font-medium text-sm">
+                                    Keep Timing Points (BPM + Kiai)
+                                </div>
                                 <div className="text-xs text-[#7b7b7b]">
                                     Preserve BPM changes and Kiai sections from original beatmap
                                 </div>
@@ -380,8 +431,8 @@ export function BeatmapClone({ selectedBeatmap }: BeatmapCloneProps) {
                             <button
                                 onClick={() => setRemoveSkinFiles(!removeSkinFiles)}
                                 className={`flex flex-col gap-1 px-3 py-2.5 rounded-lg border text-left transition-all duration-200 hover:scale-105 active:scale-95 w-full ${removeSkinFiles
-                                    ? "bg-[#2563eb]/20 border-[#2563eb] shadow-lg shadow-[#2563eb]/20"
-                                    : "bg-[#171717] border-[#2a2a2a]"
+                                        ? "bg-[#2563eb]/20 border-[#2563eb] shadow-lg shadow-[#2563eb]/20"
+                                        : "bg-[#171717] border-[#2a2a2a]"
                                     }`}
                             >
                                 <div className="font-medium text-sm">Remove Skin Files</div>
@@ -393,11 +444,13 @@ export function BeatmapClone({ selectedBeatmap }: BeatmapCloneProps) {
                             <button
                                 onClick={() => setResetSampleSet(!resetSampleSet)}
                                 className={`flex flex-col gap-1 px-3 py-2.5 rounded-lg border text-left transition-all duration-200 hover:scale-105 active:scale-95 w-full ${resetSampleSet
-                                    ? "bg-[#2563eb]/20 border-[#2563eb] shadow-lg shadow-[#2563eb]/20"
-                                    : "bg-[#171717] border-[#2a2a2a]"
+                                        ? "bg-[#2563eb]/20 border-[#2563eb] shadow-lg shadow-[#2563eb]/20"
+                                        : "bg-[#171717] border-[#2a2a2a]"
                                     }`}
                             >
-                                <div className="font-medium text-sm">Reset Sample Set to Normal</div>
+                                <div className="font-medium text-sm">
+                                    Reset Sample Set to Normal
+                                </div>
                                 <div className="text-xs text-[#7b7b7b]">
                                     Set General.SampleSet to Normal
                                 </div>
@@ -406,8 +459,8 @@ export function BeatmapClone({ selectedBeatmap }: BeatmapCloneProps) {
                             <button
                                 onClick={() => setResetDifficulty(!resetDifficulty)}
                                 className={`flex flex-col gap-1 px-3 py-2.5 rounded-lg border text-left transition-all duration-200 hover:scale-105 active:scale-95 w-full ${resetDifficulty
-                                    ? "bg-[#2563eb]/20 border-[#2563eb] shadow-lg shadow-[#2563eb]/20"
-                                    : "bg-[#171717] border-[#2a2a2a]"
+                                        ? "bg-[#2563eb]/20 border-[#2563eb] shadow-lg shadow-[#2563eb]/20"
+                                        : "bg-[#171717] border-[#2a2a2a]"
                                     }`}
                             >
                                 <div className="font-medium text-sm">Reset Difficulty Settings</div>
@@ -419,8 +472,8 @@ export function BeatmapClone({ selectedBeatmap }: BeatmapCloneProps) {
                             <button
                                 onClick={() => setRemoveColours(!removeColours)}
                                 className={`flex flex-col gap-1 px-3 py-2.5 rounded-lg border text-left transition-all duration-200 hover:scale-105 active:scale-95 w-full ${removeColours
-                                    ? "bg-[#2563eb]/20 border-[#2563eb] shadow-lg shadow-[#2563eb]/20"
-                                    : "bg-[#171717] border-[#2a2a2a]"
+                                        ? "bg-[#2563eb]/20 border-[#2563eb] shadow-lg shadow-[#2563eb]/20"
+                                        : "bg-[#171717] border-[#2a2a2a]"
                                     }`}
                             >
                                 <div className="font-medium text-sm">Remove Colours Section</div>
@@ -435,31 +488,25 @@ export function BeatmapClone({ selectedBeatmap }: BeatmapCloneProps) {
                         <h3 className="font-semibold text-sm mb-2">Preview</h3>
                         <div className="text-xs text-[#7b7b7b] space-y-1">
                             <div>
-                                New folder: <span className="text-[#e0e0e0]">
-                                    beatmap-###-{(artist || selectedBeatmap.artist).replace(/ /g, '_')}_{(title || selectedBeatmap.title).replace(/ /g, '_')}
+                                New folder:{" "}
+                                <span className="text-[#e0e0e0]">{previewFolderName}</span>
+                            </div>
+                            <div>
+                                Creator: <span className="text-[#e0e0e0]">{previewCreator}</span>
+                            </div>
+                            <div>
+                                Mode: <span className="text-[#e0e0e0]">{gameMode}</span>
+                            </div>
+                            <div>
+                                Difficulties:{" "}
+                                <span className="text-[#e0e0e0]">
+                                    {selectedDifficulties.size}
                                 </span>
                             </div>
-                            <div>Creator: <span className="text-[#e0e0e0]">{creator || selectedBeatmap.creator}</span></div>
-                            <div>Mode: <span className="text-[#e0e0e0]">{gameMode}</span></div>
-                            <div>Difficulties: <span className="text-[#e0e0e0]">{selectedDifficulties.size}</span></div>
                         </div>
                     </Card>
 
-                    {result && (
-                        <Card
-                            className={`flex items-center gap-2.5 px-3 py-2.5 ${result.success
-                                ? "bg-green-500/10 border-green-500/30 text-green-400"
-                                : "bg-red-500/10 border-red-500/30 text-red-400"
-                                }`}
-                        >
-                            {result.success ? (
-                                <FiCheckCircle className="w-4 h-4 flex-shrink-0" />
-                            ) : (
-                                <FiAlertCircle className="w-4 h-4 flex-shrink-0" />
-                            )}
-                            <span className="text-sm">{result.message}</span>
-                        </Card>
-                    )}
+                    {result && <StatusMessage type={result.success ? "success" : "error"} message={result.message} />}
                 </div>
             </div>
 
@@ -473,10 +520,7 @@ export function BeatmapClone({ selectedBeatmap }: BeatmapCloneProps) {
                         disabled={processing || selectedDifficulties.size === 0}
                         className="w-full"
                     >
-                        {processing
-                            ? "Creating..."
-                            : `Create ${selectedDifficulties.size} Beatmap${selectedDifficulties.size !== 1 ? 's' : ''}`
-                        }
+                        {buttonText}
                     </Button>
                 </div>
             </div>

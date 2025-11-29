@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { FiLink, FiFolder, FiDownload, FiFilm, FiMusic, FiTrash2 } from "react-icons/fi";
+
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
-import { FiLink, FiFolder, FiDownload, FiFilm, FiMusic, FiTrash2 } from "react-icons/fi";
 
 import { Button } from "../components/common/Button";
 import { Card } from "../components/common/Card";
@@ -11,36 +12,43 @@ import { Select } from "../components/common/Select";
 import { Switch } from "../components/common/Switch";
 import { Chip } from "../components/common/Chip";
 
+type AudioFormat = "mp3" | "ogg";
+
 export function Downloader() {
     const [url, setUrl] = useState("");
     const [outDir, setOutDir] = useState("");
-    const [audioFormat, setAudioFormat] = useState<"mp3" | "ogg">("mp3");
+    const [audioFormat, setAudioFormat] = useState<AudioFormat>("mp3");
     const [includeVideo, setIncludeVideo] = useState(false);
     const [busy, setBusy] = useState(false);
     const [log, setLog] = useState("");
     const logRef = useRef<HTMLPreElement | null>(null);
 
-    useEffect(() => {
-        let off: (() => void) | undefined;
-        listen<string>("download-progress", (e) => {
-            const line = typeof e.payload === "string" ? e.payload : JSON.stringify(e.payload);
-            setLog((p) => p + line);
-        }).then((un) => (off = un));
-        return () => off?.();
+    const appendLog = useCallback((payload: string) => {
+        const line = typeof payload === "string" ? payload : JSON.stringify(payload);
+        setLog((prev) => prev + line);
     }, []);
 
-    useEffect(() => {
-        if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
-    }, [log]);
+    const pickDir = useCallback(async () => {
+        const dir = await open({
+            directory: true,
+            multiple: false,
+            title: "Select output folder",
+        });
+        if (typeof dir === "string") {
+            setOutDir(dir);
+        }
+    }, []);
 
-    const pickDir = async () => {
-        const d = await open({ directory: true, multiple: false, title: "Select output folder" });
-        if (typeof d === "string") setOutDir(d);
-    };
+    const startDownload = useCallback(async () => {
+        if (!url.trim()) {
+            alert("Enter a URL");
+            return;
+        }
+        if (!outDir.trim()) {
+            alert("Select an output folder");
+            return;
+        }
 
-    const start = async () => {
-        if (!url.trim()) return alert("Enter a URL");
-        if (!outDir.trim()) return alert("Select an output folder");
         setBusy(true);
         try {
             const res = await invoke<string>("run_download", {
@@ -49,13 +57,36 @@ export function Downloader() {
                 audioFormat,
                 includeVideo,
             });
-            if (res !== "started") setLog((p) => p + res);
+            if (res !== "started") {
+                appendLog(res);
+            }
         } catch (e: any) {
-            setLog((p) => p + `[ui][err] ${String(e)}`);
+            appendLog(`[ui][err] ${String(e)}`);
         } finally {
             setBusy(false);
         }
-    };
+    }, [url, outDir, audioFormat, includeVideo, appendLog]);
+
+    const clearLog = useCallback(() => setLog(""), []);
+
+    const formatMeta = useMemo(
+        () => `Format: ${audioFormat.toUpperCase()}${includeVideo ? " + Video" : ""}`,
+        [audioFormat, includeVideo]
+    );
+
+    useEffect(() => {
+        let unlisten: (() => void) | undefined;
+        listen<string>("download-progress", (e) => {
+            appendLog(e.payload);
+        }).then((fn) => (unlisten = fn));
+        return () => unlisten?.();
+    }, [appendLog]);
+
+    useEffect(() => {
+        if (logRef.current) {
+            logRef.current.scrollTop = logRef.current.scrollHeight;
+        }
+    }, [log]);
 
     return (
         <div className="flex flex-col gap-2 text-zinc-200">
@@ -73,7 +104,7 @@ export function Downloader() {
 
                 <Select
                     value={audioFormat}
-                    onChange={(e) => setAudioFormat(e.target.value as "mp3" | "ogg")}
+                    onChange={(e) => setAudioFormat(e.target.value as AudioFormat)}
                     disabled={busy}
                     icon={<FiMusic />}
                     className="min-w-[220px]"
@@ -97,7 +128,7 @@ export function Downloader() {
                 <Button
                     variant="primary"
                     icon={<FiDownload />}
-                    onClick={start}
+                    onClick={startDownload}
                     disabled={busy}
                     title="Start download"
                 >
@@ -127,8 +158,8 @@ export function Downloader() {
                 <Button
                     variant="danger"
                     icon={<FiTrash2 />}
-                    onClick={() => setLog("")}
-                    disabled={busy && !log}
+                    onClick={clearLog}
+                    disabled={busy || !log}
                     title="Clear log"
                 >
                     Clear
@@ -138,9 +169,7 @@ export function Downloader() {
             <Card className="flex flex-col">
                 <div className="flex items-center justify-between px-3 py-2 border-b border-[#2a2a2a]">
                     <span className="text-sm opacity-80">Log</span>
-                    <span className="text-xs opacity-60">
-                        Format: {audioFormat.toUpperCase()} {includeVideo ? "+ Video" : ""}
-                    </span>
+                    <span className="text-xs opacity-60">{formatMeta}</span>
                 </div>
                 <pre
                     ref={logRef}
