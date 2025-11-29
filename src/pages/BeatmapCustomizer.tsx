@@ -7,13 +7,10 @@ import { Button } from "../components/common/Button";
 import { Card } from "../components/common/Card";
 import { Switch } from "../components/common/Switch";
 
+import { Beatmapset } from "../types/beatmap";
+
 interface BeatmapCustomizerProps {
-    selectedBeatmap?: {
-        folder_name: string;
-        title: string;
-        artist: string;
-        creator: string;
-    };
+    selectedBeatmap?: Beatmapset | null;
 }
 
 function rewriteCenter(osuText: string, x = 256, y = 192): string {

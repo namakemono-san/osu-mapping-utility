@@ -15,6 +15,7 @@ import { Downloader } from "./pages/Downloader";
 import { BeatmapClone } from "./pages/BeatmapClone";
 import { MetadataEditor } from "./pages/MetadataEditor";
 
+import { Beatmapset } from "./types/beatmap";
 
 const MAP_TOOLS: SidebarKey[] = [
   "beatmap_clone",
@@ -25,7 +26,7 @@ const MAP_TOOLS: SidebarKey[] = [
 
 function App() {
   const [activeTool, setActiveTool] = useState<SidebarKey>("beatmap_customizer");
-  const [selectedBeatmap, setSelectedBeatmap] = useState<any>(null);
+  const [selectedBeatmap, setSelectedBeatmap] = useState<Beatmapset | null>(null);
 
   const showMapSelector = MAP_TOOLS.includes(activeTool);
 
