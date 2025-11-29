@@ -6,9 +6,13 @@
     "main"
   ],
   "permissions": [
+    "opener:default",
     {
       "identifier": "opener:allow-open-path",
       "allow": [
+        {
+          "path": "**"
+        },
         {
           "path": "$APPDATA"
         },
