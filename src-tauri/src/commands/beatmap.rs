@@ -7,57 +7,117 @@ use std::fs;
 use std::io::Write;
 use std::path::Path;
 use std::process::Command;
-use std::sync::Mutex;
+use std::sync::{Arc, RwLock};
+use std::time::SystemTime;
 
-static BEATMAP_CACHE: Lazy<Mutex<HashMap<String, Vec<Beatmapset>>>> =
-    Lazy::new(|| Mutex::new(HashMap::new()));
+struct BeatmapCache {
+    data: HashMap<String, Arc<Vec<Beatmapset>>>,
+    last_modified: HashMap<String, SystemTime>,
+}
+
+impl BeatmapCache {
+    fn new() -> Self {
+        Self {
+            data: HashMap::new(),
+            last_modified: HashMap::new(),
+        }
+    }
+}
+
+static BEATMAP_CACHE: Lazy<RwLock<BeatmapCache>> = Lazy::new(|| RwLock::new(BeatmapCache::new()));
 
 #[tauri::command]
 pub fn detect_osu_path() -> Result<String, String> {
-    #[cfg(target_os = "windows")]
-    {
-        let output = Command::new("reg")
-            .args(&["query", "HKCR\\osu\\DefaultIcon", "/ve"])
-            .output();
+    if let Some(path) = try_detect_from_registry_hkcr() {
+        return Ok(path);
+    }
 
-        if let Ok(result) = output {
-            let stdout = String::from_utf8_lossy(&result.stdout);
-            eprintln!("[detect] Registry output: {}", stdout);
+    if let Some(path) = try_detect_from_registry_hkcu() {
+        return Ok(path);
+    }
 
-            for line in stdout.lines() {
-                if line.contains("REG_SZ") || line.contains("(既定)") || line.contains("(Default)")
-                {
-                    let parts: Vec<&str> = line.split_whitespace().collect();
-                    if let Some(path_part) = parts.last() {
-                        let cleaned = path_part
-                            .trim_matches('"')
-                            .split(',')
-                            .next()
-                            .unwrap_or("")
-                            .trim_matches('"');
+    if let Some(path) = try_common_locations() {
+        return Ok(path);
+    }
 
-                        if cleaned.ends_with("osu!.exe") {
-                            if let Some(parent) = std::path::Path::new(cleaned).parent() {
-                                let songs_path = parent.join("Songs");
-                                if songs_path.exists() {
-                                    let songs_str = songs_path.to_string_lossy().to_string();
-                                    eprintln!("[detect] Found osu! Songs folder: {}", songs_str);
-                                    return Ok(songs_str);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+    Err("osu! installation not found. Please select the Songs folder manually.".to_string())
+}
+
+fn try_detect_from_registry_hkcr() -> Option<String> {
+    let output = Command::new("reg")
+        .args(["query", r"HKCR\osustable.Uri.osu\DefaultIcon", "/ve"])
+        .output()
+        .ok()?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    eprintln!("[detect] HKCR output: {}", stdout);
+
+    for line in stdout.lines() {
+        if !line.contains("REG_SZ") {
+            continue;
         }
 
-        Err("osu! installation not found".to_string())
+        let after_regsz = line.split("REG_SZ").nth(1)?;
+        let trimmed = after_regsz.trim();
+
+        let exe_path = trimmed
+            .trim_start_matches('"')
+            .split(',')
+            .next()?
+            .trim_end_matches('"')
+            .trim();
+
+        if exe_path.to_lowercase().ends_with("osu!.exe") {
+            let parent = Path::new(exe_path).parent()?;
+            let songs_path = parent.join("Songs");
+
+            if songs_path.exists() {
+                return Some(songs_path.to_string_lossy().to_string());
+            }
+        }
     }
 
-    #[cfg(not(target_os = "windows"))]
-    {
-        Err("osu! detection only supported on Windows".to_string())
+    None
+}
+
+fn try_detect_from_registry_hkcu() -> Option<String> {
+    let output = Command::new("reg")
+        .args(["query", r"HKCU\Software\osu!", "/v", "InstallPath"])
+        .output()
+        .ok()?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    for line in stdout.lines() {
+        if line.contains("REG_SZ") {
+            let after_regsz = line.split("REG_SZ").nth(1)?;
+            let install_path = after_regsz.trim();
+            let songs_path = Path::new(install_path).join("Songs");
+
+            if songs_path.exists() {
+                return Some(songs_path.to_string_lossy().to_string());
+            }
+        }
     }
+
+    None
+}
+
+fn try_common_locations() -> Option<String> {
+    let local_app_data = std::env::var("LOCALAPPDATA").ok()?;
+    let candidates = vec![
+        format!("{}/osu!/Songs", local_app_data),
+        format!("{}/../Local/osu!/Songs", local_app_data),
+    ];
+
+    for path in candidates {
+        let p = Path::new(&path);
+        if p.exists() {
+            return Some(p.to_string_lossy().to_string());
+        }
+    }
+
+    None
 }
 
 fn load_all_beatmaps(base_path: &str) -> Result<Vec<Beatmapset>, String> {
@@ -67,81 +127,96 @@ fn load_all_beatmaps(base_path: &str) -> Result<Vec<Beatmapset>, String> {
         return Err(format!("Folder not found: {}", base_path));
     }
 
-    let entries = fs::read_dir(base).map_err(|e| format!("Failed to read directory: {}", e))?;
-
-    let mut folders_with_time: Vec<_> = entries
+    let entries: Vec<_> = fs::read_dir(base)
+        .map_err(|e| format!("Failed to read directory: {}", e))?
         .filter_map(|e| e.ok())
         .filter(|e| e.file_type().map(|ft| ft.is_dir()).unwrap_or(false))
+        .collect();
+
+    let mut folders_with_time: Vec<_> = entries
+        .par_iter()
         .filter_map(|entry| {
             let modified = fs::metadata(entry.path()).and_then(|m| m.modified()).ok()?;
-            Some((entry, modified))
+            Some((
+                entry.path(),
+                entry.file_name().to_string_lossy().to_string(),
+                modified,
+            ))
         })
         .collect();
 
-    folders_with_time.par_sort_by(|a, b| b.1.cmp(&a.1));
+    folders_with_time.sort_by(|a, b| b.2.cmp(&a.2));
 
     let results: Vec<Beatmapset> = folders_with_time
         .par_iter()
-        .filter_map(|(entry, _modified)| {
-            let folder_path = entry.path();
-            let folder_name = entry.file_name().to_string_lossy().to_string();
-
-            let files = fs::read_dir(&folder_path).ok()?;
-
-            for file in files.filter_map(|f| f.ok()) {
-                let path = file.path();
-                if let Some(ext) = path.extension() {
-                    if ext == "osu" {
-                        if let Ok(data) = fs::read_to_string(&path) {
-                            let title = scrape(&data, "Title:", "\n");
-                            let artist = scrape(&data, "Artist:", "\n");
-                            let creator = scrape(&data, "Creator:", "\n");
-                            let beatmap_id = scrape(&data, "BeatmapID:", "\n");
-                            let beatmapset_id = scrape(&data, "BeatmapSetID:", "\n");
-                            let bg_file = scrape(&data, "0,0,\"", "\"");
-
-                            let display_title = if !title.is_empty() && !artist.is_empty() {
-                                format!("{} - {}", artist, title)
-                            } else {
-                                folder_name
-                                    .split_once(' ')
-                                    .map(|(_, rest)| rest.to_string())
-                                    .unwrap_or(folder_name.clone())
-                            };
-
-                            let beatmap = Beatmapset {
-                                folder_name: folder_name.clone(),
-                                title: display_title,
-                                artist: if artist.is_empty() {
-                                    "Unknown".to_string()
-                                } else {
-                                    artist
-                                },
-                                creator: if creator.is_empty() {
-                                    "Unknown".to_string()
-                                } else {
-                                    creator
-                                },
-                                background_path: if !bg_file.is_empty() {
-                                    Some(format!("{}/{}", folder_path.display(), bg_file))
-                                } else {
-                                    None
-                                },
-                                beatmap_id,
-                                beatmap_set_id: beatmapset_id,
-                            };
-
-                            return Some(beatmap);
-                        }
-                        break;
-                    }
-                }
-            }
-            None
-        })
+        .filter_map(|(folder_path, folder_name, _)| parse_beatmap_folder(folder_path, folder_name))
         .collect();
 
+    eprintln!(
+        "[load] Loaded {} beatmaps from {}",
+        results.len(),
+        base_path
+    );
     Ok(results)
+}
+
+fn parse_beatmap_folder(folder_path: &Path, folder_name: &str) -> Option<Beatmapset> {
+    let files = fs::read_dir(folder_path).ok()?;
+
+    for file in files.filter_map(|f| f.ok()) {
+        let path = file.path();
+
+        if path.extension().and_then(|e| e.to_str()) != Some("osu") {
+            continue;
+        }
+
+        let data = match fs::read_to_string(&path) {
+            Ok(d) => d,
+            Err(_) => continue,
+        };
+
+        let title = scrape(&data, "Title:", "\n");
+        let artist = scrape(&data, "Artist:", "\n");
+        let creator = scrape(&data, "Creator:", "\n");
+        let beatmap_id = scrape(&data, "BeatmapID:", "\n");
+        let beatmapset_id = scrape(&data, "BeatmapSetID:", "\n");
+        let bg_file = scrape(&data, "0,0,\"", "\"");
+
+        let display_title = if !title.is_empty() && !artist.is_empty() {
+            format!("{} - {}", artist, title)
+        } else {
+            folder_name
+                .split_once(' ')
+                .map(|(_, rest)| rest.to_string())
+                .unwrap_or_else(|| folder_name.to_string())
+        };
+
+        let background_path = if !bg_file.is_empty() {
+            Some(format!("{}/{}", folder_path.display(), bg_file))
+        } else {
+            None
+        };
+
+        return Some(Beatmapset {
+            folder_name: folder_name.to_string(),
+            title: display_title,
+            artist: if artist.is_empty() {
+                "Unknown".to_string()
+            } else {
+                artist
+            },
+            creator: if creator.is_empty() {
+                "Unknown".to_string()
+            } else {
+                creator
+            },
+            background_path,
+            beatmap_id,
+            beatmap_set_id: beatmapset_id,
+        });
+    }
+
+    None
 }
 
 #[tauri::command]
@@ -151,38 +226,54 @@ pub fn scan_songs_step(
     step_size: usize,
     search_query: String,
 ) -> Result<(Vec<Beatmapset>, usize, bool), String> {
-    let mut cache = BEATMAP_CACHE.lock().unwrap();
-
-    let all_beatmaps = if let Some(cached) = cache.get(&base_path) {
-        cached.clone()
-    } else {
-        eprintln!("[scan] Loading beatmaps for the first time...");
-        let loaded = load_all_beatmaps(&base_path)?;
-        cache.insert(base_path.clone(), loaded.clone());
-        loaded
+    let all_beatmaps = {
+        let cache = BEATMAP_CACHE.read().unwrap();
+        cache.data.get(&base_path).cloned()
     };
 
-    drop(cache);
+    let all_beatmaps = match all_beatmaps {
+        Some(cached) => cached,
+        None => {
+            eprintln!("[scan] Cache miss, loading beatmaps...");
+            let loaded = load_all_beatmaps(&base_path)?;
+            let arc_loaded = Arc::new(loaded);
 
-    let filtered: Vec<Beatmapset> = if search_query.is_empty() {
-        all_beatmaps
+            let mut cache = BEATMAP_CACHE.write().unwrap();
+            cache.data.insert(base_path.clone(), arc_loaded.clone());
+            cache
+                .last_modified
+                .insert(base_path.clone(), SystemTime::now());
+
+            arc_loaded
+        }
+    };
+
+    let filtered: Vec<&Beatmapset> = if search_query.is_empty() {
+        all_beatmaps.iter().collect()
     } else {
         let query_lower = search_query.to_lowercase();
         all_beatmaps
-            .into_iter()
+            .par_iter()
             .filter(|b| {
                 let searchable = format!(
                     "{} {} {} {} {}",
-                    b.title, b.artist, b.creator, b.beatmap_id, b.beatmap_set_id
+                    b.title.to_lowercase(),
+                    b.artist.to_lowercase(),
+                    b.creator.to_lowercase(),
+                    b.beatmap_id,
+                    b.beatmap_set_id
                 );
-                searchable.to_lowercase().contains(&query_lower)
+                searchable.contains(&query_lower)
             })
             .collect()
     };
 
     let total = filtered.len();
     let end_index = (start_index + step_size).min(total);
-    let results = filtered[start_index..end_index].to_vec();
+    let results: Vec<Beatmapset> = filtered[start_index..end_index]
+        .iter()
+        .map(|b| (*b).clone())
+        .collect();
     let has_more = end_index < total;
 
     Ok((results, end_index, has_more))
@@ -190,9 +281,35 @@ pub fn scan_songs_step(
 
 #[tauri::command]
 pub fn clear_beatmap_cache() {
-    let mut cache = BEATMAP_CACHE.lock().unwrap();
-    cache.clear();
+    let mut cache = BEATMAP_CACHE.write().unwrap();
+    cache.data.clear();
+    cache.last_modified.clear();
     eprintln!("[cache] Cleared beatmap cache");
+}
+
+#[tauri::command]
+pub fn invalidate_cache_for_path(base_path: String) {
+    let mut cache = BEATMAP_CACHE.write().unwrap();
+    cache.data.remove(&base_path);
+    cache.last_modified.remove(&base_path);
+    eprintln!("[cache] Invalidated cache for: {}", base_path);
+}
+
+#[tauri::command]
+pub fn reload_beatmaps(base_path: String) -> Result<usize, String> {
+    {
+        let mut cache = BEATMAP_CACHE.write().unwrap();
+        cache.data.remove(&base_path);
+    }
+
+    let loaded = load_all_beatmaps(&base_path)?;
+    let count = loaded.len();
+
+    let mut cache = BEATMAP_CACHE.write().unwrap();
+    cache.data.insert(base_path.clone(), Arc::new(loaded));
+    cache.last_modified.insert(base_path, SystemTime::now());
+
+    Ok(count)
 }
 
 #[tauri::command]
@@ -203,9 +320,8 @@ pub fn list_osu_files(beatmap_folder: String) -> Result<Vec<String>, String> {
         return Err(format!("Folder not found: {}", beatmap_folder));
     }
 
-    let entries = fs::read_dir(path).map_err(|e| format!("Failed to read directory: {}", e))?;
-
-    let osu_files: Vec<String> = entries
+    let osu_files: Vec<String> = fs::read_dir(path)
+        .map_err(|e| format!("Failed to read directory: {}", e))?
         .filter_map(|e| e.ok())
         .filter(|e| {
             e.path()
@@ -232,11 +348,11 @@ pub fn read_audio_file(file_path: String) -> Result<Vec<u8>, String> {
 
 #[tauri::command]
 pub fn write_osu_file(file_path: String, content: String) -> Result<(), String> {
-    let mut file = std::fs::File::create(&file_path)
-        .map_err(|e| format!("Failed to create file: {}", e))?;
-    
+    let mut file =
+        fs::File::create(&file_path).map_err(|e| format!("Failed to create file: {}", e))?;
+
     file.write_all(content.as_bytes())
         .map_err(|e| format!("Failed to write file: {}", e))?;
-    
+
     Ok(())
 }
