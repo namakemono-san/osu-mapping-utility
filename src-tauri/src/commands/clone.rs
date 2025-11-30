@@ -506,7 +506,7 @@ fn process_osu_content(
                 continue;
             }
             if trimmed.starts_with("BeatmapID:") {
-                output.push("BeatmapID:-1".to_string());
+                output.push("BeatmapID:0".to_string());
                 continue;
             }
             if trimmed.starts_with("BeatmapSetID:") {
