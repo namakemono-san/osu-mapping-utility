@@ -381,7 +381,12 @@ export function MapSelector({
                 }
             }
 
-            await reloadSearch();
+            currentRequestRef.current += 1;
+            const requestId = currentRequestRef.current;
+            setBeatmaps([]);
+            setCurrentIndex(0);
+            setHasMore(true);
+            await loadStep(folder, "", 0, false, requestId);
         })();
 
         return () => {

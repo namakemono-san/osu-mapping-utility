@@ -2,13 +2,22 @@ use crate::models::beatmapset::Beatmapset;
 use crate::utils::parser::scrape;
 use once_cell::sync::Lazy;
 use rayon::prelude::*;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::io::Write;
 use std::path::Path;
+use std::path::PathBuf;
 use std::process::Command;
 use std::sync::{Arc, RwLock};
 use std::time::SystemTime;
+
+#[derive(Serialize, Deserialize)]
+struct DiskCache {
+    base_path: String,
+    beatmaps: Vec<Beatmapset>,
+    cached_at: u64,
+}
 
 struct BeatmapCache {
     data: HashMap<String, Arc<Vec<Beatmapset>>>,
@@ -219,6 +228,52 @@ fn parse_beatmap_folder(folder_path: &Path, folder_name: &str) -> Option<Beatmap
     None
 }
 
+fn get_cache_path(base_path: &str) -> PathBuf {
+    let hash = base_path
+        .bytes()
+        .fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
+    dirs::cache_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join(format!("osu-mapping-util/beatmaps_{}.json", hash))
+}
+
+fn load_disk_cache(base_path: &str) -> Option<Vec<Beatmapset>> {
+    let path = get_cache_path(base_path);
+    let data = fs::read_to_string(&path).ok()?;
+    let cache: DiskCache = serde_json::from_str(&data).ok()?;
+
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .ok()?
+        .as_secs();
+
+    if now - cache.cached_at < 86400 && cache.base_path == base_path {
+        Some(cache.beatmaps)
+    } else {
+        None
+    }
+}
+
+fn save_disk_cache(base_path: &str, beatmaps: &[Beatmapset]) {
+    let path = get_cache_path(base_path);
+    if let Some(parent) = path.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+
+    let cache = DiskCache {
+        base_path: base_path.to_string(),
+        beatmaps: beatmaps.to_vec(),
+        cached_at: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs(),
+    };
+
+    if let Ok(json) = serde_json::to_string(&cache) {
+        let _ = fs::write(&path, json);
+    }
+}
+
 #[tauri::command]
 pub fn scan_songs_step(
     base_path: String,
@@ -234,17 +289,35 @@ pub fn scan_songs_step(
     let all_beatmaps = match all_beatmaps {
         Some(cached) => cached,
         None => {
-            eprintln!("[scan] Cache miss, loading beatmaps...");
-            let loaded = load_all_beatmaps(&base_path)?;
-            let arc_loaded = Arc::new(loaded);
+            if let Some(disk_cached) = load_disk_cache(&base_path) {
+                eprintln!(
+                    "[scan] Loaded {} beatmaps from disk cache",
+                    disk_cached.len()
+                );
+                let arc_loaded = Arc::new(disk_cached);
 
-            let mut cache = BEATMAP_CACHE.write().unwrap();
-            cache.data.insert(base_path.clone(), arc_loaded.clone());
-            cache
-                .last_modified
-                .insert(base_path.clone(), SystemTime::now());
+                let mut cache = BEATMAP_CACHE.write().unwrap();
+                cache.data.insert(base_path.clone(), arc_loaded.clone());
+                cache
+                    .last_modified
+                    .insert(base_path.clone(), SystemTime::now());
 
-            arc_loaded
+                arc_loaded
+            } else {
+                eprintln!("[scan] Cache miss, loading beatmaps...");
+                let loaded = load_all_beatmaps(&base_path)?;
+
+                save_disk_cache(&base_path, &loaded);
+
+                let arc_loaded = Arc::new(loaded);
+                let mut cache = BEATMAP_CACHE.write().unwrap();
+                cache.data.insert(base_path.clone(), arc_loaded.clone());
+                cache
+                    .last_modified
+                    .insert(base_path.clone(), SystemTime::now());
+
+                arc_loaded
+            }
         }
     };
 
