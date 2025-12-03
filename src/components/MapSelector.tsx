@@ -25,8 +25,9 @@ interface ContextMenuState {
     beatmap: Beatmapset | null;
 }
 
-const STEP_SIZE = 20;
-const SCROLL_THRESHOLD = 100;
+const STEP_SIZE = 30;
+const SCROLL_THRESHOLD = 200;
+const SEARCH_DEBOUNCE_MS = 400;
 
 const ContextMenu = memo(function ContextMenu({
     x,
@@ -148,6 +149,7 @@ export function MapSelector({
 }: MapSelectorProps) {
     const [beatmaps, setBeatmaps] = useState<Beatmapset[]>([]);
     const [search, setSearch] = useState("");
+    const [debouncedSearch, setDebouncedSearch] = useState("");
     const [isScanning, setIsScanning] = useState(false);
     const [songsFolder, setSongsFolder] = useSongsFolder();
     const [detectStatus, setDetectStatus] = useState<string>("");
@@ -190,7 +192,7 @@ export function MapSelector({
             setDetectStatus("Auto-detection failed. Please select folder manually.");
             return null;
         }
-    }, []);
+    }, [setSongsFolder]);
 
     const selectFolder = useCallback(async () => {
         const selected = await open({
@@ -208,7 +210,7 @@ export function MapSelector({
             return selected;
         }
         return null;
-    }, [songsFolder]);
+    }, [songsFolder, setSongsFolder]);
 
     const loadStep = useCallback(
         async (
@@ -223,15 +225,31 @@ export function MapSelector({
             setIsScanning(true);
 
             try {
-                const result = await invoke<[Beatmapset[], number, boolean]>(
-                    "scan_songs_step",
-                    {
-                        basePath: folder,
-                        startIndex,
-                        stepSize: STEP_SIZE,
-                        searchQuery,
-                    }
-                );
+                const useFullSearch = searchQuery.length > 0 && !searchQuery.match(/^\d+\s/);
+
+                let result: [Beatmapset[], number, boolean];
+
+                if (useFullSearch && searchQuery.length >= 2) {
+                    result = await invoke<[Beatmapset[], number, boolean]>(
+                        "search_beatmaps_full",
+                        {
+                            basePath: folder,
+                            searchQuery,
+                            startIndex,
+                            stepSize: STEP_SIZE,
+                        }
+                    );
+                } else {
+                    result = await invoke<[Beatmapset[], number, boolean]>(
+                        "scan_songs_step",
+                        {
+                            basePath: folder,
+                            startIndex,
+                            stepSize: STEP_SIZE,
+                            searchQuery,
+                        }
+                    );
+                }
 
                 if (requestId !== currentRequestRef.current) {
                     return;
@@ -269,6 +287,11 @@ export function MapSelector({
             setBeatmaps([]);
             setCurrentIndex(0);
             setHasMore(true);
+
+            if (scrollContainerRef.current) {
+                scrollContainerRef.current.scrollTop = 0;
+            }
+
             await loadStep(songsFolder, searchQuery, 0, false, requestId);
         },
         [songsFolder, loadStep]
@@ -284,29 +307,35 @@ export function MapSelector({
             const count = await invoke<number>("reload_beatmaps", {
                 basePath: songsFolder,
             });
-            setDetectStatus(`Reloaded ${count} beatmaps`);
-            await reloadSearch(search);
+            setDetectStatus(`Found ${count} beatmaps`);
+            await reloadSearch(debouncedSearch);
         } catch (err) {
             console.error("[forceReload] Error:", err);
             setDetectStatus(`Reload error: ${err}`);
             setIsScanning(false);
         }
-    }, [songsFolder, search, reloadSearch]);
+    }, [songsFolder, debouncedSearch, reloadSearch]);
 
-    const handleSearchChange = useCallback(
-        (value: string) => {
-            setSearch(value);
+    useEffect(() => {
+        if (searchTimerRef.current) {
+            clearTimeout(searchTimerRef.current);
+        }
 
+        searchTimerRef.current = setTimeout(() => {
+            setDebouncedSearch(search);
+        }, SEARCH_DEBOUNCE_MS);
+
+        return () => {
             if (searchTimerRef.current) {
                 clearTimeout(searchTimerRef.current);
             }
+        };
+    }, [search]);
 
-            searchTimerRef.current = setTimeout(() => {
-                reloadSearch(value);
-            }, 300);
-        },
-        [reloadSearch]
-    );
+    useEffect(() => {
+        if (isInitialMount.current) return;
+        reloadSearch(debouncedSearch);
+    }, [debouncedSearch, reloadSearch]);
 
     const handleScroll = useCallback(
         (e: React.UIEvent<HTMLDivElement>) => {
@@ -319,10 +348,10 @@ export function MapSelector({
             if (distanceFromBottom < SCROLL_THRESHOLD) {
                 currentRequestRef.current += 1;
                 const requestId = currentRequestRef.current;
-                loadStep(songsFolder, search, currentIndex, true, requestId);
+                loadStep(songsFolder, debouncedSearch, currentIndex, true, requestId);
             }
         },
-        [songsFolder, hasMore, search, currentIndex, loadStep]
+        [songsFolder, hasMore, debouncedSearch, currentIndex, loadStep]
     );
 
     const handleCardContextMenu = useCallback(
@@ -365,7 +394,7 @@ export function MapSelector({
         }
 
         if (songsFolder) {
-            reloadSearch(search);
+            reloadSearch(debouncedSearch);
         }
     }, [songsFolder]);
 
@@ -404,11 +433,15 @@ export function MapSelector({
     );
 
     const statusText = useMemo(() => {
-        const count = beatmaps.length;
-        const suffix = count !== 1 ? "s" : "";
+        const loaded = beatmaps.length;
         const moreText = hasMore ? " · scroll for more" : "";
-        return `${count} beatmap${suffix}${moreText}`;
-    }, [beatmaps.length, hasMore]);
+
+        if (debouncedSearch) {
+            return `${loaded} results${moreText}`;
+        }
+
+        return `${loaded} loaded${moreText}`;
+    }, [beatmaps.length, hasMore, debouncedSearch]);
 
     return (
         <aside
@@ -449,7 +482,7 @@ export function MapSelector({
                             type="text"
                             placeholder="Search beatmaps..."
                             value={search}
-                            onChange={(e) => handleSearchChange(e.target.value)}
+                            onChange={(e) => setSearch(e.target.value)}
                             className="w-full h-8 pl-9 pr-3 rounded-lg bg-[#2a2a2a] border border-[#3a3a3a] text-sm placeholder-[#7b7b7b] focus:outline-none focus:border-[#4a4a4a] transition-colors"
                         />
                     </div>

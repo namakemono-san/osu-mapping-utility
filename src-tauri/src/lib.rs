@@ -58,6 +58,7 @@ pub fn run() {
             commands::run_download,
             commands::detect_osu_path,
             commands::scan_songs_step,
+            commands::search_beatmaps_full,
             commands::clear_beatmap_cache,
             commands::invalidate_cache_for_path,
             commands::reload_beatmaps,
