@@ -2,53 +2,61 @@ use crate::models::beatmapset::Beatmapset;
 use crate::utils::parser::scrape;
 use once_cell::sync::Lazy;
 use rayon::prelude::*;
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::io::Write;
 use std::path::Path;
-use std::path::PathBuf;
 use std::process::Command;
 use std::sync::{Arc, RwLock};
 use std::time::SystemTime;
 
-#[derive(Serialize, Deserialize)]
-struct DiskCache {
-    base_path: String,
-    beatmaps: Vec<Beatmapset>,
-    cached_at: u64,
+#[derive(Clone)]
+struct FolderEntry {
+    name: String,
+    path: std::path::PathBuf,
+    modified: SystemTime,
 }
 
-struct BeatmapCache {
-    data: HashMap<String, Arc<Vec<Beatmapset>>>,
-    last_modified: HashMap<String, SystemTime>,
+struct FolderListCache {
+    folders: HashMap<String, Arc<Vec<FolderEntry>>>,
+    last_updated: HashMap<String, SystemTime>,
 }
 
-impl BeatmapCache {
+impl FolderListCache {
     fn new() -> Self {
         Self {
-            data: HashMap::new(),
-            last_modified: HashMap::new(),
+            folders: HashMap::new(),
+            last_updated: HashMap::new(),
         }
     }
 }
 
-static BEATMAP_CACHE: Lazy<RwLock<BeatmapCache>> = Lazy::new(|| RwLock::new(BeatmapCache::new()));
+static FOLDER_CACHE: Lazy<RwLock<FolderListCache>> =
+    Lazy::new(|| RwLock::new(FolderListCache::new()));
+
+struct ParsedBeatmapCache {
+    data: HashMap<String, Beatmapset>,
+}
+
+impl ParsedBeatmapCache {
+    fn new() -> Self {
+        Self {
+            data: HashMap::new(),
+        }
+    }
+}
+
+static PARSED_CACHE: Lazy<RwLock<HashMap<String, ParsedBeatmapCache>>> =
+    Lazy::new(|| RwLock::new(HashMap::new()));
 
 #[tauri::command]
 pub fn detect_osu_path() -> Result<String, String> {
     if let Some(path) = try_detect_from_registry_hkcr() {
         return Ok(path);
     }
-
-    if let Some(path) = try_detect_from_registry_hkcu() {
-        return Ok(path);
-    }
-
     if let Some(path) = try_common_locations() {
         return Ok(path);
     }
-
     Err("osu! installation not found. Please select the Songs folder manually.".to_string())
 }
 
@@ -59,16 +67,13 @@ fn try_detect_from_registry_hkcr() -> Option<String> {
         .ok()?;
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    eprintln!("[detect] HKCR output: {}", stdout);
 
     for line in stdout.lines() {
         if !line.contains("REG_SZ") {
             continue;
         }
-
         let after_regsz = line.split("REG_SZ").nth(1)?;
         let trimmed = after_regsz.trim();
-
         let exe_path = trimmed
             .trim_start_matches('"')
             .split(',')
@@ -79,36 +84,11 @@ fn try_detect_from_registry_hkcr() -> Option<String> {
         if exe_path.to_lowercase().ends_with("osu!.exe") {
             let parent = Path::new(exe_path).parent()?;
             let songs_path = parent.join("Songs");
-
             if songs_path.exists() {
                 return Some(songs_path.to_string_lossy().to_string());
             }
         }
     }
-
-    None
-}
-
-fn try_detect_from_registry_hkcu() -> Option<String> {
-    let output = Command::new("reg")
-        .args(["query", r"HKCU\Software\osu!", "/v", "InstallPath"])
-        .output()
-        .ok()?;
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-
-    for line in stdout.lines() {
-        if line.contains("REG_SZ") {
-            let after_regsz = line.split("REG_SZ").nth(1)?;
-            let install_path = after_regsz.trim();
-            let songs_path = Path::new(install_path).join("Songs");
-
-            if songs_path.exists() {
-                return Some(songs_path.to_string_lossy().to_string());
-            }
-        }
-    }
-
     None
 }
 
@@ -125,13 +105,18 @@ fn try_common_locations() -> Option<String> {
             return Some(p.to_string_lossy().to_string());
         }
     }
-
     None
 }
 
-fn load_all_beatmaps(base_path: &str) -> Result<Vec<Beatmapset>, String> {
-    let base = Path::new(base_path);
+fn get_folder_list(base_path: &str) -> Result<Arc<Vec<FolderEntry>>, String> {
+    {
+        let cache = FOLDER_CACHE.read().unwrap();
+        if let Some(folders) = cache.folders.get(base_path) {
+            return Ok(folders.clone());
+        }
+    }
 
+    let base = Path::new(base_path);
     if !base.exists() {
         return Err(format!("Folder not found: {}", base_path));
     }
@@ -142,31 +127,33 @@ fn load_all_beatmaps(base_path: &str) -> Result<Vec<Beatmapset>, String> {
         .filter(|e| e.file_type().map(|ft| ft.is_dir()).unwrap_or(false))
         .collect();
 
-    let mut folders_with_time: Vec<_> = entries
+    let mut folders: Vec<FolderEntry> = entries
         .par_iter()
         .filter_map(|entry| {
             let modified = fs::metadata(entry.path()).and_then(|m| m.modified()).ok()?;
-            Some((
-                entry.path(),
-                entry.file_name().to_string_lossy().to_string(),
+            Some(FolderEntry {
+                name: entry.file_name().to_string_lossy().to_string(),
+                path: entry.path(),
                 modified,
-            ))
+            })
         })
         .collect();
 
-    folders_with_time.sort_by(|a, b| b.2.cmp(&a.2));
+    folders.sort_by(|a, b| b.modified.cmp(&a.modified));
 
-    let results: Vec<Beatmapset> = folders_with_time
-        .par_iter()
-        .filter_map(|(folder_path, folder_name, _)| parse_beatmap_folder(folder_path, folder_name))
-        .collect();
+    let arc_folders = Arc::new(folders);
 
-    eprintln!(
-        "[load] Loaded {} beatmaps from {}",
-        results.len(),
-        base_path
-    );
-    Ok(results)
+    {
+        let mut cache = FOLDER_CACHE.write().unwrap();
+        cache
+            .folders
+            .insert(base_path.to_string(), arc_folders.clone());
+        cache
+            .last_updated
+            .insert(base_path.to_string(), SystemTime::now());
+    }
+
+    Ok(arc_folders)
 }
 
 fn parse_beatmap_folder(folder_path: &Path, folder_name: &str) -> Option<Beatmapset> {
@@ -228,50 +215,27 @@ fn parse_beatmap_folder(folder_path: &Path, folder_name: &str) -> Option<Beatmap
     None
 }
 
-fn get_cache_path(base_path: &str) -> PathBuf {
-    let hash = base_path
-        .bytes()
-        .fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
-    dirs::cache_dir()
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join(format!("osu-mapping-util/beatmaps_{}.json", hash))
-}
-
-fn load_disk_cache(base_path: &str) -> Option<Vec<Beatmapset>> {
-    let path = get_cache_path(base_path);
-    let data = fs::read_to_string(&path).ok()?;
-    let cache: DiskCache = serde_json::from_str(&data).ok()?;
-
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .ok()?
-        .as_secs();
-
-    if now - cache.cached_at < 86400 && cache.base_path == base_path {
-        Some(cache.beatmaps)
-    } else {
-        None
-    }
-}
-
-fn save_disk_cache(base_path: &str, beatmaps: &[Beatmapset]) {
-    let path = get_cache_path(base_path);
-    if let Some(parent) = path.parent() {
-        let _ = fs::create_dir_all(parent);
+fn get_or_parse_beatmap(base_path: &str, folder: &FolderEntry) -> Option<Beatmapset> {
+    {
+        let cache = PARSED_CACHE.read().unwrap();
+        if let Some(path_cache) = cache.get(base_path) {
+            if let Some(beatmap) = path_cache.data.get(&folder.name) {
+                return Some(beatmap.clone());
+            }
+        }
     }
 
-    let cache = DiskCache {
-        base_path: base_path.to_string(),
-        beatmaps: beatmaps.to_vec(),
-        cached_at: std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs(),
-    };
+    let beatmap = parse_beatmap_folder(&folder.path, &folder.name)?;
 
-    if let Ok(json) = serde_json::to_string(&cache) {
-        let _ = fs::write(&path, json);
+    {
+        let mut cache = PARSED_CACHE.write().unwrap();
+        let path_cache = cache
+            .entry(base_path.to_string())
+            .or_insert_with(ParsedBeatmapCache::new);
+        path_cache.data.insert(folder.name.clone(), beatmap.clone());
     }
+
+    Some(beatmap)
 }
 
 #[tauri::command]
@@ -281,52 +245,58 @@ pub fn scan_songs_step(
     step_size: usize,
     search_query: String,
 ) -> Result<(Vec<Beatmapset>, usize, bool), String> {
-    let all_beatmaps = {
-        let cache = BEATMAP_CACHE.read().unwrap();
-        cache.data.get(&base_path).cloned()
-    };
+    let folders = get_folder_list(&base_path)?;
 
-    let all_beatmaps = match all_beatmaps {
-        Some(cached) => cached,
-        None => {
-            if let Some(disk_cached) = load_disk_cache(&base_path) {
-                eprintln!(
-                    "[scan] Loaded {} beatmaps from disk cache",
-                    disk_cached.len()
-                );
-                let arc_loaded = Arc::new(disk_cached);
+    if search_query.is_empty() {
+        let total = folders.len();
+        let end_index = (start_index + step_size).min(total);
 
-                let mut cache = BEATMAP_CACHE.write().unwrap();
-                cache.data.insert(base_path.clone(), arc_loaded.clone());
-                cache
-                    .last_modified
-                    .insert(base_path.clone(), SystemTime::now());
+        let results: Vec<Beatmapset> = folders[start_index..end_index]
+            .par_iter()
+            .filter_map(|folder| get_or_parse_beatmap(&base_path, folder))
+            .collect();
 
-                arc_loaded
-            } else {
-                eprintln!("[scan] Cache miss, loading beatmaps...");
-                let loaded = load_all_beatmaps(&base_path)?;
-
-                save_disk_cache(&base_path, &loaded);
-
-                let arc_loaded = Arc::new(loaded);
-                let mut cache = BEATMAP_CACHE.write().unwrap();
-                cache.data.insert(base_path.clone(), arc_loaded.clone());
-                cache
-                    .last_modified
-                    .insert(base_path.clone(), SystemTime::now());
-
-                arc_loaded
-            }
-        }
-    };
-
-    let filtered: Vec<&Beatmapset> = if search_query.is_empty() {
-        all_beatmaps.iter().collect()
+        let has_more = end_index < total;
+        Ok((results, end_index, has_more))
     } else {
         let query_lower = search_query.to_lowercase();
-        all_beatmaps
+
+        let matching_folders: Vec<&FolderEntry> = folders
+            .iter()
+            .filter(|f| f.name.to_lowercase().contains(&query_lower))
+            .collect();
+
+        let total = matching_folders.len();
+        let end_index = (start_index + step_size).min(total);
+
+        let results: Vec<Beatmapset> = matching_folders[start_index..end_index]
             .par_iter()
+            .filter_map(|folder| get_or_parse_beatmap(&base_path, folder))
+            .collect();
+
+        let has_more = end_index < total;
+        Ok((results, end_index, has_more))
+    }
+}
+
+#[tauri::command]
+pub fn search_beatmaps_full(
+    base_path: String,
+    search_query: String,
+    start_index: usize,
+    step_size: usize,
+) -> Result<(Vec<Beatmapset>, usize, bool), String> {
+    let folders = get_folder_list(&base_path)?;
+    let query_lower = search_query.to_lowercase();
+
+    let batch_size = 500;
+    let mut matched: Vec<Beatmapset> = Vec::new();
+    let mut scanned = 0;
+
+    for chunk in folders.chunks(batch_size) {
+        let parsed: Vec<Beatmapset> = chunk
+            .par_iter()
+            .filter_map(|folder| get_or_parse_beatmap(&base_path, folder))
             .filter(|b| {
                 let searchable = format!(
                     "{} {} {} {} {}",
@@ -338,51 +308,55 @@ pub fn scan_songs_step(
                 );
                 searchable.contains(&query_lower)
             })
-            .collect()
-    };
+            .collect();
 
-    let total = filtered.len();
+        matched.extend(parsed);
+        scanned += chunk.len();
+
+        if matched.len() >= start_index + step_size {
+            break;
+        }
+    }
+
+    let total = matched.len();
     let end_index = (start_index + step_size).min(total);
-    let results: Vec<Beatmapset> = filtered[start_index..end_index]
-        .iter()
-        .map(|b| (*b).clone())
-        .collect();
-    let has_more = end_index < total;
+    let results = matched[start_index..end_index].to_vec();
+    let has_more = scanned < folders.len() || end_index < total;
 
     Ok((results, end_index, has_more))
 }
 
 #[tauri::command]
 pub fn clear_beatmap_cache() {
-    let mut cache = BEATMAP_CACHE.write().unwrap();
-    cache.data.clear();
-    cache.last_modified.clear();
-    eprintln!("[cache] Cleared beatmap cache");
+    {
+        let mut cache = FOLDER_CACHE.write().unwrap();
+        cache.folders.clear();
+        cache.last_updated.clear();
+    }
+    {
+        let mut cache = PARSED_CACHE.write().unwrap();
+        cache.clear();
+    }
 }
 
 #[tauri::command]
 pub fn invalidate_cache_for_path(base_path: String) {
-    let mut cache = BEATMAP_CACHE.write().unwrap();
-    cache.data.remove(&base_path);
-    cache.last_modified.remove(&base_path);
-    eprintln!("[cache] Invalidated cache for: {}", base_path);
+    {
+        let mut cache = FOLDER_CACHE.write().unwrap();
+        cache.folders.remove(&base_path);
+        cache.last_updated.remove(&base_path);
+    }
+    {
+        let mut cache = PARSED_CACHE.write().unwrap();
+        cache.remove(&base_path);
+    }
 }
 
 #[tauri::command]
 pub fn reload_beatmaps(base_path: String) -> Result<usize, String> {
-    {
-        let mut cache = BEATMAP_CACHE.write().unwrap();
-        cache.data.remove(&base_path);
-    }
-
-    let loaded = load_all_beatmaps(&base_path)?;
-    let count = loaded.len();
-
-    let mut cache = BEATMAP_CACHE.write().unwrap();
-    cache.data.insert(base_path.clone(), Arc::new(loaded));
-    cache.last_modified.insert(base_path, SystemTime::now());
-
-    Ok(count)
+    invalidate_cache_for_path(base_path.clone());
+    let folders = get_folder_list(&base_path)?;
+    Ok(folders.len())
 }
 
 #[tauri::command]
