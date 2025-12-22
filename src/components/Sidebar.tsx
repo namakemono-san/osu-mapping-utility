@@ -9,6 +9,7 @@ import {
     MdRemoveRedEye,
     MdEdit,
     MdFolderOpen,
+    MdImage,
 } from "react-icons/md";
 import { appDataDir } from "@tauri-apps/api/path";
 import { openPath } from '@tauri-apps/plugin-opener';
@@ -20,6 +21,7 @@ export type SidebarKey =
     | "offset_calibrator"
     | "metadata_editor"
     | "downloader"
+    | "thumbnail_downloader"
 
 type SidebarProps = {
     active?: SidebarKey;
@@ -53,7 +55,8 @@ const CATEGORIES: SidebarCategory[] = [
         title: "Utilities",
         items: [
             { key: "offset_calibrator", label: "Offset Calibrator", Icon: MdSpeed },
-            { key: "downloader", label: "Downloader", Icon: MdDownload }
+            { key: "downloader", label: "Downloader", Icon: MdDownload },
+            { key: "thumbnail_downloader", label: "Downloader", Icon: MdImage }
         ],
     },
 ];

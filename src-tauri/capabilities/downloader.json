@@ -79,6 +79,28 @@
               "validator": ".+"
             }
           ]
+        },
+        {
+          "name": "waifu2x-ncnn-vulkan",
+          "sidecar": true,
+          "args": [
+            "-i",
+            {
+              "validator": ".+"
+            },
+            "-o",
+            {
+              "validator": ".+"
+            },
+            "-s",
+            {
+              "validator": "^[0-9]+$"
+            },
+            "-n",
+            {
+              "validator": "^[0-9]+$"
+            }
+          ]
         }
       ]
     }

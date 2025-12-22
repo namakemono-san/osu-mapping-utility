@@ -67,6 +67,8 @@ pub fn run() {
             commands::read_osu_file,
             commands::read_audio_file,
             commands::clone_beatmap,
+            commands::process_thumbnail,
+            commands::save_thumbnail,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -16,6 +16,7 @@ import { BeatmapClone } from "./pages/BeatmapClone";
 import { MetadataEditor } from "./pages/MetadataEditor";
 
 import { Beatmapset } from "./types/beatmap";
+import { ThumbnailDownloader } from "./pages/ThumbnailDownloader";
 
 const MAP_TOOLS: SidebarKey[] = [
   "beatmap_clone",
@@ -66,6 +67,8 @@ function App() {
         return <OffsetCalibrator />;
       case "downloader":
         return <Downloader />;
+      case "thumbnail_downloader":
+        return <ThumbnailDownloader />
       default:
         return null;
     }

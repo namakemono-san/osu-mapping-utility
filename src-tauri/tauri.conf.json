@@ -49,9 +49,16 @@
     "targets": [
       "nsis"
     ],
+    "resources": [
+      "binaries/models-cunet/*",
+      "binaries/models-upconv_7_anime_style_art_rgb/*",
+      "binaries/models-upconv_7_photo/*",
+      "binaries/vcomp140.dll"
+    ],
     "externalBin": [
       "binaries/yt-dlp",
-      "binaries/ffmpeg"
+      "binaries/ffmpeg",
+      "binaries/waifu2x-ncnn-vulkan"
     ],
     "icon": [
       "icons/32x32.png",
