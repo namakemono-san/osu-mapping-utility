@@ -14,15 +14,12 @@
           "name": "yt-dlp",
           "sidecar": true,
           "args": [
-            "-x",
-            "--audio-format",
-            {
-              "validator": "^(mp3|vorbis)$"
-            },
-            "--audio-quality",
-            {
-              "validator": "^(192K|6)$"
-            },
+            "--newline",
+            "--no-color",
+            "--encoding",
+            "utf-8",
+            "-f",
+            "bestaudio",
             "--no-playlist",
             "--windows-filenames",
             "--trim-filenames",
@@ -34,7 +31,9 @@
               "validator": ".+"
             },
             "--output",
-            "%(title)s-audio.%(ext)s",
+            "%(title)s-audio-src.%(ext)s",
+            "--print",
+            "after_move:filepath",
             {
               "validator": "^https?://.+"
             }
@@ -44,6 +43,10 @@
           "name": "yt-dlp",
           "sidecar": true,
           "args": [
+            "--newline",
+            "--no-color",
+            "--encoding",
+            "utf-8",
             "--no-playlist",
             "--windows-filenames",
             "--trim-filenames",
@@ -57,9 +60,44 @@
               "validator": ".+"
             },
             "--output",
-            "%(title)s-background-src.%(ext)s",
+            "%(title)s-background.%(ext)s",
             {
               "validator": "^https?://.+"
+            }
+          ]
+        },
+        {
+          "name": "ffmpeg",
+          "sidecar": true,
+          "args": [
+            "-i",
+            {
+              "validator": ".+"
+            },
+            "-f",
+            "null",
+            "-"
+          ]
+        },
+        {
+          "name": "ffmpeg",
+          "sidecar": true,
+          "args": [
+            "-y",
+            "-i",
+            {
+              "validator": ".+"
+            },
+            "-c:a",
+            {
+              "validator": "^(libmp3lame|libvorbis)$"
+            },
+            "-b:a",
+            {
+              "validator": "^[0-9]+k$"
+            },
+            {
+              "validator": ".+"
             }
           ]
         },
