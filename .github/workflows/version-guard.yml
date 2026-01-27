@@ -1,0 +1,38 @@
+name: Version Guard (master PR)
+
+on:
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Read version
+        id: ver
+        run: echo "version=$(node .github/scripts/sync-version.mjs --print)" >> "$GITHUB_OUTPUT"
+
+      - name: Ensure manifests are synced
+        run: node .github/scripts/sync-version.mjs --check
+
+      - name: Fail if tag already exists
+        run: |
+          git fetch --tags --force
+          if git show-ref --tags --verify --quiet "refs/tags/v${{ steps.ver.outputs.version }}"; then
+            echo "Tag v${{ steps.ver.outputs.version }} already exists"
+            exit 1
+          fi

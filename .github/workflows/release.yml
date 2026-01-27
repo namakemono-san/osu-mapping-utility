@@ -1,9 +1,11 @@
-name: Release
+name: Release (manual)
 
 on:
-  push:
-    tags:
-      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag name to release (e.g. v0.5.1)"
+        required: true
 
 jobs:
   release:
@@ -14,6 +16,9 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -22,6 +27,9 @@ jobs:
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Ensure manifests are synced
+        run: node .github/scripts/sync-version.mjs --check
 
       - name: Install frontend dependencies
         run: yarn install
@@ -33,7 +41,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
         with:
-          tagName: ${{ github.ref_name }}
+          tagName: ${{ inputs.tag }}
           releaseName: "osu! mapping utility v__VERSION__"
           releaseBody: "See the assets to download this version and install."
           releaseDraft: false

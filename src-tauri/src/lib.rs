@@ -56,6 +56,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::run_download,
+            commands::convert_taiko_video,
             commands::detect_osu_path,
             commands::scan_songs_step,
             commands::search_beatmaps_full,
@@ -66,6 +67,7 @@ pub fn run() {
             commands::write_osu_file,
             commands::read_osu_file,
             commands::read_audio_file,
+            commands::rename_osu_files,
             commands::clone_beatmap,
             commands::process_thumbnail,
             commands::save_thumbnail,

@@ -2,6 +2,7 @@ use crate::models::beatmapset::Beatmapset;
 use crate::utils::parser::scrape;
 use once_cell::sync::Lazy;
 use rayon::prelude::*;
+use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs;
 use std::io::Write;
@@ -400,6 +401,82 @@ pub fn write_osu_file(file_path: String, content: String) -> Result<(), String> 
 
     file.write_all(content.as_bytes())
         .map_err(|e| format!("Failed to write file: {}", e))?;
+
+    Ok(())
+}
+
+#[derive(Deserialize)]
+pub struct RenameOp {
+    pub from: String,
+    pub to: String,
+}
+
+#[tauri::command]
+pub fn rename_osu_files(beatmap_folder: String, renames: Vec<RenameOp>) -> Result<(), String> {
+    let base = Path::new(&beatmap_folder);
+    if !base.exists() {
+        return Err(format!("Folder not found: {}", beatmap_folder));
+    }
+
+    let ops: Vec<RenameOp> = renames.into_iter().filter(|op| op.from != op.to).collect();
+
+    if ops.is_empty() {
+        return Ok(());
+    }
+
+    for op in &ops {
+        if op.from.trim().is_empty() || op.to.trim().is_empty() {
+            return Err("Invalid rename op".to_string());
+        }
+        let from_path = base.join(&op.from);
+        if !from_path.exists() {
+            return Err(format!("File not found: {}", from_path.display()));
+        }
+    }
+
+    let pid = std::process::id();
+    let mut temp_paths: Vec<(std::path::PathBuf, std::path::PathBuf)> =
+        Vec::with_capacity(ops.len());
+
+    for (i, op) in ops.iter().enumerate() {
+        let from_path = base.join(&op.from);
+
+        let mut tmp_name = format!(".__omu_tmp__{}_{}__.osu", pid, i);
+        let mut tmp_path = base.join(&tmp_name);
+        let mut j = 0;
+        while tmp_path.exists() {
+            j += 1;
+            tmp_name = format!(".__omu_tmp__{}_{}_{}__.osu", pid, i, j);
+            tmp_path = base.join(&tmp_name);
+        }
+
+        fs::rename(&from_path, &tmp_path).map_err(|e| {
+            format!(
+                "Failed to rename {} -> {}: {}",
+                from_path.display(),
+                tmp_path.display(),
+                e
+            )
+        })?;
+        temp_paths.push((tmp_path, base.join(&op.to)));
+    }
+
+    for (_tmp_path, final_path) in &temp_paths {
+        if final_path.exists() {
+            return Err(format!("Target already exists: {}", final_path.display()));
+        }
+    }
+
+    for (tmp_path, final_path) in temp_paths {
+        fs::rename(&tmp_path, &final_path).map_err(|e| {
+            format!(
+                "Failed to rename {} -> {}: {}",
+                tmp_path.display(),
+                final_path.display(),
+                e
+            )
+        })?;
+    }
 
     Ok(())
 }

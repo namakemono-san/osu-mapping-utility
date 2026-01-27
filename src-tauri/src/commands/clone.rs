@@ -1,44 +1,289 @@
 use crate::models::beatmapset::BeatmapMetadata;
-use crate::utils::parser::scrape;
-use std::collections::HashMap;
+use chrono::Local;
+use std::collections::HashSet;
 use std::fs;
-use std::path::Path;
+use std::io::Write;
+use std::path::{Component, Path, PathBuf};
+use tauri::Manager;
+use zip::write::FileOptions;
+use zip::ZipWriter;
 
-fn get_next_beatmap_number(songs_path: &Path) -> Result<i32, String> {
-    let entries =
-        fs::read_dir(songs_path).map_err(|e| format!("Failed to read songs directory: {}", e))?;
+fn sanitize_filename_component(input: &str) -> String {
+    const FORBIDDEN: [char; 9] = ['<', '>', ':', '"', '/', '\\', '|', '?', '*'];
 
-    let mut max_num = 0;
-    for entry in entries.filter_map(|e| e.ok()) {
-        let folder_name = entry.file_name().to_string_lossy().to_string();
-        if folder_name.starts_with("beatmap-") {
-            if let Some(num_str) = folder_name.strip_prefix("beatmap-") {
-                if let Some(num_part) = num_str.split('-').next() {
-                    if let Ok(num) = num_part.parse::<i32>() {
-                        max_num = max_num.max(num);
-                    }
-                }
-            }
+    fn strip_trailing_dots_spaces(mut s: String) -> String {
+        while s.ends_with(' ') || s.ends_with('.') {
+            s.pop();
         }
+        s
     }
 
-    Ok(max_num + 1)
+    fn is_reserved_windows_name(stem: &str) -> bool {
+        let t = stem
+            .trim()
+            .trim_end_matches(['.', ' '])
+            .to_ascii_lowercase();
+        matches!(
+            t.as_str(),
+            "con"
+                | "prn"
+                | "aux"
+                | "nul"
+                | "com1"
+                | "com2"
+                | "com3"
+                | "com4"
+                | "com5"
+                | "com6"
+                | "com7"
+                | "com8"
+                | "com9"
+                | "lpt1"
+                | "lpt2"
+                | "lpt3"
+                | "lpt4"
+                | "lpt5"
+                | "lpt6"
+                | "lpt7"
+                | "lpt8"
+                | "lpt9"
+        )
+    }
+
+    let out: String = input
+        .chars()
+        .filter(|c| !c.is_control() && !FORBIDDEN.contains(c))
+        .collect();
+
+    let mut out = strip_trailing_dots_spaces(out);
+    out = out.split_whitespace().collect::<Vec<_>>().join(" ");
+    out = out.trim().to_string();
+
+    if out.is_empty() {
+        return "Untitled".to_string();
+    }
+
+    if is_reserved_windows_name(&out) {
+        out = format!("_{}", out);
+    }
+
+    strip_trailing_dots_spaces(out)
 }
 
-fn get_background_from_osu(content: &str) -> Option<String> {
-    for line in content.lines() {
-        let trimmed = line.trim();
-        if trimmed.starts_with("0,0,") || trimmed.starts_with("Background,") {
-            if let Some(start) = trimmed.find('"') {
-                if let Some(end) = trimmed[start + 1..].find('"') {
-                    return Some(trimmed[start + 1..start + 1 + end].to_string());
-                }
+fn safe_rel_path(rel: &str) -> Result<PathBuf, String> {
+    let rel = rel.trim();
+    if rel.is_empty() {
+        return Err("Empty path".to_string());
+    }
+
+    let p = Path::new(rel);
+    for comp in p.components() {
+        match comp {
+            Component::Normal(_) => {}
+            Component::CurDir => {}
+            Component::ParentDir => return Err(format!("Invalid relative path: {}", rel)),
+            Component::RootDir | Component::Prefix(_) => {
+                return Err(format!("Invalid relative path: {}", rel))
             }
         }
     }
+
+    Ok(p.to_path_buf())
+}
+
+fn zip_path(p: &Path) -> String {
+    p.to_string_lossy().replace('\\', "/")
+}
+
+fn first_quoted(s: &str) -> Option<String> {
+    let start = s.find('"')?;
+    let rest = &s[start + 1..];
+    let end = rest.find('"')?;
+    Some(rest[..end].to_string())
+}
+
+fn parse_event_filename(trimmed: &str, unquoted_index: usize) -> Option<String> {
+    if let Some(q) = first_quoted(trimmed) {
+        let v = q.trim();
+        return if v.is_empty() {
+            None
+        } else {
+            Some(v.to_string())
+        };
+    }
+
+    let parts: Vec<&str> = trimmed.split(',').collect();
+    let raw = parts.get(unquoted_index)?.trim();
+    let raw = raw.split_once("//").map(|(a, _)| a).unwrap_or(raw).trim();
+    let raw = raw.trim_matches('"').trim();
+    if raw.is_empty() {
+        None
+    } else {
+        Some(raw.to_string())
+    }
+}
+
+fn parse_audio_filename(content: &str) -> Option<String> {
+    let mut in_general = false;
+    for line in content.lines() {
+        let trimmed = line.trim();
+
+        if trimmed.starts_with('[') && trimmed.ends_with(']') {
+            in_general = trimmed.eq_ignore_ascii_case("[General]");
+            continue;
+        }
+
+        if !in_general {
+            continue;
+        }
+
+        if let Some(rest) = trimmed.strip_prefix("AudioFilename:") {
+            let v = rest.trim();
+            if !v.is_empty() {
+                return Some(v.to_string());
+            }
+        }
+    }
+
     None
 }
 
+fn is_background_event_line(trimmed: &str) -> bool {
+    trimmed.starts_with("0,0,") || trimmed.starts_with("Background,")
+}
+
+fn is_video_event_line(trimmed: &str) -> bool {
+    trimmed.starts_with("Video,") || trimmed.starts_with("1,")
+}
+
+fn parse_events_background_and_video(content: &str) -> (Option<String>, Option<String>) {
+    let mut in_events = false;
+    let mut bg: Option<String> = None;
+    let mut video: Option<String> = None;
+
+    for line in content.lines() {
+        let trimmed = line.trim();
+
+        if trimmed.starts_with('[') && trimmed.ends_with(']') {
+            in_events = trimmed.eq_ignore_ascii_case("[Events]");
+            continue;
+        }
+
+        if !in_events || trimmed.is_empty() || trimmed.starts_with("//") {
+            continue;
+        }
+
+        if bg.is_none() && is_background_event_line(trimmed) {
+            let idx = if trimmed.starts_with("Background,") {
+                3
+            } else {
+                2
+            };
+            bg = parse_event_filename(trimmed, idx);
+            continue;
+        }
+
+        if video.is_none() && is_video_event_line(trimmed) {
+            video = parse_event_filename(trimmed, 2);
+            continue;
+        }
+
+        if bg.is_some() && video.is_some() {
+            break;
+        }
+    }
+
+    (bg, video)
+}
+
+fn process_timing_points_reset(lines: &[&str], keep_kiai: bool) -> Vec<String> {
+    let mut result: Vec<String> = Vec::new();
+    let mut in_kiai = false;
+    let mut last_bpm_beat_length: Option<&str> = None;
+    let mut last_bpm_meter: Option<&str> = None;
+
+    for line in lines {
+        let trimmed = line.trim();
+
+        if trimmed.is_empty() || trimmed.starts_with("//") {
+            continue;
+        }
+
+        let parts: Vec<&str> = trimmed.split(',').collect();
+        if parts.len() < 8 {
+            continue;
+        }
+
+        let time = parts[0].trim();
+        let beat_length = parts[1].trim();
+        let meter = parts[2].trim();
+        let uninherited = parts[6].trim();
+        // Inherited timing points (green lines) use a negative beatLength (SV).
+        // Some maps may have inconsistent uninherited flags, so also treat non-negative beatLength as BPM.
+        let looks_like_uninherited = uninherited == "1" || !beat_length.starts_with('-');
+
+        let effects_raw = parts[7].trim().parse::<i32>().unwrap_or(0);
+        let has_kiai = (effects_raw & 1) == 1;
+        let effects_out = if keep_kiai && has_kiai { 1 } else { 0 };
+
+        if looks_like_uninherited {
+            last_bpm_beat_length = Some(beat_length);
+            last_bpm_meter = Some(meter);
+
+            // Keep BPM (beatLength) + meter; reset samples/volume; optionally keep kiai.
+            result.push(format!(
+                "{},{},{},1,0,100,1,{}",
+                time, beat_length, meter, effects_out
+            ));
+            in_kiai = has_kiai;
+            continue;
+        }
+
+        if keep_kiai && has_kiai != in_kiai {
+            if let (Some(bpm_bl), Some(bpm_meter)) = (last_bpm_beat_length, last_bpm_meter) {
+                result.push(format!(
+                    "{},{},{},1,0,100,0,{}",
+                    time, bpm_bl, bpm_meter, effects_out
+                ));
+            }
+            in_kiai = has_kiai;
+        }
+    }
+
+    result
+}
+
+fn next_available_file_path(mut path: PathBuf) -> PathBuf {
+    if !path.exists() {
+        return path;
+    }
+
+    let parent = path.parent().map(|p| p.to_path_buf()).unwrap_or_default();
+    let stem = path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("file")
+        .to_string();
+    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+
+    for i in 1..=9999 {
+        let suffix = format!(" ({})", i);
+        let candidate = if ext.is_empty() {
+            parent.join(format!("{}{}", stem, suffix))
+        } else {
+            parent.join(format!("{}{}.{ext}", stem, suffix))
+        };
+
+        if !candidate.exists() {
+            path = candidate;
+            break;
+        }
+    }
+
+    path
+}
+
+#[allow(dead_code)]
 fn is_skin_file(filename: &str) -> bool {
     let lower = filename.to_lowercase();
     let name_without_ext = lower.rsplit_once('.').map(|(n, _)| n).unwrap_or(&lower);
@@ -310,77 +555,16 @@ fn is_skin_file(filename: &str) -> bool {
     false
 }
 
-fn process_timing_points(lines: &[&str]) -> Vec<String> {
-    let mut result = Vec::new();
-    let mut in_kiai = false;
-    let mut last_bpm_line: Option<String> = None;
-
-    for line in lines {
-        let trimmed = line.trim();
-
-        if trimmed.is_empty() || trimmed.starts_with("//") {
-            continue;
-        }
-
-        let parts: Vec<&str> = trimmed.split(',').collect();
-        if parts.len() < 8 {
-            continue;
-        }
-
-        let time = parts[0].trim();
-        let beat_length = parts[1].trim();
-        let meter = parts[2].trim();
-        let uninherited = parts[6].trim();
-        let effects = parts[7].trim().parse::<i32>().unwrap_or(0);
-        let has_kiai = (effects & 1) == 1;
-
-        if uninherited == "1" {
-            let new_line = format!(
-                "{},{},{},1,0,100,1,{}",
-                time,
-                beat_length,
-                meter,
-                if has_kiai { "1" } else { "0" }
-            );
-            last_bpm_line = Some(new_line.clone());
-            result.push(new_line);
-            in_kiai = has_kiai;
-            continue;
-        }
-
-        if has_kiai != in_kiai {
-            if let Some(ref bpm_line) = last_bpm_line {
-                let bpm_parts: Vec<&str> = bpm_line.split(',').collect();
-                let bpm_beat_length = bpm_parts[1];
-                let bpm_meter = bpm_parts[2];
-
-                let new_line = format!(
-                    "{},{},{},1,0,100,0,{}",
-                    time,
-                    bpm_beat_length,
-                    bpm_meter,
-                    if has_kiai { "1" } else { "0" }
-                );
-                result.push(new_line);
-            }
-
-            in_kiai = has_kiai;
-        }
-    }
-
-    result
-}
-
 fn process_osu_content(
     content: &str,
     metadata: &BeatmapMetadata,
     game_mode: u8,
-    difficulty: &str,
-    keep_timing_points: bool,
-    reset_sample_set: bool,
+    reset_timing_points: bool,
+    keep_kiai: bool,
+    copy_preview_time: bool,
     reset_difficulty: bool,
-    remove_colours: bool,
     background_file: Option<&str>,
+    video_file: Option<&str>,
 ) -> String {
     let eol = if content.contains("\r\n") {
         "\r\n"
@@ -389,42 +573,79 @@ fn process_osu_content(
     };
 
     let lines: Vec<&str> = content.split(eol).collect();
-    let mut output = Vec::new();
+    let mut output: Vec<String> = Vec::new();
+
     let mut current_section = String::new();
-    let mut timing_lines = Vec::new();
-    let mut in_timing_section = false;
     let mut skip_section = false;
+    let mut in_timing_section = false;
+    let mut in_events_section = false;
+    let mut in_hitobjects_section = false;
+    let mut wrote_preview_time = false;
+
+    let mut timing_lines: Vec<&str> = Vec::new();
 
     for line in lines {
         let trimmed = line.trim();
 
         if trimmed.starts_with('[') && trimmed.ends_with(']') {
-            if current_section == "[TimingPoints]" && in_timing_section {
-                if keep_timing_points {
-                    let processed = process_timing_points(&timing_lines);
-                    for tp_line in processed {
-                        output.push(tp_line);
-                    }
+            let leaving_events = current_section == "[Events]" && in_events_section;
+            let leaving_timing_points = current_section == "[TimingPoints]" && in_timing_section;
+
+            if leaving_events {
+                // Always keep one empty line between [Events] and the next section.
+                if output.last().map(|s| !s.is_empty()).unwrap_or(true) {
+                    output.push(String::new());
                 }
+            }
+
+            if leaving_timing_points && reset_timing_points {
+                let processed = process_timing_points_reset(&timing_lines, keep_kiai);
+                output.extend(processed);
                 timing_lines.clear();
-                in_timing_section = false;
+            }
+
+            if leaving_timing_points {
+                // Always keep one empty line between [TimingPoints] and the next section.
+                if output.last().map(|s| !s.is_empty()).unwrap_or(true) {
+                    output.push(String::new());
+                }
             }
 
             current_section = trimmed.to_string();
+            skip_section = current_section == "[Editor]" || current_section == "[Colours]";
+            in_timing_section = current_section == "[TimingPoints]";
+            in_events_section = current_section == "[Events]";
+            in_hitobjects_section = current_section == "[HitObjects]";
 
-            if current_section == "[Editor]"
-                || current_section == "[HitObjects]"
-                || (current_section == "[Colours]" && remove_colours)
-            {
-                skip_section = true;
+            if in_timing_section {
+                timing_lines.clear();
+            }
+
+            if current_section == "[General]" {
+                wrote_preview_time = false;
+            }
+
+            if skip_section {
                 continue;
             }
 
-            skip_section = false;
             output.push(line.to_string());
 
-            if current_section == "[TimingPoints]" {
-                in_timing_section = true;
+            if in_events_section {
+                output.push("//Background and Video events".to_string());
+                if let Some(bg) = background_file {
+                    output.push(format!("0,0,\"{}\",0,0", bg));
+                }
+                if let Some(v) = video_file {
+                    output.push(format!("Video,0,\"{}\"", v));
+                }
+                output.push("//Break Periods".to_string());
+                output.push("//Storyboard Layer 0 (Background)".to_string());
+                output.push("//Storyboard Layer 1 (Fail)".to_string());
+                output.push("//Storyboard Layer 2 (Pass)".to_string());
+                output.push("//Storyboard Layer 3 (Foreground)".to_string());
+                output.push("//Storyboard Layer 4 (Overlay)".to_string());
+                output.push("//Storyboard Sound Samples".to_string());
             }
 
             continue;
@@ -434,30 +655,17 @@ fn process_osu_content(
             continue;
         }
 
-        if in_timing_section && keep_timing_points {
+        if in_hitobjects_section {
+            continue;
+        }
+
+        if in_events_section {
+            // Entire [Events] body is rewritten to a fixed template.
+            continue;
+        }
+
+        if in_timing_section && reset_timing_points {
             timing_lines.push(line);
-            continue;
-        }
-
-        if in_timing_section && !keep_timing_points {
-            continue;
-        }
-
-        if current_section == "[Events]" {
-            if trimmed.starts_with("//") || trimmed.is_empty() {
-                output.push(line.to_string());
-                continue;
-            }
-
-            if trimmed.starts_with("0,0,") || trimmed.starts_with("Background,") {
-                if let Some(bg) = background_file {
-                    output.push(format!("0,0,\"{}\",0,0", bg));
-                } else {
-                    output.push(line.to_string());
-                }
-                continue;
-            }
-
             continue;
         }
 
@@ -466,7 +674,23 @@ fn process_osu_content(
                 output.push(format!("Mode: {}", game_mode));
                 continue;
             }
-            if reset_sample_set && trimmed.starts_with("SampleSet:") {
+
+            if trimmed.starts_with("PreviewTime:") {
+                if copy_preview_time {
+                    output.push(line.to_string());
+                } else if !wrote_preview_time {
+                    output.push("PreviewTime:-1".to_string());
+                }
+                wrote_preview_time = true;
+                continue;
+            }
+
+            if !copy_preview_time && !wrote_preview_time {
+                output.push("PreviewTime:-1".to_string());
+                wrote_preview_time = true;
+            }
+
+            if reset_timing_points && trimmed.starts_with("SampleSet:") {
                 output.push("SampleSet: Normal".to_string());
                 continue;
             }
@@ -490,11 +714,11 @@ fn process_osu_content(
                 continue;
             }
             if trimmed.starts_with("Creator:") {
-                output.push(format!("Creator:{}", metadata.creator));
+                output.push("Creator:".to_string());
                 continue;
             }
             if trimmed.starts_with("Version:") {
-                output.push(format!("Version:{}", difficulty));
+                output.push("Version:".to_string());
                 continue;
             }
             if trimmed.starts_with("Source:") {
@@ -521,7 +745,7 @@ fn process_osu_content(
                 continue;
             }
             if trimmed.starts_with("CircleSize:") {
-                output.push("CircleSize:2".to_string());
+                output.push("CircleSize:5".to_string());
                 continue;
             }
             if trimmed.starts_with("OverallDifficulty:") {
@@ -545,11 +769,9 @@ fn process_osu_content(
         output.push(line.to_string());
     }
 
-    if in_timing_section && keep_timing_points && !timing_lines.is_empty() {
-        let processed = process_timing_points(&timing_lines);
-        for tp_line in processed {
-            output.push(tp_line);
-        }
+    if current_section == "[TimingPoints]" && in_timing_section && reset_timing_points {
+        let processed = process_timing_points_reset(&timing_lines, keep_kiai);
+        output.extend(processed);
     }
 
     output.join(eol)
@@ -557,15 +779,16 @@ fn process_osu_content(
 
 #[tauri::command]
 pub fn clone_beatmap(
+    app: tauri::AppHandle,
     source_beatmap: String,
+    template_osu_file: String,
     game_mode: u8,
-    difficulties: Vec<String>,
     metadata: BeatmapMetadata,
-    keep_timing_points: bool,
+    reset_timing_points: bool,
+    keep_kiai: bool,
     remove_skin_files: bool,
-    reset_sample_set: bool,
+    copy_preview_time: bool,
     reset_difficulty: bool,
-    remove_colours: bool,
     songs_folder: String,
 ) -> Result<String, String> {
     let songs_path = Path::new(&songs_folder);
@@ -575,105 +798,158 @@ pub fn clone_beatmap(
         return Err(format!("Source beatmap not found: {}", source_beatmap));
     }
 
-    let beatmap_num = get_next_beatmap_number(songs_path)?;
+    if template_osu_file.contains('\\') || template_osu_file.contains('/') {
+        return Err("Invalid .osu filename".to_string());
+    }
 
-    let safe_title = metadata
-        .title
-        .chars()
-        .map(|c| {
-            if c.is_alphanumeric() || c == ' ' {
-                c
-            } else {
-                '_'
+    let template_path = source_path.join(&template_osu_file);
+    if !template_path.exists() {
+        return Err(format!("Template .osu not found: {}", template_osu_file));
+    }
+
+    let template_content = fs::read_to_string(&template_path)
+        .map_err(|e| format!("Failed to read template .osu: {}", e))?;
+
+    let audio_filename = parse_audio_filename(&template_content)
+        .ok_or_else(|| "AudioFilename not found in .osu".to_string())?;
+
+    let (bg_from_events, video_from_events) = parse_events_background_and_video(&template_content);
+
+    let audio_rel = safe_rel_path(&audio_filename)?;
+    let audio_abs = source_path.join(&audio_rel);
+    if !audio_abs.exists() {
+        return Err(format!("Audio file not found: {}", audio_abs.display()));
+    }
+
+    let bg_rel: Option<PathBuf> = match bg_from_events.as_deref() {
+        Some(v) if !v.trim().is_empty() => {
+            let rel = safe_rel_path(v)?;
+            let abs = source_path.join(&rel);
+            if !abs.exists() {
+                return Err(format!("Background file not found: {}", abs.display()));
             }
-        })
-        .collect::<String>()
-        .replace(' ', "_");
-
-    let new_folder_name = format!("beatmap-{}-{}", beatmap_num, safe_title);
-    let new_folder_path = songs_path.join(&new_folder_name);
-
-    fs::create_dir_all(&new_folder_path).map_err(|e| format!("Failed to create folder: {}", e))?;
-
-    let osu_files: Vec<_> = fs::read_dir(&source_path)
-        .map_err(|e| format!("Failed to read source: {}", e))?
-        .filter_map(|e| e.ok())
-        .filter(|e| {
-            e.path()
-                .extension()
-                .and_then(|s| s.to_str())
-                .map(|s| s == "osu")
-                .unwrap_or(false)
-        })
-        .collect();
-
-    if osu_files.is_empty() {
-        return Err("No .osu files found in source beatmap".to_string());
-    }
-
-    let mut diff_backgrounds: HashMap<String, String> = HashMap::new();
-    for osu_file in &osu_files {
-        let content = fs::read_to_string(osu_file.path())
-            .map_err(|e| format!("Failed to read .osu file: {}", e))?;
-
-        let version = scrape(&content, "Version:", "\n");
-        if let Some(bg) = get_background_from_osu(&content) {
-            diff_backgrounds.insert(version, bg);
+            Some(rel)
         }
+        _ => None,
+    };
+
+    let video_rel: Option<PathBuf> = match video_from_events.as_deref() {
+        Some(v) if !v.trim().is_empty() => {
+            let rel = safe_rel_path(v)?;
+            let abs = source_path.join(&rel);
+            if !abs.exists() {
+                return Err(format!("Video file not found: {}", abs.display()));
+            }
+            Some(rel)
+        }
+        _ => None,
+    };
+
+    let new_content = process_osu_content(
+        &template_content,
+        &metadata,
+        game_mode,
+        reset_timing_points,
+        keep_kiai,
+        copy_preview_time,
+        reset_difficulty,
+        bg_from_events.as_deref(),
+        video_from_events.as_deref(),
+    );
+
+    let timestamp = Local::now().format("%Y%m%d%H%M%S").to_string();
+    let mut artist = sanitize_filename_component(&metadata.artist);
+    let mut title = sanitize_filename_component(&metadata.title);
+    if artist.is_empty() {
+        artist = "Unknown".to_string();
+    }
+    if title.is_empty() {
+        title = "Untitled".to_string();
     }
 
-    let audio_extensions = ["mp3", "ogg", "wav"];
-    let image_extensions = ["jpg", "jpeg", "png"];
+    let osz_stem = format!("{} - {} - {}", timestamp, artist, title);
 
-    for entry in fs::read_dir(&source_path).map_err(|e| format!("Failed to read source: {}", e))? {
-        let entry = entry.map_err(|e| format!("Failed to read entry: {}", e))?;
-        let path = entry.path();
+    let cache_dir = app
+        .path()
+        .app_cache_dir()
+        .map_err(|e| format!("Failed to resolve cache dir: {}", e))?;
+    let out_dir = cache_dir.join("clone");
+    fs::create_dir_all(&out_dir).map_err(|e| format!("Failed to create cache dir: {}", e))?;
 
-        if let Some(ext) = path.extension() {
-            let ext_str = ext.to_str().unwrap_or("").to_lowercase();
-            let file_name = path.file_name().unwrap().to_str().unwrap_or("");
+    let osz_path = next_available_file_path(out_dir.join(format!("{}.osz", osz_stem)));
 
-            if remove_skin_files && is_skin_file(file_name) {
+    let osu_filename = format!("{} - {}.osu", artist, title);
+
+    let mut include_files: HashSet<PathBuf> = HashSet::new();
+    include_files.insert(audio_rel);
+    if let Some(rel) = bg_rel {
+        include_files.insert(rel);
+    }
+    if let Some(rel) = video_rel {
+        include_files.insert(rel);
+    }
+
+    // Keep the .osz minimal by default: only files referenced by the selected source .osu.
+    // If the user disables "Remove Skin Files", also bundle extra media files from the source folder.
+    if !remove_skin_files {
+        let audio_extensions = ["mp3", "ogg", "wav"];
+        let image_extensions = ["jpg", "jpeg", "png"];
+        let video_extensions = ["mp4", "webm", "avi", "mkv"];
+
+        for entry in
+            fs::read_dir(&source_path).map_err(|e| format!("Failed to read source: {}", e))?
+        {
+            let entry = entry.map_err(|e| format!("Failed to read entry: {}", e))?;
+            let path = entry.path();
+            if !path.is_file() {
                 continue;
             }
 
-            if audio_extensions.contains(&ext_str.as_str())
-                || image_extensions.contains(&ext_str.as_str())
+            let file_name = match path.file_name().and_then(|s| s.to_str()) {
+                Some(v) => v,
+                None => continue,
+            };
+
+            let ext = path
+                .extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or("")
+                .to_lowercase();
+
+            if audio_extensions.contains(&ext.as_str())
+                || image_extensions.contains(&ext.as_str())
+                || video_extensions.contains(&ext.as_str())
             {
-                let dest = new_folder_path.join(path.file_name().unwrap());
-                fs::copy(&path, &dest).map_err(|e| format!("Failed to copy file: {}", e))?;
+                include_files.insert(PathBuf::from(file_name));
             }
         }
     }
 
-    let template_path = osu_files[0].path();
-    let template_content = fs::read_to_string(&template_path)
-        .map_err(|e| format!("Failed to read template: {}", e))?;
+    let file = fs::File::create(&osz_path).map_err(|e| format!("Failed to create .osz: {}", e))?;
+    let mut zip = ZipWriter::new(file);
+    let options: FileOptions<'static, ()> =
+        FileOptions::default().compression_method(zip::CompressionMethod::Deflated);
 
-    for diff in &difficulties {
-        let background = diff_backgrounds.get(diff.as_str()).map(|s| s.as_str());
+    zip.start_file(&osu_filename, options)
+        .map_err(|e| format!("Failed to write .osu entry: {}", e))?;
+    zip.write_all(new_content.as_bytes())
+        .map_err(|e| format!("Failed to write .osu entry: {}", e))?;
 
-        let new_content = process_osu_content(
-            &template_content,
-            &metadata,
-            game_mode,
-            diff,
-            keep_timing_points,
-            reset_sample_set,
-            reset_difficulty,
-            remove_colours,
-            background,
-        );
+    for rel in include_files {
+        let abs = source_path.join(&rel);
+        if !abs.exists() {
+            return Err(format!("Referenced file not found: {}", abs.display()));
+        }
 
-        let new_filename = format!(
-            "{} - {} ({}) [{}].osu",
-            metadata.artist, metadata.title, metadata.creator, diff
-        );
+        zip.start_file(zip_path(&rel), options)
+            .map_err(|e| format!("Failed to add zip entry: {}", e))?;
 
-        let new_file_path = new_folder_path.join(new_filename);
-        fs::write(&new_file_path, new_content)
-            .map_err(|e| format!("Failed to write .osu file: {}", e))?;
+        let mut f = fs::File::open(&abs).map_err(|e| format!("Failed to open file: {}", e))?;
+        std::io::copy(&mut f, &mut zip).map_err(|e| format!("Failed to write zip entry: {}", e))?;
     }
 
-    Ok(format!("Successfully created beatmap: {}", new_folder_name))
+    zip.finish()
+        .map_err(|e| format!("Failed to finalize .osz: {}", e))?;
+
+    Ok(osz_path.to_string_lossy().to_string())
 }
