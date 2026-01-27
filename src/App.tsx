@@ -11,12 +11,14 @@ import { UpdateChecker } from "./components/UpdateChecker";
 import { OffsetCalibrator } from "./pages/OffsetCalibrator";
 import { BeatmapPreview } from "./pages/BeatmapPreview";
 import { BeatmapCustomizer } from "./pages/BeatmapCustomizer";
-import { Downloader } from "./pages/Downloader";
+import { VideoDownloader } from "./pages/VideoDownloader";
 import { BeatmapClone } from "./pages/BeatmapClone";
 import { MetadataEditor } from "./pages/MetadataEditor";
 
 import { Beatmapset } from "./types/beatmap";
 import { ThumbnailDownloader } from "./pages/ThumbnailDownloader";
+
+import { useI18n } from "./hooks/i18nContext";
 
 const MAP_TOOLS: SidebarKey[] = [
   "beatmap_clone",
@@ -28,6 +30,8 @@ const MAP_TOOLS: SidebarKey[] = [
 function App() {
   const [activeTool, setActiveTool] = useState<SidebarKey>("beatmap_customizer");
   const [selectedBeatmap, setSelectedBeatmap] = useState<Beatmapset | null>(null);
+
+  const { t } = useI18n();
 
   const showMapSelector = MAP_TOOLS.includes(activeTool);
 
@@ -44,10 +48,10 @@ function App() {
           <div className="text-center">
             <div className="text-6xl mb-4 opacity-20">🎵</div>
             <h2 className="text-2xl font-bold text-[#eeeeee] mb-2">
-              Select a Beatmap
+              {t("app.selectBeatmap.title")}
             </h2>
             <p className="text-[#7b7b7b]">
-              Choose a beatmap from the left sidebar to get started
+              {t("app.selectBeatmap.desc")}
             </p>
           </div>
         </div>
@@ -65,8 +69,8 @@ function App() {
         return <MetadataEditor selectedBeatmap={selectedBeatmap} />
       case "offset_calibrator":
         return <OffsetCalibrator />;
-      case "downloader":
-        return <Downloader />;
+      case "video_downloader":
+        return <VideoDownloader />;
       case "thumbnail_downloader":
         return <ThumbnailDownloader />
       default:

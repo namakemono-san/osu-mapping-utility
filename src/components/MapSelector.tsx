@@ -11,6 +11,8 @@ import { Button } from "./common/Button";
 
 import { Beatmapset } from "../types/beatmap";
 import { useSongsFolder } from "../hooks/useStorage";
+import { useI18n } from "../hooks/i18nContext";
+import type { LocaleKey } from "../locale";
 
 type MapSelectorProps = {
     onSelect?: (beatmap: Beatmapset) => void;
@@ -40,6 +42,7 @@ const ContextMenu = memo(function ContextMenu({
     onOpenFolder: () => void;
     onClose: () => void;
 }) {
+    const { t } = useI18n();
     const menuRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -75,7 +78,7 @@ const ContextMenu = memo(function ContextMenu({
                 className="w-full px-3 py-2 flex items-center gap-2 text-sm text-[#eeeeee] hover:bg-[#3a3a3a] transition-colors text-left"
             >
                 <MdFolderOpen className="text-base" />
-                Open Folder
+                {t("mapSelector.context.openFolder")}
             </button>
         </div>,
         document.body
@@ -93,6 +96,7 @@ const BeatmapCard = memo(function BeatmapCard({
     onContextMenu: (e: React.MouseEvent, data: Beatmapset) => void;
     isSelected?: boolean;
 }) {
+    const { t } = useI18n();
     const bgStyle = useMemo(() => {
         if (data.background_path) {
             return {
@@ -135,7 +139,7 @@ const BeatmapCard = memo(function BeatmapCard({
                     {data.title || data.folder_name}
                 </div>
                 <div className="text-[#c0c0c0] text-xs font-light">
-                    Mapped by {data.creator}
+                    {t("mapSelector.mappedBy", { creator: data.creator })}
                 </div>
             </div>
         </div>
@@ -147,12 +151,17 @@ export function MapSelector({
     selectedBeatmap,
     className = "",
 }: MapSelectorProps) {
+    const { t } = useI18n();
+
     const [beatmaps, setBeatmaps] = useState<Beatmapset[]>([]);
     const [search, setSearch] = useState("");
     const [debouncedSearch, setDebouncedSearch] = useState("");
     const [isScanning, setIsScanning] = useState(false);
     const [songsFolder, setSongsFolder] = useSongsFolder();
-    const [detectStatus, setDetectStatus] = useState<string>("");
+    const [detectStatus, setDetectStatus] = useState<
+        | { key: LocaleKey; params?: Record<string, string | number> }
+        | null
+    >(null);
     const [currentIndex, setCurrentIndex] = useState(0);
     const [hasMore, setHasMore] = useState(true);
     const [contextMenu, setContextMenu] = useState<ContextMenuState>({
@@ -165,6 +174,7 @@ export function MapSelector({
     const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const currentRequestRef = useRef<number>(0);
     const isLoadingRef = useRef(false);
+    const pendingReloadRef = useRef<{ folder: string; searchQuery: string } | null>(null);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const isInitialMount = useRef(true);
 
@@ -180,16 +190,16 @@ export function MapSelector({
     }, []);
 
     const autoDetectOsuFolder = useCallback(async (): Promise<string | null> => {
-        setDetectStatus("Detecting osu! installation...");
+        setDetectStatus({ key: "mapSelector.detect.detecting" });
 
         try {
             const path = await invoke<string>("detect_osu_path");
-            setDetectStatus(`Found: ${path}`);
+            setDetectStatus({ key: "mapSelector.detect.found", params: { path } });
             setSongsFolder(path);
             return path;
         } catch (err) {
             console.error("[detect] Auto-detection failed:", err);
-            setDetectStatus("Auto-detection failed. Please select folder manually.");
+            setDetectStatus({ key: "mapSelector.detect.failed" });
             return null;
         }
     }, [setSongsFolder]);
@@ -198,7 +208,7 @@ export function MapSelector({
         const selected = await open({
             directory: true,
             multiple: false,
-            title: "Select osu! Songs folder",
+            title: t("mapSelector.dialog.selectSongsFolder"),
             defaultPath: songsFolder || undefined,
         });
 
@@ -206,11 +216,11 @@ export function MapSelector({
             await invoke("invalidate_cache_for_path", { basePath: selected });
 
             setSongsFolder(selected);
-            setDetectStatus(`Selected: ${selected}`);
+            setDetectStatus({ key: "mapSelector.detect.selected", params: { path: selected } });
             return selected;
         }
         return null;
-    }, [songsFolder, setSongsFolder]);
+    }, [songsFolder, setSongsFolder, t]);
 
     const loadStep = useCallback(
         async (
@@ -265,13 +275,29 @@ export function MapSelector({
             } catch (err) {
                 if (requestId === currentRequestRef.current) {
                     console.error("[loadStep] Error:", err);
-                    setDetectStatus(`Error: ${err}`);
+                    setDetectStatus({ key: "mapSelector.detect.error", params: { error: String(err) } });
                 }
             } finally {
-                if (requestId === currentRequestRef.current) {
-                    setIsScanning(false);
-                }
                 isLoadingRef.current = false;
+
+                const pending = pendingReloadRef.current;
+                if (pending) {
+                    pendingReloadRef.current = null;
+                    const nextRequestId = currentRequestRef.current;
+
+                    setBeatmaps([]);
+                    setCurrentIndex(0);
+                    setHasMore(true);
+                    if (scrollContainerRef.current) {
+                        scrollContainerRef.current.scrollTop = 0;
+                    }
+
+                    // Kick the queued reload now that the in-flight request finished.
+                    void loadStep(pending.folder, pending.searchQuery, 0, false, nextRequestId);
+                    return;
+                }
+
+                setIsScanning(false);
             }
         },
         []
@@ -280,6 +306,15 @@ export function MapSelector({
     const reloadSearch = useCallback(
         async (searchQuery: string = "") => {
             if (!songsFolder) return;
+
+            // If a request is already running, queue the latest reload and cancel
+            // any in-flight results by bumping the request id.
+            if (isLoadingRef.current) {
+                currentRequestRef.current += 1;
+                pendingReloadRef.current = { folder: songsFolder, searchQuery };
+                setIsScanning(true);
+                return;
+            }
 
             currentRequestRef.current += 1;
             const requestId = currentRequestRef.current;
@@ -301,17 +336,17 @@ export function MapSelector({
         if (!songsFolder) return;
 
         setIsScanning(true);
-        setDetectStatus("Reloading...");
+        setDetectStatus({ key: "mapSelector.detect.reloading" });
 
         try {
             const count = await invoke<number>("reload_beatmaps", {
                 basePath: songsFolder,
             });
-            setDetectStatus(`Found ${count} beatmaps`);
+            setDetectStatus({ key: "mapSelector.detect.foundBeatmaps", params: { count } });
             await reloadSearch(debouncedSearch);
         } catch (err) {
             console.error("[forceReload] Error:", err);
-            setDetectStatus(`Reload error: ${err}`);
+            setDetectStatus({ key: "mapSelector.detect.reloadError", params: { error: String(err) } });
             setIsScanning(false);
         }
     }, [songsFolder, debouncedSearch, reloadSearch]);
@@ -434,14 +469,14 @@ export function MapSelector({
 
     const statusText = useMemo(() => {
         const loaded = beatmaps.length;
-        const moreText = hasMore ? " · scroll for more" : "";
+        const moreText = hasMore ? ` · ${t("mapSelector.status.scrollForMore")}` : "";
 
         if (debouncedSearch) {
-            return `${loaded} results${moreText}`;
+            return t("mapSelector.status.results", { count: loaded, more: moreText });
         }
 
-        return `${loaded} loaded${moreText}`;
-    }, [beatmaps.length, hasMore, debouncedSearch]);
+        return t("mapSelector.status.loaded", { count: loaded, more: moreText });
+    }, [beatmaps.length, hasMore, debouncedSearch, t]);
 
     return (
         <aside
@@ -456,21 +491,21 @@ export function MapSelector({
                             className="flex-1"
                             onClick={forceReload}
                             disabled={isScanning}
-                            title="Reload beatmaps"
+                            title={t("mapSelector.button.reloadTitle")}
                             icon={
                                 <MdRefresh
                                     className={`text-base ${isScanning ? "animate-spin" : ""}`}
                                 />
                             }
                         >
-                            Reload
+                            {t("mapSelector.button.reload")}
                         </Button>
                         <Button
                             onClick={selectFolder}
                             disabled={isScanning}
                             variant="secondary"
                             size="sm"
-                            title="Change folder"
+                            title={t("mapSelector.button.changeFolderTitle")}
                         >
                             <MdFolder className="text-base" />
                         </Button>
@@ -480,7 +515,7 @@ export function MapSelector({
                         <MdSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-[#7b7b7b] text-base" />
                         <input
                             type="text"
-                            placeholder="Search beatmaps..."
+                            placeholder={t("mapSelector.search.placeholder")}
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                             className="w-full h-8 pl-9 pr-3 rounded-lg bg-[#2a2a2a] border border-[#3a3a3a] text-sm placeholder-[#7b7b7b] focus:outline-none focus:border-[#4a4a4a] transition-colors"
@@ -490,9 +525,9 @@ export function MapSelector({
                     {detectStatus && (
                         <div
                             className="text-xs text-[#7b7b7b] truncate"
-                            title={detectStatus}
+                            title={t(detectStatus.key, detectStatus.params)}
                         >
-                            {detectStatus}
+                            {t(detectStatus.key, detectStatus.params)}
                         </div>
                     )}
 
@@ -516,14 +551,14 @@ export function MapSelector({
                 ))}
                 {isScanning && (
                     <div className="text-center py-4 text-sm text-yellow-400 animate-pulse">
-                        Loading...
+                        {t("mapSelector.loading")}
                     </div>
                 )}
                 {!isScanning && beatmaps.length === 0 && (
                     <div className="text-center py-8 text-[#7b7b7b]">
-                        <p className="text-sm">No beatmaps found</p>
+                        <p className="text-sm">{t("mapSelector.empty.noBeatmaps")}</p>
                         {search && (
-                            <p className="text-xs mt-2">Try a different search term</p>
+                            <p className="text-xs mt-2">{t("mapSelector.empty.tryDifferent")}</p>
                         )}
                     </div>
                 )}

@@ -1,0 +1,46 @@
+name: Version Sync (develop)
+
+on:
+  push:
+    branches:
+      - develop
+
+jobs:
+  sync:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: develop
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Read version
+        id: ver
+        run: echo "version=$(node .github/scripts/sync-version.mjs --print)" >> "$GITHUB_OUTPUT"
+
+      - name: Sync manifests
+        run: node .github/scripts/sync-version.mjs
+
+      - name: Commit and push (if changed)
+        run: |
+          if git diff --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add package.json src-tauri/Cargo.toml src-tauri/Cargo.lock
+          git commit -m "chore(version): sync manifests to v${{ steps.ver.outputs.version }}"
+          git push

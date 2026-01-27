@@ -115,6 +115,10 @@ export function useDownloaderSettings() {
         STORAGE_KEYS.DOWNLOADER_INCLUDE_VIDEO,
         false
     );
+    const [autoTaikoVideo, setAutoTaikoVideo] = useStorage<boolean>(
+        STORAGE_KEYS.DOWNLOADER_AUTO_TAIKO_VIDEO,
+        false
+    );
     const [outDir, setOutDir] = useStorageString(
         STORAGE_KEYS.DOWNLOAD_FOLDER,
         ""
@@ -125,6 +129,8 @@ export function useDownloaderSettings() {
         setAudioFormat,
         includeVideo,
         setIncludeVideo,
+        autoTaikoVideo,
+        setAutoTaikoVideo,
         outDir,
         setOutDir,
     };

@@ -14,15 +14,12 @@
           "name": "yt-dlp",
           "sidecar": true,
           "args": [
-            "-x",
-            "--audio-format",
-            {
-              "validator": "^(mp3|vorbis)$"
-            },
-            "--audio-quality",
-            {
-              "validator": "^(192K|6)$"
-            },
+            "--newline",
+            "--no-color",
+            "--encoding",
+            "utf-8",
+            "-f",
+            "bestaudio",
             "--no-playlist",
             "--windows-filenames",
             "--trim-filenames",
@@ -34,7 +31,9 @@
               "validator": ".+"
             },
             "--output",
-            "%(title)s-audio.%(ext)s",
+            "%(title)s-audio-src.%(ext)s",
+            "--print",
+            "after_move:filepath",
             {
               "validator": "^https?://.+"
             }
@@ -44,6 +43,10 @@
           "name": "yt-dlp",
           "sidecar": true,
           "args": [
+            "--newline",
+            "--no-color",
+            "--encoding",
+            "utf-8",
             "--no-playlist",
             "--windows-filenames",
             "--trim-filenames",
@@ -57,9 +60,46 @@
               "validator": ".+"
             },
             "--output",
-            "%(title)s-background-src.%(ext)s",
+            "%(title)s-background.%(ext)s",
+            "--print",
+            "after_move:filepath",
             {
               "validator": "^https?://.+"
+            }
+          ]
+        },
+        {
+          "name": "ffmpeg",
+          "sidecar": true,
+          "args": [
+            "-i",
+            {
+              "validator": ".+"
+            },
+            "-f",
+            "null",
+            "-"
+          ]
+        },
+        {
+          "name": "ffmpeg",
+          "sidecar": true,
+          "args": [
+            "-y",
+            "-i",
+            {
+              "validator": ".+"
+            },
+            "-c:a",
+            {
+              "validator": "^(libmp3lame|libvorbis)$"
+            },
+            "-b:a",
+            {
+              "validator": "^[0-9]+k$"
+            },
+            {
+              "validator": ".+"
             }
           ]
         },
@@ -75,6 +115,56 @@
             "-an",
             "-c:v",
             "copy",
+            {
+              "validator": ".+"
+            }
+          ]
+        },
+        {
+          "name": "ffmpeg",
+          "sidecar": true,
+          "args": [
+            "-y",
+            "-i",
+            {
+              "validator": ".+"
+            },
+            "-vf",
+            {
+              "validator": "^scale=[0-9]+:[0-9]+$"
+            },
+            "-q:v",
+            {
+              "validator": "^[0-9]{1,2}$"
+            },
+            {
+              "validator": ".+"
+            }
+          ]
+        },
+        {
+          "name": "ffmpeg",
+          "sidecar": true,
+          "args": [
+            "-y",
+            "-i",
+            {
+              "validator": ".+"
+            },
+            "-i",
+            {
+              "validator": ".+"
+            },
+            "-filter_complex",
+            {
+              "validator": "^\\[0\\]split=3\\[blur\\]\\[scale\\]\\[output\\];\\[output\\]scale=1280:720\\[output\\];\\[scale\\]scale=-1:340\\[scale\\];\\[blur\\]scale=1280:-1,boxblur=10,crop=1280:340\\[blur\\];\\[output\\]\\[1\\]overlay=0:0\\[output\\];\\[output\\]\\[blur\\]overlay=0:387\\[output\\];\\[output\\]\\[scale\\]overlay=\\(W-w\\)/2:387\\[output\\]$"
+            },
+            "-map",
+            "[output]",
+            "-aspect",
+            "1280:720",
+            "-b:v",
+            "800K",
             {
               "validator": ".+"
             }
@@ -99,6 +189,10 @@
             "-n",
             {
               "validator": "^[0-9]+$"
+            },
+            "-m",
+            {
+              "validator": ".+"
             }
           ]
         }

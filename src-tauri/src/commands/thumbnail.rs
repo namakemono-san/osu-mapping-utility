@@ -4,6 +4,8 @@ use tauri::Manager;
 use tauri_plugin_shell::ShellExt;
 use tokio::{fs::File, io::AsyncWriteExt};
 
+const MAX_THUMBNAIL_BYTES: u64 = 2_500_000;
+
 async fn download(url: &str, path: &PathBuf) -> Result<(), String> {
     let client = Client::new();
     let resp = client.get(url).send().await.map_err(|e| e.to_string())?;
@@ -20,11 +22,8 @@ async fn download(url: &str, path: &PathBuf) -> Result<(), String> {
 }
 
 fn strip_unc(path: &PathBuf) -> String {
-    path.to_str()
-        .unwrap()
-        .strip_prefix(r"\\?\")
-        .unwrap_or(path.to_str().unwrap())
-        .to_string()
+    let s = path.to_string_lossy();
+    s.strip_prefix(r"\\?\").unwrap_or(&s).to_string()
 }
 
 async fn run_waifu2x(
@@ -41,20 +40,23 @@ async fn run_waifu2x(
 
     let model_path = resource_dir.join("binaries/models-cunet");
 
+    let args: Vec<String> = vec![
+        "-i".into(),
+        input.to_string_lossy().to_string(),
+        "-o".into(),
+        output.to_string_lossy().to_string(),
+        "-s".into(),
+        "2".into(),
+        "-n".into(),
+        "2".into(),
+        "-m".into(),
+        strip_unc(&model_path),
+    ];
+
     let result = shell
-        .command("waifu2x-ncnn-vulkan")
-        .args([
-            "-i",
-            input.to_str().unwrap(),
-            "-o",
-            output.to_str().unwrap(),
-            "-s",
-            "2",
-            "-n",
-            "2",
-            "-m",
-            &strip_unc(&model_path),
-        ])
+        .sidecar("waifu2x-ncnn-vulkan")
+        .map_err(|e| format!("waifu2x sidecar init error: {}", e))?
+        .args(args)
         .output()
         .await
         .map_err(|e| format!("waifu2x spawn error: {}", e))?;
@@ -73,23 +75,34 @@ async fn run_waifu2x(
     }
 }
 
-async fn resize_fhd(
+async fn render_jpeg(
     app: &tauri::AppHandle,
     input: &PathBuf,
     output: &PathBuf,
+    width: u32,
+    height: u32,
+    q: u8,
 ) -> Result<(), String> {
     let shell = app.shell();
 
+    let vf = format!("scale={}:{}", width, height);
+    let q_str = q.to_string();
+
+    let args: Vec<String> = vec![
+        "-y".into(),
+        "-i".into(),
+        input.to_string_lossy().to_string(),
+        "-vf".into(),
+        vf,
+        "-q:v".into(),
+        q_str,
+        output.to_string_lossy().to_string(),
+    ];
+
     let result = shell
-        .command("ffmpeg")
-        .args([
-            "-y",
-            "-i",
-            input.to_str().unwrap(),
-            "-vf",
-            "scale=1920:1080",
-            output.to_str().unwrap(),
-        ])
+        .sidecar("ffmpeg")
+        .map_err(|e| format!("ffmpeg sidecar init error: {}", e))?
+        .args(args)
         .output()
         .await
         .map_err(|e| format!("ffmpeg spawn error: {}", e))?;
@@ -108,10 +121,29 @@ async fn resize_fhd(
     }
 }
 
+async fn ensure_under_size(app: &tauri::AppHandle, input: &PathBuf, output: &PathBuf) -> Result<(), String> {
+    let sizes = [(1920, 1080), (1600, 900), (1280, 720), (960, 540), (854, 480)];
+    let qualities: [u8; 15] = [3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31];
+
+    for (w, h) in sizes {
+        for q in qualities {
+            render_jpeg(app, input, output, w, h, q).await?;
+            let size = std::fs::metadata(output).map_err(|e| e.to_string())?.len();
+            if size <= MAX_THUMBNAIL_BYTES {
+                return Ok(());
+            }
+        }
+    }
+
+    let final_size = std::fs::metadata(output).map_err(|e| e.to_string())?.len();
+    Err(format!(
+        "Thumbnail exceeds limit: {} bytes (max {} bytes)",
+        final_size, MAX_THUMBNAIL_BYTES
+    ))
+}
+
 #[tauri::command]
 pub async fn process_thumbnail(app: tauri::AppHandle, video_id: String) -> Result<String, String> {
-    println!("process_thumbnail called: {}", video_id);
-
     let base_dir = app
         .path()
         .app_data_dir()
@@ -122,10 +154,13 @@ pub async fn process_thumbnail(app: tauri::AppHandle, video_id: String) -> Resul
 
     let raw = base_dir.join(format!("{}_raw.jpg", video_id));
     let upscaled = base_dir.join(format!("{}_upscaled.png", video_id));
-    let fhd = base_dir.join(format!("{}_fhd.png", video_id));
+    let fhd = base_dir.join(format!("{}_fhd.jpg", video_id));
 
     if fhd.exists() {
-        return Ok(fhd.to_string_lossy().to_string());
+        let size = std::fs::metadata(&fhd).map_err(|e| e.to_string())?.len();
+        if size <= MAX_THUMBNAIL_BYTES {
+            return Ok(fhd.to_string_lossy().to_string());
+        }
     }
 
     let maxres = format!("https://img.youtube.com/vi/{}/maxresdefault.jpg", video_id);
@@ -136,7 +171,7 @@ pub async fn process_thumbnail(app: tauri::AppHandle, video_id: String) -> Resul
     }
 
     run_waifu2x(&app, &raw, &upscaled).await?;
-    resize_fhd(&app, &upscaled, &fhd).await?;
+    ensure_under_size(&app, &upscaled, &fhd).await?;
 
     Ok(fhd.to_string_lossy().to_string())
 }

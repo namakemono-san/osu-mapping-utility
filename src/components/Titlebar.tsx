@@ -1,10 +1,9 @@
-import { useEffect, useState } from "react";;
+import { useEffect, useState } from "react";
 import { getVersion } from '@tauri-apps/api/app';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { FiX, FiMinus, FiMaximize, FiMinimize, FiBookOpen } from 'react-icons/fi';
+import { FiX, FiMinus, FiMaximize, FiMinimize, FiGlobe } from 'react-icons/fi';
 
-// FiGlobe
-// import { useI18n } from "../hooks/i18nContext";
+import { useI18n } from "../hooks/i18nContext";
 
 function ToolButton({ icon, label, onClick }: { icon: React.ReactNode; label: string; onClick?: () => void }) {
     return (
@@ -31,7 +30,7 @@ export function Titlebar() {
     const [isMax, setIsMax] = useState(false);
     const [version, setVersion] = useState<string>("");
 
-    // const { lang, setLang } = useI18n();
+    const { lang, setLang, t } = useI18n();
 
     useEffect(() => {
         let unlisten: (() => void) | undefined;
@@ -60,12 +59,11 @@ export function Titlebar() {
 
             <div className="flex items-center h-full" data-tauri-drag-region="false">
                 <div className="flex gap-2" onDoubleClickCapture={(e) => e.stopPropagation()}>
-                    <ToolButton icon={<FiBookOpen className="text-[18px]" />} label="Documentation" />
-                    {/* <ToolButton
+                    <ToolButton
                         icon={<FiGlobe className="text-[18px]" />}
-                        label={`Language: ${lang.toUpperCase()}`}
+                        label={t("titlebar.language", { lang: lang.toUpperCase() })}
                         onClick={() => setLang(lang === "en" ? "ja" : "en")}
-                    /> */}
+                    />
                 </div>
 
                 <div className="w-px h-full bg-zinc-700/70 ml-2" />

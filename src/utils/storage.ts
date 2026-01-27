@@ -14,6 +14,7 @@ export const STORAGE_KEYS = {
 
     DOWNLOADER_AUDIO_FORMAT: "downloader.audioFormat",
     DOWNLOADER_INCLUDE_VIDEO: "downloader.includeVideo",
+    DOWNLOADER_AUTO_TAIKO_VIDEO: "downloader.autoTaikoVideo",
 } as const;
 
 type StorageKey = (typeof STORAGE_KEYS)[keyof typeof STORAGE_KEYS];
@@ -31,6 +32,7 @@ const DEFAULTS: Partial<Record<StorageKey, unknown>> = {
 
     [STORAGE_KEYS.DOWNLOADER_AUDIO_FORMAT]: "mp3",
     [STORAGE_KEYS.DOWNLOADER_INCLUDE_VIDEO]: false,
+    [STORAGE_KEYS.DOWNLOADER_AUTO_TAIKO_VIDEO]: false,
 };
 
 export function getStorage<T>(key: StorageKey, defaultValue?: T): T | null {
