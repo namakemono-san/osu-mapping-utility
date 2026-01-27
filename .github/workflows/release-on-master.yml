@@ -43,12 +43,15 @@ jobs:
           $tag = "v${{ steps.ver.outputs.version }}"
           git show-ref --tags --verify --quiet "refs/tags/$tag"
           $exists = ($LASTEXITCODE -eq 0)
+          $global:LASTEXITCODE = 0
           if ($exists) {
             Write-Host "Tag $tag already exists; skipping release"
             "should_release=false" >> $env:GITHUB_OUTPUT
           } else {
             "should_release=true" >> $env:GITHUB_OUTPUT
           }
+
+          exit 0
 
       - name: Install frontend dependencies
         if: steps.check.outputs.should_release == 'true'
