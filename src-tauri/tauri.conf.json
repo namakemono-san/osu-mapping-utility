@@ -54,6 +54,13 @@
     "targets": [
       "nsis"
     ],
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "installerIcon": "icons/icon.ico",
+        "headerImage": "icons/icon.ico"
+      }
+    },
     "resources": [
       "binaries/models-cunet/*",
       "binaries/models-upconv_7_anime_style_art_rgb/*",
