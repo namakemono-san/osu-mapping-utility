@@ -1,0 +1,94 @@
+name: Release (master)
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  release:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Ensure manifests are synced
+        run: node .github/scripts/sync-version.mjs --check
+
+      - name: Read version
+        id: ver
+        shell: pwsh
+        run: |
+          $v = node .github/scripts/sync-version.mjs --print
+          "version=$v" >> $env:GITHUB_OUTPUT
+
+      - name: Check existing tag
+        id: check
+        shell: pwsh
+        run: |
+          git fetch --tags --force
+          $tag = "v${{ steps.ver.outputs.version }}"
+          git show-ref --tags --verify --quiet "refs/tags/$tag"
+          $exists = ($LASTEXITCODE -eq 0)
+          if ($exists) {
+            Write-Host "Tag $tag already exists; skipping release"
+            "should_release=false" >> $env:GITHUB_OUTPUT
+          } else {
+            "should_release=true" >> $env:GITHUB_OUTPUT
+          }
+
+      - name: Install frontend dependencies
+        if: steps.check.outputs.should_release == 'true'
+        run: yarn install
+
+      - name: Build (Tauri)
+        if: steps.check.outputs.should_release == 'true'
+        run: yarn tauri build
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+
+      - name: Collect release assets
+        if: steps.check.outputs.should_release == 'true'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $bundle = Join-Path $pwd 'src-tauri\target\release\bundle'
+          $outDir = Join-Path $pwd 'release-assets'
+          New-Item -ItemType Directory -Force -Path $outDir | Out-Null
+
+          $items = Get-ChildItem -Path "$bundle\*" -Recurse -File -Include *.exe,*.msi,*.zip,*.sig,latest.json
+          if (-not $items) {
+            throw "No release assets found under $bundle"
+          }
+          foreach ($it in $items) {
+            Copy-Item -Force -Path $it.FullName -Destination $outDir
+          }
+
+      - name: Create release (creates tag last)
+        if: steps.check.outputs.should_release == 'true'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = "${{ steps.ver.outputs.version }}"
+          $tag = "v$version"
+          gh release create $tag --target "${{ github.sha }}" --title "osu! mapping utility v$version" --notes "See the assets to download this version and install."
+
+          $assetsDir = Join-Path $pwd 'release-assets'
+          $assets = Get-ChildItem -Path $assetsDir -File | ForEach-Object { $_.FullName }
+          gh release upload $tag @assets --clobber

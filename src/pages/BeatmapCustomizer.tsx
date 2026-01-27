@@ -7,6 +7,8 @@ import { Button } from "../components/common/Button";
 import { Card } from "../components/common/Card";
 import { Switch } from "../components/common/Switch";
 
+import { useI18n } from "../hooks/i18nContext";
+
 import { Beatmapset } from "../types/beatmap";
 
 interface BeatmapCustomizerProps {
@@ -160,6 +162,7 @@ function extractMetadata(osuText: string): { beatmapId?: string; beatmapSetId?: 
 }
 
 export function BeatmapCustomizer({ selectedBeatmap }: BeatmapCustomizerProps) {
+    const { t } = useI18n();
     const [osuFiles, setOsuFiles] = useState<string[]>([]);
     const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
     const [processing, setProcessing] = useState(false);
@@ -300,7 +303,7 @@ export function BeatmapCustomizer({ selectedBeatmap }: BeatmapCustomizerProps) {
             <div className="flex items-center justify-center h-full">
                 <div className="text-center text-[#7b7b7b]">
                     <div className="text-4xl mb-3 opacity-30">📝</div>
-                    <p>Select a beatmap to customize</p>
+                    <p>{t("customizer.empty.selectBeatmap")}</p>
                 </div>
             </div>
         );
@@ -315,8 +318,13 @@ export function BeatmapCustomizer({ selectedBeatmap }: BeatmapCustomizerProps) {
                     <Card className="p-3">
                         <h2 className="text-lg font-bold mb-1.5">{selectedBeatmap.title}</h2>
                         <div className="flex items-end justify-between text-xs text-[#7b7b7b]">
-                            <div>Mapped by {selectedBeatmap.creator}</div>
-                            <div>{osuFiles.length} difficulty file{osuFiles.length !== 1 ? 's' : ''} found</div>
+                            <div>{t("mapSelector.mappedBy", { creator: selectedBeatmap.creator })}</div>
+                            <div>
+                                {t("customizer.header.difficultiesFound", {
+                                    count: osuFiles.length,
+                                    plural: osuFiles.length === 1 ? "" : "s",
+                                })}
+                            </div>
                         </div>
                     </Card>
 
@@ -327,7 +335,7 @@ export function BeatmapCustomizer({ selectedBeatmap }: BeatmapCustomizerProps) {
                                     onClick={() => setIsDiffExpanded(!isDiffExpanded)}
                                     className="flex items-center gap-2 hover:text-[#eeeeee] transition-colors"
                                 >
-                                    <h3 className="font-semibold text-sm">Select Difficulties</h3>
+                                    <h3 className="font-semibold text-sm">{t("customizer.section.selectDifficulties")}</h3>
                                     <span className="text-xs text-[#7b7b7b]">
                                         ({selectedFiles.size}/{osuFiles.length})
                                     </span>
@@ -343,7 +351,9 @@ export function BeatmapCustomizer({ selectedBeatmap }: BeatmapCustomizerProps) {
                                     onClick={toggleAll}
                                     className="h-auto px-0 text-[#2563eb] hover:text-[#1f56cc] hover:bg-transparent"
                                 >
-                                    {selectedFiles.size === osuFiles.length ? "Deselect All" : "Select All"}
+                                    {selectedFiles.size === osuFiles.length
+                                        ? t("customizer.button.deselectAll")
+                                        : t("customizer.button.selectAll")}
                                 </Button>
                             </div>
 
@@ -376,26 +386,26 @@ export function BeatmapCustomizer({ selectedBeatmap }: BeatmapCustomizerProps) {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
                         {[
                             {
-                                label: "Center objects",
-                                desc: "Move all hit objects to center (osu!taiko)",
+                                label: t("customizer.option.center.label"),
+                                desc: t("customizer.option.center.desc"),
                                 checked: centerOn,
                                 set: setCenterOn,
                             },
                             {
-                                label: "Remove bookmarks",
-                                desc: "Delete all bookmarks (all modes)",
+                                label: t("customizer.option.bookmarks.label"),
+                                desc: t("customizer.option.bookmarks.desc"),
                                 checked: rmBookmarks,
                                 set: setRmBookmarks,
                             },
                             {
-                                label: "Strip new combo flags",
-                                desc: "Remove new combo flags (osu!taiko)",
+                                label: t("customizer.option.newCombo.label"),
+                                desc: t("customizer.option.newCombo.desc"),
                                 checked: rmNewCombo,
                                 set: setRmNewCombo,
                             },
                             {
-                                label: "Whistle → Clap",
-                                desc: "Replace Whistle with Clap (osu!taiko)",
+                                label: t("customizer.option.whistle.label"),
+                                desc: t("customizer.option.whistle.desc"),
                                 checked: w2cOn,
                                 set: setW2cOn,
                             },
@@ -438,7 +448,7 @@ export function BeatmapCustomizer({ selectedBeatmap }: BeatmapCustomizerProps) {
                         checked={createBackup}
                         onChange={setCreateBackup}
                         className="h-11 px-2"
-                        label="Create Backup"
+                        label={t("customizer.backup.label")}
                     />
 
                     <Button
@@ -450,8 +460,11 @@ export function BeatmapCustomizer({ selectedBeatmap }: BeatmapCustomizerProps) {
                         className="flex-1"
                     >
                         {processing
-                            ? "Processing..."
-                            : `Apply to ${selectedFiles.size} Difficult${selectedFiles.size !== 1 ? 'ies' : 'y'}`
+                            ? t("customizer.button.processing")
+                            : t("customizer.button.apply", {
+                                count: selectedFiles.size,
+                                plural: selectedFiles.size === 1 ? "y" : "ies",
+                            })
                         }
                     </Button>
                 </div>

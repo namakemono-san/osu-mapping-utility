@@ -23,6 +23,7 @@ import { Card } from "../components/common/Card";
 
 import { Beatmapset } from "../types/beatmap";
 import { useSongsFolder, usePreviewSettings } from "../hooks/useStorage";
+import { useI18n } from "../hooks/i18nContext";
 
 interface BeatmapPreviewProps {
     selectedBeatmap?: Beatmapset | null;
@@ -130,6 +131,7 @@ function sortDifficulties(difficulties: Difficulty[]): { sorted: Difficulty[], e
 }
 
 export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
+    const { t } = useI18n();
     const [songsFolder] = useSongsFolder();
 
     const [loading, setLoading] = useState(false);
@@ -714,7 +716,6 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
                 try {
                     audioSourceRef.current.stop();
                 } catch (e) {
-                    // エラーを握りつぶす
                 }
                 audioSourceRef.current.disconnect();
                 audioSourceRef.current = null;
@@ -731,7 +732,6 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
             try {
                 audioSourceRef.current.stop();
             } catch (e) {
-                // エラーを握りつぶす
             }
             audioSourceRef.current.disconnect();
             audioSourceRef.current = null;
@@ -1375,7 +1375,7 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
             <div className="flex items-center justify-center h-full">
                 <div className="text-center text-[#7b7b7b]">
                     <div className="text-4xl mb-3 opacity-30">🥁</div>
-                    <p>Select a beatmap to preview</p>
+                    <p>{t("preview.empty.selectBeatmap")}</p>
                 </div>
             </div>
         );
@@ -1386,7 +1386,7 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
             <div className="flex items-center justify-center h-full">
                 <div className="text-center text-[#7b7b7b]">
                     <FiRefreshCw className="w-8 h-8 animate-spin mx-auto mb-3" />
-                    <p className="font-semibold mb-1">Loading beatmap...</p>
+                    <p className="font-semibold mb-1">{t("preview.loading")}</p>
                     {loadingStep && <p className="text-sm opacity-70">{loadingStep}</p>}
                 </div>
             </div>
@@ -1400,7 +1400,7 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
                     <div className="flex items-center gap-3 text-red-400">
                         <FiAlertCircle className="w-6 h-6" />
                         <div>
-                            <div className="font-semibold mb-1">Failed to load beatmap</div>
+                            <div className="font-semibold mb-1">{t("preview.error.title")}</div>
                             <div className="text-sm opacity-80">{error}</div>
                         </div>
                     </div>
@@ -1423,7 +1423,10 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
                             <div className="flex-1">
                                 <h2 className="text-lg font-bold">{beatmapData.title}</h2>
                                 <div className="text-sm text-[#7b7b7b]">
-                                    {beatmapData.artist} // Mapped by {beatmapData.creator}
+                                    {t("preview.header.artistMapper", {
+                                        artist: beatmapData.artist,
+                                        creator: beatmapData.creator,
+                                    })}
                                 </div>
                             </div>
                         </div>
@@ -1555,7 +1558,7 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
                                         {isPlaying ? <FiPause className="w-4 h-4" /> : <FiPlay className="w-4 h-4" />}
                                     </button>
                                     <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
-                                        {isPlaying ? "Pause" : "Play"}
+                                        {isPlaying ? t("preview.controls.pause") : t("preview.controls.play")}
                                     </div>
                                 </div>
 
@@ -1567,7 +1570,7 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
                                         <FiSkipBack className="w-4 h-4" />
                                     </button>
                                     <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
-                                        Restart
+                                        {t("preview.controls.restart")}
                                     </div>
                                 </div>
 
@@ -1579,7 +1582,7 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
                                         {isGameplayMode ? <FiHeadphones className="w-4 h-4" /> : <FiEdit className="w-4 h-4" />}
                                     </button>
                                     <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
-                                        {isGameplayMode ? "Edit mode" : "Gameplay mode"}
+                                        {isGameplayMode ? t("preview.controls.editMode") : t("preview.controls.gameplayMode")}
                                     </div>
                                 </div>
 
@@ -1591,7 +1594,7 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
                                         {isViewSVLine ? <FiEye className="w-4 h-4" /> : <FiEyeOff className="w-4 h-4" />}
                                     </button>
                                     <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
-                                        {isViewSVLine ? "Hide SV lines" : "Show SV lines"}
+                                        {isViewSVLine ? t("preview.controls.hideSvLines") : t("preview.controls.showSvLines")}
                                     </div>
                                 </div>
 
@@ -1606,7 +1609,7 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
                                         DT
                                     </button>
                                     <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
-                                        {mods.isHR ? "Disable DT" : "Enable DT"}
+                                        {mods.isDT ? t("preview.controls.disableDt") : t("preview.controls.enableDt")}
                                     </div>
                                 </div>
 
@@ -1621,7 +1624,7 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
                                         HR
                                     </button>
                                     <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
-                                        {mods.isHR ? "Disable HR" : "Enable HR"}
+                                        {mods.isHR ? t("preview.controls.disableHr") : t("preview.controls.enableHr")}
                                     </div>
                                 </div>
 
@@ -1630,7 +1633,7 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
                                     size="sm"
                                     onClick={() => setDebugMode(!debugMode)}
                                 >
-                                    {debugMode ? "Hide Debug" : "Show Debug"}
+                                    {debugMode ? t("preview.controls.hideDebug") : t("preview.controls.showDebug")}
                                 </Button>
 
                                 <div className="flex items-center gap-2 text-sm font-mono ml-auto">
@@ -1687,26 +1690,28 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
                             {debugMode && (
                                 <div className="bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg p-3">
                                     <div className="text-xs font-mono text-[#7b7b7b] space-y-1">
-                                        <div className="text-[#e0e0e0] mb-2">Debug Info:</div>
-                                        <div>Mode: {isGameplayMode ? "Gameplay" : "Edit"}</div>
-                                        <div>Mods: {[
+                                        <div className="text-[#e0e0e0] mb-2">{t("preview.debug.title")}</div>
+                                        <div>
+                                            {t("preview.debug.mode")} {isGameplayMode ? t("preview.debug.gameplay") : t("preview.debug.edit")}
+                                        </div>
+                                        <div>{t("preview.debug.mods")} {[
                                             mods.isDT && "DT",
                                             mods.isHR && "HR"
-                                        ].filter(Boolean).join(", ") || "None"}</div>
-                                        <div>Current Time: {currentTime.toFixed(1)}ms</div>
-                                        <div>Raw Audio Time: {getCurrentTimeMs().toFixed(1)}ms</div>
-                                        <div>AudioLeadIn: {audioLeadIn}ms</div>
-                                        <div>Hit Window: ±{HIT_WINDOW}ms</div>
+                                        ].filter(Boolean).join(", ") || t("preview.debug.none")}</div>
+                                        <div>{t("preview.debug.currentTime", { ms: currentTime.toFixed(1) })}</div>
+                                        <div>{t("preview.debug.rawAudioTime", { ms: getCurrentTimeMs().toFixed(1) })}</div>
+                                        <div>{t("preview.debug.audioLeadIn", { ms: audioLeadIn })}</div>
+                                        <div>{t("preview.debug.hitWindow", { ms: HIT_WINDOW })}</div>
                                         {isGameplayMode && beatmapData && filteredDifficulties.length > 0 && (
                                             <>
-                                                <div>Current BPM: {getCurrentBPM(currentTime, filteredDifficulties[0].timingPoints)}</div>
-                                                <div>Current SV: {getCurrentSV(currentTime, filteredDifficulties[0].timingPoints).toFixed(2)}</div>
+                                                <div>{t("preview.debug.currentBpm", { bpm: getCurrentBPM(currentTime, filteredDifficulties[0].timingPoints) })}</div>
+                                                <div>{t("preview.debug.currentSv", { sv: getCurrentSV(currentTime, filteredDifficulties[0].timingPoints).toFixed(2) })}</div>
                                             </>
                                         )}
                                         <div className="border-t border-[#2a2a2a] pt-2 mt-2">
-                                            <div className="text-[#e0e0e0] mb-1">Recent Hits:</div>
+                                            <div className="text-[#e0e0e0] mb-1">{t("preview.debug.recentHits")}</div>
                                             {debugInfo.length === 0 ? (
-                                                <div className="opacity-50">No hits yet</div>
+                                                <div className="opacity-50">{t("preview.debug.noHits")}</div>
                                             ) : (
                                                 debugInfo.map((info, i) => (
                                                     <div key={i} className="opacity-80">{info}</div>
@@ -1716,7 +1721,7 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
 
                                         {beatmapData && (
                                             <div className="border-t border-[#2a2a2a] pt-2 mt-2">
-                                                <div className="text-[#e0e0e0] mb-1">Next Notes:</div>
+                                                <div className="text-[#e0e0e0] mb-1">{t("preview.debug.nextNotes")}</div>
                                                 {beatmapData.difficulties
                                                     .filter(d => selectedDifficulties.has(d.version))
                                                     .flatMap(diff =>
@@ -1735,7 +1740,11 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
                                                     .slice(0, 5)
                                                     .map((note, i) => (
                                                         <div key={i} className="opacity-80">
-                                                            {note.diff}: {note.type} in {note.timeUntil.toFixed(0)}ms
+                                                            {t("preview.debug.nextNote", {
+                                                                diff: note.diff,
+                                                                type: note.type,
+                                                                ms: note.timeUntil.toFixed(0),
+                                                            })}
                                                             {note.endTime && ` (${note.time}-${note.endTime}, dur: ${note.endTime - note.time}ms)`}
                                                         </div>
                                                     ))
@@ -1791,7 +1800,7 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
                                 <div>
                                     <div className="flex items-center gap-2 mb-2">
                                         <FiMusic className="w-4 h-4 text-[#7b7b7b]" />
-                                        <span className="text-sm text-[#7b7b7b]">Music Volume</span>
+                                        <span className="text-sm text-[#7b7b7b]">{t("preview.volume.music")}</span>
                                         <span className="text-sm text-[#e0e0e0] ml-auto">{Math.round(musicVolume * 100)}%</span>
                                     </div>
                                     <input
@@ -1808,7 +1817,7 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
                                 <div>
                                     <div className="flex items-center gap-2 mb-2">
                                         {hitsoundVolume === 0 ? <FiVolumeX className="w-4 h-4 text-[#7b7b7b]" /> : <FiVolume2 className="w-4 h-4 text-[#7b7b7b]" />}
-                                        <span className="text-sm text-[#7b7b7b]">Hitsound Volume</span>
+                                        <span className="text-sm text-[#7b7b7b]">{t("preview.volume.hitsound")}</span>
                                         <span className="text-sm text-[#e0e0e0] ml-auto">{Math.round(hitsoundVolume * 100)}%</span>
                                     </div>
                                     <input

@@ -1,4 +1,5 @@
 use crate::utils::parser::quote;
+use crate::commands::taiko_video::convert_taiko_video_impl;
 use std::path::PathBuf;
 use tauri::Emitter;
 use tauri::Manager;
@@ -12,6 +13,7 @@ pub async fn run_download(
     out_dir: String,
     audio_format: String,
     include_video: bool,
+    auto_taiko_video: bool,
 ) -> Result<String, String> {
     let url = url.trim();
     if url.is_empty() {
@@ -96,11 +98,20 @@ pub async fn run_download(
                         let s = String::from_utf8_lossy(&b).to_string();
                         let _ = window.emit("download-progress", format!("[audio][err] {}", s));
                     }
-                    CommandEvent::Terminated(code) => {
+                    CommandEvent::Terminated(payload) => {
+                        let exit_code = payload.code;
                         let _ = window.emit(
                             "download-progress",
-                            format!("[audio][yt-dlp-done] code={:?}", code),
+                            format!("[audio][yt-dlp-done] code={:?}", payload),
                         );
+
+                        if exit_code != Some(0) {
+                            let _ = window.emit(
+                                "download-progress",
+                                format!("[audio][fail] yt-dlp failed: code={:?}", exit_code),
+                            );
+                            break;
+                        }
 
                         if let Some(ref src_path) = cached_filepath {
                             let _ = convert_audio(
@@ -111,7 +122,13 @@ pub async fn run_download(
                                 &audio_format_clone,
                             )
                             .await;
+                        } else {
+                            let _ = window.emit(
+                                "download-progress",
+                                "[audio][fail] could not detect downloaded audio path",
+                            );
                         }
+                        break;
                     }
                     _ => {}
                 }
@@ -135,6 +152,8 @@ pub async fn run_download(
             out_dir_norm.clone(),
             "--output".into(),
             "%(title)s-background.%(ext)s".into(),
+            "--print".into(),
+            "after_move:filepath".into(),
             url.to_string(),
         ];
 
@@ -157,22 +176,66 @@ pub async fn run_download(
 
         {
             let window = window.clone();
+            let app_clone = app.clone();
+            let out_dir_clone = out_dir_norm.clone();
+            let auto_taiko_video = auto_taiko_video;
+
             tauri::async_runtime::spawn(async move {
+                let mut cached_filepath: Option<String> = None;
+
                 while let Some(ev) = v_rx.recv().await {
                     match ev {
                         CommandEvent::Stdout(b) => {
-                            let s = String::from_utf8_lossy(&b).to_string();
+                            let s = String::from_utf8_lossy(&b).trim().to_string();
                             let _ = window.emit("download-progress", format!("[video][out] {}", s));
+
+                            if s.contains("-background.") {
+                                cached_filepath = Some(s);
+                            }
                         }
                         CommandEvent::Stderr(b) => {
                             let s = String::from_utf8_lossy(&b).to_string();
                             let _ = window.emit("download-progress", format!("[video][err] {}", s));
                         }
-                        CommandEvent::Terminated(code) => {
+                        CommandEvent::Terminated(payload) => {
+                            let exit_code = payload.code;
                             let _ = window.emit(
                                 "download-progress",
-                                format!("[video][done] code={:?}", code),
+                                format!("[video][done] code={:?}", payload),
                             );
+
+                            if exit_code != Some(0) {
+                                let _ = window.emit(
+                                    "download-progress",
+                                    format!("[video][fail] yt-dlp failed: code={:?}", exit_code),
+                                );
+                                if auto_taiko_video {
+                                    let _ = window.emit(
+                                        "download-progress",
+                                        "[taiko][skip] yt-dlp failed; skipping taiko processing",
+                                    );
+                                }
+                                break;
+                            }
+
+                            if auto_taiko_video {
+                                if let Some(ref src_path) = cached_filepath {
+                                    let _ = convert_taiko_video_impl(
+                                        &app_clone,
+                                        &window,
+                                        src_path,
+                                        &out_dir_clone,
+                                    )
+                                    .await;
+                                } else {
+                                    let _ = window.emit(
+                                        "download-progress",
+                                        "[taiko][skip] could not detect downloaded video path",
+                                    );
+                                }
+                            }
+
+                            break;
                         }
                         _ => {}
                     }
@@ -279,13 +342,21 @@ async fn convert_audio(
                 let s = String::from_utf8_lossy(&b).to_string();
                 let _ = window.emit("download-progress", format!("[audio][ffmpeg] {}", s));
             }
-            CommandEvent::Terminated(code) => {
-                let _ = window.emit(
-                    "download-progress",
-                    format!("[audio][done] code={:?}, output={}", code, out_path),
-                );
-
-                let _ = std::fs::remove_file(src_path);
+            CommandEvent::Terminated(payload) => {
+                let exit_code = payload.code;
+                if exit_code == Some(0) {
+                    let _ = window.emit(
+                        "download-progress",
+                        format!("[audio][done] code={:?}, output={}", payload, out_path),
+                    );
+                    let _ = std::fs::remove_file(src_path);
+                } else {
+                    let _ = window.emit(
+                        "download-progress",
+                        format!("[audio][fail] ffmpeg failed: code={:?}, output={}", exit_code, out_path),
+                    );
+                    return Err(format!("ffmpeg failed: code={:?}", exit_code));
+                }
             }
             _ => {}
         }

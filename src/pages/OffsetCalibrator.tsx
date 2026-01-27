@@ -5,12 +5,14 @@ import {
 } from "react-icons/fi";
 
 import { useCalibratorSettings } from "../hooks/useStorage";
+import { useI18n } from "../hooks/i18nContext";
 
 type Props = {
     defaultBpm?: number;
 };
 
 export function OffsetCalibrator({ defaultBpm = 120 }: Props) {
+    const { t } = useI18n();
     const [audioBuffer, setAudioBuffer] = useState<AudioBuffer | null>(null);
     const [fileName, setFileName] = useState("");
 
@@ -48,6 +50,7 @@ export function OffsetCalibrator({ defaultBpm = 120 }: Props) {
 
     const schedulerRef = useRef<number | null>(null);
     const nextBeatIndexRef = useRef(0);
+    const mountedRef = useRef(true);
     const meterBeats = 4;
     const lookAheadMs = 25;
     const scheduleAheadSec = 0.25;
@@ -86,6 +89,7 @@ export function OffsetCalibrator({ defaultBpm = 120 }: Props) {
 
     const stopPlayback = useCallback(() => {
         if (srcNodeRef.current) {
+            srcNodeRef.current.onended = null;
             try { srcNodeRef.current.stop(); } catch { }
             srcNodeRef.current.disconnect();
             srcNodeRef.current = null;
@@ -94,6 +98,22 @@ export function OffsetCalibrator({ defaultBpm = 120 }: Props) {
         setPlayStartAt(0);
         setPlayStartCtxTime(0);
     }, []);
+
+    useEffect(() => {
+        mountedRef.current = true;
+        return () => {
+            mountedRef.current = false;
+            stopPlayback();
+            if (schedulerRef.current) {
+                window.clearInterval(schedulerRef.current);
+                schedulerRef.current = null;
+            }
+            if (audioCtxRef.current) {
+                try { void audioCtxRef.current.close(); } catch { }
+                audioCtxRef.current = null;
+            }
+        };
+    }, [stopPlayback]);
 
     const playFrom = useCallback(
         async (ms: number) => {
@@ -110,7 +130,9 @@ export function OffsetCalibrator({ defaultBpm = 120 }: Props) {
             g.gain.value = playVol;
 
             src.start(0, Math.max(0, ms / 1000));
-            src.onended = () => setPlaying(false);
+            src.onended = () => {
+                if (mountedRef.current) setPlaying(false);
+            };
 
             srcNodeRef.current = src;
             gainRef.current = g;
@@ -737,10 +759,10 @@ export function OffsetCalibrator({ defaultBpm = 120 }: Props) {
             <div className={`flex items-center gap-2 ${PANEL} p-2`}>
                 <div
                     className={`${CHIP} shrink min-w-0 max-w-[min(50%,520px)]`}
-                    title={fileName || "No audio loaded"}
+                    title={fileName || t("calibrator.noAudio")}
                 >
                     <FiMusic className="opacity-80" />
-                    <span className="truncate">{fileName || "No audio loaded"}</span>
+                    <span className="truncate">{fileName || t("calibrator.noAudio")}</span>
                 </div>
                 <div className="flex-1" />
                 <button
@@ -752,13 +774,13 @@ export function OffsetCalibrator({ defaultBpm = 120 }: Props) {
                     }}
                     className={BTN}
                 >
-                    <FiUpload /> Load
+                    <FiUpload /> {t("calibrator.load")}
                 </button>
                 <button
                     onClick={() => (isPlaying ? stopPlayback() : playFrom(Math.max(0, offsetMs - 100)))}
                     className={BTN}
                 >
-                    {isPlaying ? <FiPause /> : <FiPlay />} {isPlaying ? "Pause" : "Play"}
+                    {isPlaying ? <FiPause /> : <FiPlay />} {isPlaying ? t("calibrator.pause") : t("calibrator.play")}
                 </button>
             </div>
 
@@ -775,12 +797,12 @@ export function OffsetCalibrator({ defaultBpm = 120 }: Props) {
                 <button
                     onClick={() => setMetroOn(v => !v)}
                     className={`${BTN} ${metroOn ? "!bg-[#16a34a] hover:!bg-[#148a41]" : ""}`}
-                    title="Metronome (plays while audio is playing)"
+                    title={t("calibrator.metronome.title")}
                 >
-                    Metronome {metroOn ? "ON" : "OFF"}
+                    {t("calibrator.metronome.label", { state: metroOn ? t("calibrator.on") : t("calibrator.off") })}
                 </button>
                 <div className={CHIP}>
-                    <span className="opacity-80">Met Vol</span>
+                    <span className="opacity-80">{t("calibrator.metronome.volume")}</span>
                     <input
                         type="range" min={0} max={1} step={0.01}
                         value={metroVol}
@@ -793,7 +815,7 @@ export function OffsetCalibrator({ defaultBpm = 120 }: Props) {
             <div className={`flex items-center gap-2 ${PANEL} p-2`}>
                 <div className="flex items-center gap-2">
                     <div className={CHIP}>
-                        <span className="opacity-80">BPM</span>
+                        <span className="opacity-80">{t("calibrator.bpm")}</span>
                         <input
                             type="number" min={1}
                             value={bpm}
@@ -802,7 +824,7 @@ export function OffsetCalibrator({ defaultBpm = 120 }: Props) {
                         />
                     </div>
                     <div className={CHIP}>
-                        <span className="opacity-80">Offset</span>
+                        <span className="opacity-80">{t("calibrator.offset")}</span>
                         <input
                             type="number"
                             value={Math.round(offsetMs)}
@@ -816,10 +838,10 @@ export function OffsetCalibrator({ defaultBpm = 120 }: Props) {
 
                 <div className="flex items-center gap-2">
                     <button disabled={!audioBuffer || analyzingBpm} onClick={analyzeBpm} className={BTN}>
-                        <FiRefreshCw className={analyzingBpm ? "animate-spin" : ""} /> BPM Analyze
+                        <FiRefreshCw className={analyzingBpm ? "animate-spin" : ""} /> {t("calibrator.analyzeBpm")}
                     </button>
                     <button disabled={!audioBuffer || analyzingOffset} onClick={analyzeOffset} className={BTN}>
-                        <FiRefreshCw className={analyzingOffset ? "animate-spin" : ""} /> Offset Analyze
+                        <FiRefreshCw className={analyzingOffset ? "animate-spin" : ""} /> {t("calibrator.analyzeOffset")}
                     </button>
                 </div>
             </div>
@@ -839,31 +861,31 @@ export function OffsetCalibrator({ defaultBpm = 120 }: Props) {
                 <canvas ref={overlayRef} className="absolute inset-0 pointer-events-none" />
                 {!audioBuffer && (
                     <div className="absolute inset-0 grid place-items-center text-sm opacity-70">
-                        Drop audio here or click “Load”.
+                        {t("calibrator.dropHint", { load: t("calibrator.load") })}
                     </div>
                 )}
             </div>
 
             <div className={`flex items-center gap-2 ${PANEL} p-2`}>
-                <button onClick={() => zoomAt(1 / 1.2)} className={BTN} title="Zoom Out">
-                    <FiZoomOut /> Zoom Out
+                <button onClick={() => zoomAt(1 / 1.2)} className={BTN} title={t("calibrator.zoomOut")}>
+                    <FiZoomOut /> {t("calibrator.zoomOut")}
                 </button>
-                <button onClick={() => zoomAt(1.2)} className={BTN} title="Zoom In">
-                    <FiZoomIn /> Zoom In
+                <button onClick={() => zoomAt(1.2)} className={BTN} title={t("calibrator.zoomIn")}>
+                    <FiZoomIn /> {t("calibrator.zoomIn")}
                 </button>
-                <button onClick={() => { setZoom(1); setViewStartMs(0); }} className={BTN} title="Fit">
-                    <FiMaximize /> Fit
+                <button onClick={() => { setZoom(1); setViewStartMs(0); }} className={BTN} title={t("calibrator.fit")}>
+                    <FiMaximize /> {t("calibrator.fit")}
                 </button>
 
                 <div className="ml-auto text-xs opacity-75">
-                    Zoom: <span className="font-mono">{zoom.toFixed(2)}×</span>
+                    {t("calibrator.zoom")}: <span className="font-mono">{zoom.toFixed(2)}×</span>
                     <span className="mx-2">|</span>
-                    View: <span className="font-mono">{Math.round(viewStartMs)}–{Math.round(Math.min(durationMs, viewStartMs + visibleRangeMs))} ms</span>
+                    {t("calibrator.view")}: <span className="font-mono">{Math.round(viewStartMs)}–{Math.round(Math.min(durationMs, viewStartMs + visibleRangeMs))} ms</span>
                 </div>
             </div>
 
             <div className={`flex h-[55px] flex-wrap items-center gap-2 ${PANEL} p-2`}>
-                <span className="text-xs opacity-80">BPM Candidates:</span>
+                <span className="text-xs opacity-80">{t("calibrator.bpmCandidates")}</span>
                 {bpmCandidates.length > 0 ? (
                     bpmCandidates.map((b) => (
                         <button
@@ -877,7 +899,7 @@ export function OffsetCalibrator({ defaultBpm = 120 }: Props) {
                     ))
                 ) : (
                     <span className="text-xs text-zinc-500 italic opacity-60 select-none">
-                        No BPM detected
+                        {t("calibrator.noBpm")}
                     </span>
                 )}
             </div>

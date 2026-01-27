@@ -17,7 +17,6 @@ pub struct BeatmapMetadata {
     pub title_unicode: String,
     pub artist: String,
     pub artist_unicode: String,
-    pub creator: String,
     pub source: String,
     pub tags: String,
 }

@@ -41,7 +41,12 @@
           "deny": []
         }
       },
-      "capabilities": []
+      "capabilities": [
+        "default",
+        "opener",
+        "desktop-capability",
+        "downloader"
+      ]
     }
   },
   "bundle": {

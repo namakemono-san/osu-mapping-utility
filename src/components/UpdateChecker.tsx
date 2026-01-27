@@ -8,6 +8,8 @@ import { LoadingSpinner } from "../components/common/LoadingSpinner";
 import { ProgressBar } from "../components/common/ProgressBar";
 import { StatusMessage } from "../components/common/StatusMessage";
 
+import { useI18n } from "../hooks/i18nContext";
+
 interface DownloadProgress {
     downloaded: number;
     contentLength: number | null;
@@ -15,6 +17,8 @@ interface DownloadProgress {
 }
 
 export function UpdateChecker() {
+    const { t, locale } = useI18n();
+
     const [checking, setChecking] = useState(false);
     const [updateAvailable, setUpdateAvailable] = useState(false);
     const [updateInfo, setUpdateInfo] = useState<{
@@ -75,10 +79,10 @@ export function UpdateChecker() {
             await relaunch();
         } catch (err) {
             console.error("Update error:", err);
-            setError("Failed to install update");
+            setError(t("update.error.install"));
             setDownloading(false);
         }
-    }, [updateAvailable]);
+    }, [updateAvailable, t]);
 
     const dismissUpdate = useCallback(() => {
         setUpdateAvailable(false);
@@ -86,17 +90,17 @@ export function UpdateChecker() {
     }, []);
 
     const formatBytes = useCallback((bytes: number): string => {
-        if (bytes === 0) return "0 Bytes";
+        if (bytes === 0) return "0 B";
         const k = 1024;
-        const sizes = ["Bytes", "KB", "MB", "GB"];
+        const sizes = ["B", "KB", "MB", "GB"];
         const i = Math.floor(Math.log(bytes) / Math.log(k));
         return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + " " + sizes[i];
     }, []);
 
     const formattedDate = useMemo(() => {
         if (!updateInfo?.date) return null;
-        return new Date(updateInfo.date).toLocaleDateString("en-US");
-    }, [updateInfo?.date]);
+        return new Date(updateInfo.date).toLocaleDateString(locale);
+    }, [updateInfo?.date, locale]);
 
     const progressInfo = useMemo(() => {
         if (!progress.contentLength) return null;
@@ -121,14 +125,14 @@ export function UpdateChecker() {
                     setUpdateAvailable(true);
                     setUpdateInfo({
                         version: update.version,
-                        notes: update.body || "No release notes available",
+                        notes: update.body || t("update.noNotes"),
                         date: update.date || "",
                     });
                 }
             } catch (err) {
                 if (!mounted) return;
                 console.error("Update check error:", err);
-                setError("Failed to check for updates");
+                setError(t("update.error.check"));
             } finally {
                 if (mounted) {
                     setChecking(false);
@@ -146,14 +150,14 @@ export function UpdateChecker() {
     if (checking) {
         return (
             <Modal isOpen={true} onClose={() => { }} title="" hideCloseButton>
-                <LoadingSpinner label="Checking for updates..." />
+                <LoadingSpinner label={t("update.checking")} />
             </Modal>
         );
     }
 
     if (downloading) {
         return (
-            <Modal isOpen={true} onClose={() => { }} title="Downloading Update" hideCloseButton>
+            <Modal isOpen={true} onClose={() => { }} title={t("update.downloadingTitle")} hideCloseButton>
                 <div className="space-y-4">
                     <ProgressBar percentage={progress.percentage} />
                     <div className="flex justify-between text-sm text-[#7b7b7b]">
@@ -161,7 +165,7 @@ export function UpdateChecker() {
                         {progressInfo && <span>{progressInfo}</span>}
                     </div>
                     <p className="text-xs text-[#7b7b7b]">
-                        The app will restart automatically after installation
+                        {t("update.restartNotice")}
                     </p>
                 </div>
             </Modal>
@@ -170,11 +174,11 @@ export function UpdateChecker() {
 
     if (updateAvailable && updateInfo) {
         return (
-            <Modal isOpen={true} onClose={dismissUpdate} title="Update Available">
+            <Modal isOpen={true} onClose={dismissUpdate} title={t("update.availableTitle")}>
                 <div className="space-y-4">
                     <div className="space-y-2">
                         <div className="flex items-center gap-2">
-                            <span className="text-sm text-[#7b7b7b]">Version:</span>
+                            <span className="text-sm text-[#7b7b7b]">{t("update.version")}</span>
                             <span className="text-sm text-white font-medium">
                                 {updateInfo.version}
                             </span>
@@ -182,7 +186,7 @@ export function UpdateChecker() {
 
                         {formattedDate && (
                             <div className="flex items-center gap-2">
-                                <span className="text-sm text-[#7b7b7b]">Release Date:</span>
+                                <span className="text-sm text-[#7b7b7b]">{t("update.releaseDate")}</span>
                                 <span className="text-sm text-white">{formattedDate}</span>
                             </div>
                         )}
@@ -203,10 +207,10 @@ export function UpdateChecker() {
                             onClick={downloadAndInstallUpdate}
                             className="flex-1"
                         >
-                            Install
+                            {t("update.install")}
                         </Button>
                         <Button variant="secondary" onClick={dismissUpdate} className="flex-1">
-                            Later
+                            {t("update.later")}
                         </Button>
                     </div>
                 </div>
