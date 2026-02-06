@@ -73,7 +73,9 @@ jobs:
           $outDir = Join-Path $pwd 'release-assets'
           New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 
-          $items = Get-ChildItem -Path "$bundle\*" -Recurse -File -Include *.exe,*.msi,*.zip,*.sig,latest.json
+          $items = Get-ChildItem -Path "$bundle\*" -Recurse -File | Where-Object {
+            $_.Name -match '\.(exe|msi|zip|sig)$' -or $_.Name -eq 'latest.json'
+          }
           if (-not $items) {
             throw "No release assets found under $bundle"
           }
