@@ -86,23 +86,25 @@ export function BeatmapClone({ selectedBeatmap }: BeatmapCloneProps) {
             }
 
             const outPath = await invoke<string>("clone_beatmap", {
-                sourceBeatmap: selectedBeatmap.folder_name,
-                templateOsuFile,
-                gameMode: MODE_VALUES[gameMode],
-                metadata: {
-                    title: title || selectedBeatmap.title,
-                    title_unicode: titleUnicode || title || selectedBeatmap.title,
-                    artist: artist || selectedBeatmap.artist,
-                    artist_unicode: artistUnicode || artist || selectedBeatmap.artist,
-                    source: source || "",
-                    tags: tags || "",
+                config: {
+                    sourceBeatmap: selectedBeatmap.folder_name,
+                    templateOsuFile,
+                    gameMode: MODE_VALUES[gameMode],
+                    metadata: {
+                        title: title || selectedBeatmap.title,
+                        title_unicode: titleUnicode || title || selectedBeatmap.title,
+                        artist: artist || selectedBeatmap.artist,
+                        artist_unicode: artistUnicode || artist || selectedBeatmap.artist,
+                        source: source || "",
+                        tags: tags || "",
+                    },
+                    resetTimingPoints,
+                    keepKiai,
+                    removeSkinFiles,
+                    copyPreviewTime,
+                    resetDifficulty,
+                    songsFolder,
                 },
-                resetTimingPoints,
-                keepKiai,
-                removeSkinFiles,
-                copyPreviewTime,
-                resetDifficulty,
-                songsFolder,
             });
 
             let opened = false;

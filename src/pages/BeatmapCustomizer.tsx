@@ -8,6 +8,7 @@ import { Card } from "../components/common/Card";
 import { Switch } from "../components/common/Switch";
 
 import { useI18n } from "../hooks/i18nContext";
+import { useSongsFolder } from "../hooks/useStorage";
 
 import { Beatmapset } from "../types/beatmap";
 
@@ -163,6 +164,7 @@ function extractMetadata(osuText: string): { beatmapId?: string; beatmapSetId?: 
 
 export function BeatmapCustomizer({ selectedBeatmap }: BeatmapCustomizerProps) {
     const { t } = useI18n();
+    const [songsFolder] = useSongsFolder();
     const [osuFiles, setOsuFiles] = useState<string[]>([]);
     const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
     const [processing, setProcessing] = useState(false);
@@ -184,7 +186,6 @@ export function BeatmapCustomizer({ selectedBeatmap }: BeatmapCustomizerProps) {
 
         (async () => {
             try {
-                const songsFolder = localStorage.getItem("songsFolder");
                 if (!songsFolder) return;
 
                 const beatmapPath = `${songsFolder}\\${selectedBeatmap.folder_name}`;
@@ -202,7 +203,7 @@ export function BeatmapCustomizer({ selectedBeatmap }: BeatmapCustomizerProps) {
                 setSelectedFiles(new Set());
             }
         })();
-    }, [selectedBeatmap]);
+    }, [selectedBeatmap, songsFolder]);
 
     const toggleFile = (fileName: string) => {
         setSelectedFiles(prev => {
@@ -231,7 +232,6 @@ export function BeatmapCustomizer({ selectedBeatmap }: BeatmapCustomizerProps) {
         setResult(null);
 
         try {
-            const songsFolder = localStorage.getItem("songsFolder");
             if (!songsFolder) throw new Error("Songs folder not found");
 
             const beatmapPath = `${songsFolder}\\${selectedBeatmap.folder_name}`;
@@ -296,7 +296,7 @@ export function BeatmapCustomizer({ selectedBeatmap }: BeatmapCustomizerProps) {
         } finally {
             setProcessing(false);
         }
-    }, [selectedBeatmap, selectedFiles, centerOn, rmBookmarks, rmNewCombo, w2cOn, createBackup]);
+    }, [selectedBeatmap, selectedFiles, centerOn, rmBookmarks, rmNewCombo, w2cOn, createBackup, songsFolder]);
 
     if (!selectedBeatmap) {
         return (

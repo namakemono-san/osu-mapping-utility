@@ -292,7 +292,6 @@ export function MapSelector({
                         scrollContainerRef.current.scrollTop = 0;
                     }
 
-                    // Kick the queued reload now that the in-flight request finished.
                     void loadStep(pending.folder, pending.searchQuery, 0, false, nextRequestId);
                     return;
                 }
@@ -307,8 +306,6 @@ export function MapSelector({
         async (searchQuery: string = "") => {
             if (!songsFolder) return;
 
-            // If a request is already running, queue the latest reload and cancel
-            // any in-flight results by bumping the request id.
             if (isLoadingRef.current) {
                 currentRequestRef.current += 1;
                 pendingReloadRef.current = { folder: songsFolder, searchQuery };

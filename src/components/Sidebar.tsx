@@ -59,7 +59,7 @@ const CATEGORIES: SidebarCategory[] = [
         items: [
             { key: "offset_calibrator", label: "tool.offset_calibrator", Icon: MdSpeed },
             { key: "video_downloader", label: "tool.video_downloader", Icon: MdDownload },
-            { key: "thumbnail_downloader", label: "tool.thumbnail_downloader", Icon: MdImage }
+            { key: "thumbnail_downloader", label: "tool.thumbnail_downloader", Icon: MdImage },
         ],
     },
 ];

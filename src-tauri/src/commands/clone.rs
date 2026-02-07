@@ -218,8 +218,6 @@ fn process_timing_points_reset(lines: &[&str], keep_kiai: bool) -> Vec<String> {
         let beat_length = parts[1].trim();
         let meter = parts[2].trim();
         let uninherited = parts[6].trim();
-        // Inherited timing points (green lines) use a negative beatLength (SV).
-        // Some maps may have inconsistent uninherited flags, so also treat non-negative beatLength as BPM.
         let looks_like_uninherited = uninherited == "1" || !beat_length.starts_with('-');
 
         let effects_raw = parts[7].trim().parse::<i32>().unwrap_or(0);
@@ -229,8 +227,6 @@ fn process_timing_points_reset(lines: &[&str], keep_kiai: bool) -> Vec<String> {
         if looks_like_uninherited {
             last_bpm_beat_length = Some(beat_length);
             last_bpm_meter = Some(meter);
-
-            // Keep BPM (beatLength) + meter; reset samples/volume; optionally keep kiai.
             result.push(format!(
                 "{},{},{},1,0,100,1,{}",
                 time, beat_length, meter, effects_out
@@ -555,17 +551,18 @@ fn is_skin_file(filename: &str) -> bool {
     false
 }
 
-fn process_osu_content(
-    content: &str,
-    metadata: &BeatmapMetadata,
+struct OsuContentConfig<'a> {
+    metadata: &'a BeatmapMetadata,
     game_mode: u8,
     reset_timing_points: bool,
     keep_kiai: bool,
     copy_preview_time: bool,
     reset_difficulty: bool,
-    background_file: Option<&str>,
-    video_file: Option<&str>,
-) -> String {
+    background_file: Option<&'a str>,
+    video_file: Option<&'a str>,
+}
+
+fn process_osu_content(content: &str, config: &OsuContentConfig) -> String {
     let eol = if content.contains("\r\n") {
         "\r\n"
     } else {
@@ -592,20 +589,18 @@ fn process_osu_content(
             let leaving_timing_points = current_section == "[TimingPoints]" && in_timing_section;
 
             if leaving_events {
-                // Always keep one empty line between [Events] and the next section.
                 if output.last().map(|s| !s.is_empty()).unwrap_or(true) {
                     output.push(String::new());
                 }
             }
 
-            if leaving_timing_points && reset_timing_points {
-                let processed = process_timing_points_reset(&timing_lines, keep_kiai);
+            if leaving_timing_points && config.reset_timing_points {
+                let processed = process_timing_points_reset(&timing_lines, config.keep_kiai);
                 output.extend(processed);
                 timing_lines.clear();
             }
 
             if leaving_timing_points {
-                // Always keep one empty line between [TimingPoints] and the next section.
                 if output.last().map(|s| !s.is_empty()).unwrap_or(true) {
                     output.push(String::new());
                 }
@@ -633,10 +628,10 @@ fn process_osu_content(
 
             if in_events_section {
                 output.push("//Background and Video events".to_string());
-                if let Some(bg) = background_file {
+                if let Some(bg) = config.background_file {
                     output.push(format!("0,0,\"{}\",0,0", bg));
                 }
-                if let Some(v) = video_file {
+                if let Some(v) = config.video_file {
                     output.push(format!("Video,0,\"{}\"", v));
                 }
                 output.push("//Break Periods".to_string());
@@ -660,23 +655,22 @@ fn process_osu_content(
         }
 
         if in_events_section {
-            // Entire [Events] body is rewritten to a fixed template.
             continue;
         }
 
-        if in_timing_section && reset_timing_points {
+        if in_timing_section && config.reset_timing_points {
             timing_lines.push(line);
             continue;
         }
 
         if current_section == "[General]" {
             if trimmed.starts_with("Mode:") {
-                output.push(format!("Mode: {}", game_mode));
+                output.push(format!("Mode: {}", config.game_mode));
                 continue;
             }
 
             if trimmed.starts_with("PreviewTime:") {
-                if copy_preview_time {
+                if config.copy_preview_time {
                     output.push(line.to_string());
                 } else if !wrote_preview_time {
                     output.push("PreviewTime:-1".to_string());
@@ -685,12 +679,12 @@ fn process_osu_content(
                 continue;
             }
 
-            if !copy_preview_time && !wrote_preview_time {
+            if !config.copy_preview_time && !wrote_preview_time {
                 output.push("PreviewTime:-1".to_string());
                 wrote_preview_time = true;
             }
 
-            if reset_timing_points && trimmed.starts_with("SampleSet:") {
+            if config.reset_timing_points && trimmed.starts_with("SampleSet:") {
                 output.push("SampleSet: Normal".to_string());
                 continue;
             }
@@ -698,19 +692,19 @@ fn process_osu_content(
 
         if current_section == "[Metadata]" {
             if trimmed.starts_with("Title:") {
-                output.push(format!("Title:{}", metadata.title));
+                output.push(format!("Title:{}", config.metadata.title));
                 continue;
             }
             if trimmed.starts_with("TitleUnicode:") {
-                output.push(format!("TitleUnicode:{}", metadata.title_unicode));
+                output.push(format!("TitleUnicode:{}", config.metadata.title_unicode));
                 continue;
             }
             if trimmed.starts_with("Artist:") {
-                output.push(format!("Artist:{}", metadata.artist));
+                output.push(format!("Artist:{}", config.metadata.artist));
                 continue;
             }
             if trimmed.starts_with("ArtistUnicode:") {
-                output.push(format!("ArtistUnicode:{}", metadata.artist_unicode));
+                output.push(format!("ArtistUnicode:{}", config.metadata.artist_unicode));
                 continue;
             }
             if trimmed.starts_with("Creator:") {
@@ -722,11 +716,11 @@ fn process_osu_content(
                 continue;
             }
             if trimmed.starts_with("Source:") {
-                output.push(format!("Source:{}", metadata.source));
+                output.push(format!("Source:{}", config.metadata.source));
                 continue;
             }
             if trimmed.starts_with("Tags:") {
-                output.push(format!("Tags:{}", metadata.tags));
+                output.push(format!("Tags:{}", config.metadata.tags));
                 continue;
             }
             if trimmed.starts_with("BeatmapID:") {
@@ -739,7 +733,7 @@ fn process_osu_content(
             }
         }
 
-        if current_section == "[Difficulty]" && reset_difficulty {
+        if current_section == "[Difficulty]" && config.reset_difficulty {
             if trimmed.starts_with("HPDrainRate:") {
                 output.push("HPDrainRate:5".to_string());
                 continue;
@@ -769,42 +763,51 @@ fn process_osu_content(
         output.push(line.to_string());
     }
 
-    if current_section == "[TimingPoints]" && in_timing_section && reset_timing_points {
-        let processed = process_timing_points_reset(&timing_lines, keep_kiai);
+    if current_section == "[TimingPoints]" && in_timing_section && config.reset_timing_points {
+        let processed = process_timing_points_reset(&timing_lines, config.keep_kiai);
         output.extend(processed);
     }
 
     output.join(eol)
 }
 
+#[derive(serde::Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct CloneConfig {
+    pub source_beatmap: String,
+    pub template_osu_file: String,
+    pub game_mode: u8,
+    pub metadata: BeatmapMetadata,
+    pub reset_timing_points: bool,
+    pub keep_kiai: bool,
+    pub remove_skin_files: bool,
+    pub copy_preview_time: bool,
+    pub reset_difficulty: bool,
+    pub songs_folder: String,
+}
+
 #[tauri::command]
-pub fn clone_beatmap(
-    app: tauri::AppHandle,
-    source_beatmap: String,
-    template_osu_file: String,
-    game_mode: u8,
-    metadata: BeatmapMetadata,
-    reset_timing_points: bool,
-    keep_kiai: bool,
-    remove_skin_files: bool,
-    copy_preview_time: bool,
-    reset_difficulty: bool,
-    songs_folder: String,
-) -> Result<String, String> {
-    let songs_path = Path::new(&songs_folder);
-    let source_path = songs_path.join(&source_beatmap);
+pub fn clone_beatmap(app: tauri::AppHandle, config: CloneConfig) -> Result<String, String> {
+    let songs_path = Path::new(&config.songs_folder);
+    let source_path = songs_path.join(&config.source_beatmap);
 
     if !source_path.exists() {
-        return Err(format!("Source beatmap not found: {}", source_beatmap));
+        return Err(format!(
+            "Source beatmap not found: {}",
+            config.source_beatmap
+        ));
     }
 
-    if template_osu_file.contains('\\') || template_osu_file.contains('/') {
+    if config.template_osu_file.contains('\\') || config.template_osu_file.contains('/') {
         return Err("Invalid .osu filename".to_string());
     }
 
-    let template_path = source_path.join(&template_osu_file);
+    let template_path = source_path.join(&config.template_osu_file);
     if !template_path.exists() {
-        return Err(format!("Template .osu not found: {}", template_osu_file));
+        return Err(format!(
+            "Template .osu not found: {}",
+            config.template_osu_file
+        ));
     }
 
     let template_content = fs::read_to_string(&template_path)
@@ -847,19 +850,21 @@ pub fn clone_beatmap(
 
     let new_content = process_osu_content(
         &template_content,
-        &metadata,
-        game_mode,
-        reset_timing_points,
-        keep_kiai,
-        copy_preview_time,
-        reset_difficulty,
-        bg_from_events.as_deref(),
-        video_from_events.as_deref(),
+        &OsuContentConfig {
+            metadata: &config.metadata,
+            game_mode: config.game_mode,
+            reset_timing_points: config.reset_timing_points,
+            keep_kiai: config.keep_kiai,
+            copy_preview_time: config.copy_preview_time,
+            reset_difficulty: config.reset_difficulty,
+            background_file: bg_from_events.as_deref(),
+            video_file: video_from_events.as_deref(),
+        },
     );
 
     let timestamp = Local::now().format("%Y%m%d%H%M%S").to_string();
-    let mut artist = sanitize_filename_component(&metadata.artist);
-    let mut title = sanitize_filename_component(&metadata.title);
+    let mut artist = sanitize_filename_component(&config.metadata.artist);
+    let mut title = sanitize_filename_component(&config.metadata.title);
     if artist.is_empty() {
         artist = "Unknown".to_string();
     }
@@ -889,9 +894,7 @@ pub fn clone_beatmap(
         include_files.insert(rel);
     }
 
-    // Keep the .osz minimal by default: only files referenced by the selected source .osu.
-    // If the user disables "Remove Skin Files", also bundle extra media files from the source folder.
-    if !remove_skin_files {
+    if !config.remove_skin_files {
         let audio_extensions = ["mp3", "ogg", "wav"];
         let image_extensions = ["jpg", "jpeg", "png"];
         let video_extensions = ["mp4", "webm", "avi", "mkv"];

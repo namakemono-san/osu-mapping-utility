@@ -22,7 +22,7 @@ export function VideoDownloader() {
     const { t } = useI18n();
     const [url, setUrl] = useState("");
     const [busy, setBusy] = useState(false);
-    const [log, setLog] = useState("");
+    const [logLines, setLogLines] = useState<string[]>([]);
     const [lastVideoPath, setLastVideoPath] = useState<string>("");
     const logRef = useRef<HTMLPreElement | null>(null);
 
@@ -46,8 +46,19 @@ export function VideoDownloader() {
     } = useDownloaderSettings();
 
     const appendLog = useCallback((payload: string) => {
-        const line = typeof payload === "string" ? payload : JSON.stringify(payload);
-        setLog((prev) => prev + line);
+        const s = typeof payload === "string" ? payload : JSON.stringify(payload);
+        const normalized = s.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+        const parts = normalized.split("\n");
+        setLogLines((prev) => {
+            const next = [...prev];
+            for (const p of parts) {
+                if (p.length === 0) continue;
+                next.push(p);
+            }
+            // keep log bounded to avoid UI slowdown
+            if (next.length > 1500) return next.slice(next.length - 1500);
+            return next;
+        });
     }, []);
 
     const pickDir = useCallback(async () => {
@@ -112,15 +123,15 @@ export function VideoDownloader() {
                 srcPath: lastVideoPath,
                 outDir,
             });
-            appendLog(`\n[ui][taiko] output=${outPath}\n`);
+            appendLog(`[ui][taiko] output=${outPath}`);
         } catch (e: any) {
-            appendLog(`\n[ui][taiko-err] ${String(e)}\n`);
+            appendLog(`[ui][taiko-err] ${String(e)}`);
         } finally {
             setBusy(false);
         }
     }, [appendLog, lastVideoPath, outDir, t]);
 
-    const clearLog = useCallback(() => setLog(""), []);
+    const clearLog = useCallback(() => setLogLines([]), []);
 
     const formatMeta = useMemo(() => {
         const willIncludeVideo = includeVideo || autoTaikoVideo;
@@ -137,6 +148,14 @@ export function VideoDownloader() {
     useEffect(() => {
         autoTaikoVideoRef.current = autoTaikoVideo;
     }, [autoTaikoVideo]);
+
+    // Enforce dependency: taiko auto process requires video download
+    useEffect(() => {
+        if (!includeVideo && autoTaikoVideo) {
+            setAutoTaikoVideo(false);
+            appendLog("[ui] auto taiko video requires including video");
+        }
+    }, [includeVideo, autoTaikoVideo, setAutoTaikoVideo, appendLog]);
 
     useEffect(() => {
         outDirRef.current = outDir;
@@ -189,7 +208,7 @@ export function VideoDownloader() {
         if (logRef.current) {
             logRef.current.scrollTop = logRef.current.scrollHeight;
         }
-    }, [log]);
+    }, [logLines]);
 
     return (
         <div className="flex flex-col gap-2 text-zinc-200">
@@ -258,10 +277,16 @@ export function VideoDownloader() {
 
                 <Switch
                     checked={autoTaikoVideo}
-                    onChange={setAutoTaikoVideo}
+                    onChange={(v) => {
+                        if (v && !includeVideo) {
+                            appendLog("[ui] enable 'include video' to use auto taiko processing");
+                            return;
+                        }
+                        setAutoTaikoVideo(v);
+                    }}
                     label={t("video.switch.autoTaiko")}
                     icon={<FiSliders />}
-                    disabled={busy}
+                    disabled={busy || !includeVideo}
                 />
 
                 <div className="flex-1" />
@@ -280,7 +305,7 @@ export function VideoDownloader() {
                     variant="danger"
                     icon={<FiTrash2 />}
                     onClick={clearLog}
-                    disabled={busy || !log}
+                    disabled={busy || logLines.length === 0}
                     title={t("video.button.clearLogTitle")}
                 >
                     {t("video.button.clear")}
@@ -294,9 +319,9 @@ export function VideoDownloader() {
                 </div>
                 <pre
                     ref={logRef}
-                    className="font-mono text-sm whitespace-pre-wrap px-3 py-2 h-[62vh] overflow-auto"
+                    className="font-mono text-sm whitespace-pre-wrap break-words px-3 py-2 h-[62vh] overflow-auto"
                 >
-                    {log || t("video.log.ready")}
+                    {logLines.length > 0 ? logLines.join("\n") : t("video.log.ready")}
                 </pre>
             </Card>
         </div>

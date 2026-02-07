@@ -57,7 +57,7 @@ function assertVersionLike(v) {
   if (typeof v !== 'string' || v.trim() === '') {
     throw new Error(`Invalid version: ${String(v)}`);
   }
-  // Loose semver-ish validation: 1.2.3 or 1.2.3-alpha.1
+
   if (!/^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/.test(v)) {
     throw new Error(`Version is not semver-like: ${v}`);
   }
@@ -93,7 +93,6 @@ function syncCargoToml(version, mode) {
       continue;
     }
     if (inPackage && /^\[.+\]\s*$/.test(line)) {
-      // Next section starts; stop scanning.
       break;
     }
     if (inPackage && /^version\s*=\s*"[^"]*"\s*$/.test(line)) {

@@ -39,6 +39,8 @@ pub async fn run_download(
     let cache_dir_str = cache_dir.to_string_lossy().replace('\\', "/");
 
     let audio_args: Vec<String> = vec![
+        "--js-runtimes".into(),
+        "deno".into(),
         "--newline".into(),
         "--no-color".into(),
         "--encoding".into(),
@@ -138,6 +140,8 @@ pub async fn run_download(
 
     if include_video {
         let video_args: Vec<String> = vec![
+            "--js-runtimes".into(),
+            "deno".into(),
             "--newline".into(),
             "--no-color".into(),
             "--encoding".into(),
