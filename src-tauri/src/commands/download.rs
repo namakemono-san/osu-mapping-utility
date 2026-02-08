@@ -46,7 +46,9 @@ pub async fn run_download(
         "--encoding".into(),
         "utf-8".into(),
         "-f".into(),
-        "bestaudio".into(),
+        "bestaudio[video=none]/bestaudio".into(),
+        "-S".into(),
+        "acodec:opus,abr".into(),
         "--no-playlist".into(),
         "--windows-filenames".into(),
         "--trim-filenames".into(),
@@ -258,36 +260,79 @@ async fn convert_audio(
     out_dir: &str,
     audio_format: &str,
 ) -> Result<(), String> {
-    let probe_args: Vec<String> = vec![
-        "-i".into(),
-        src_path.to_string(),
-        "-f".into(),
-        "null".into(),
-        "-".into(),
-    ];
+    let _ = window.emit(
+        "download-progress",
+        "[audio][probe] analyzing source (duration, sample_rate, avg bitrate, cutoff)...",
+    );
 
-    let _ = window.emit("download-progress", "[audio][probe] checking bitrate...");
+    let duration_seconds = ffprobe_duration_seconds(app, window, src_path).await?;
+    if duration_seconds <= 0.0 {
+        let _ = window.emit(
+            "download-progress",
+            format!("[audio][fail] invalid duration: {}", duration_seconds),
+        );
+        return Err("invalid duration".into());
+    }
 
-    let probe_cmd = app
-        .shell()
-        .sidecar("ffmpeg")
-        .map_err(|e| format!("sidecar init error (ffmpeg): {e}"))?
-        .args(probe_args);
+    let sample_rate_hz = ffprobe_sample_rate_hz(app, window, src_path)
+        .await?
+        .ok_or_else(|| {
+            let _ = window.emit(
+                "download-progress",
+                "[audio][fail] could not detect sample rate (cannot guarantee no upsampling)",
+            );
+            "could not detect sample rate".to_string()
+        })?;
 
-    let output = probe_cmd.output().await.map_err(|e| {
-        let _ = window.emit("download-progress", format!("[audio][probe-error] {e}"));
-        format!("ffmpeg probe error: {e}")
-    })?;
+    let file_size_bytes = std::fs::metadata(src_path)
+        .map_err(|e| format!("failed to stat source file: {e}"))?
+        .len();
 
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    let bitrate = parse_bitrate(&stderr).unwrap_or(192);
+    let source_avg_kbps = average_kbps_from_size_and_duration(file_size_bytes, duration_seconds);
+    let target_sample_rate_hz = std::cmp::min(sample_rate_hz, 48_000);
+
+    let max_bitrate_kbps = match audio_format.to_lowercase().as_str() {
+        "ogg" => 208,
+        _ => 192,
+    };
+
+    let cutoff_hz = estimate_cutoff_hz(app, window, src_path, target_sample_rate_hz).await;
+    let classified_target = cutoff_hz
+        .map(classify_target_bitrate_kbps)
+        .unwrap_or(u32::MAX);
+    let target_bitrate = if classified_target == u32::MAX {
+        max_bitrate_kbps
+    } else {
+        std::cmp::min(classified_target, max_bitrate_kbps)
+    };
 
     let _ = window.emit(
         "download-progress",
-        format!("[audio][probe] detected bitrate: {}k", bitrate),
+        format!(
+            "[audio][probe] source_avg={:.2}k, sr={}Hz, target_sr={}Hz",
+            source_avg_kbps, sample_rate_hz, target_sample_rate_hz
+        ),
     );
 
-    let target_bitrate = if bitrate >= 192 { 192 } else { bitrate };
+    if let Some(cutoff_hz) = cutoff_hz {
+        let _ = window.emit(
+            "download-progress",
+            format!(
+                "[audio][probe] cutoff≈{:.1}kHz => target={}k (format_max={}k)",
+                cutoff_hz as f64 / 1000.0,
+                target_bitrate,
+                max_bitrate_kbps
+            ),
+        );
+    } else {
+        let _ = window.emit(
+            "download-progress",
+            format!(
+                "[audio][probe] cutoff=unknown => target={}k (format_max={}k)",
+                target_bitrate, max_bitrate_kbps
+            ),
+        );
+    }
 
     let _ = window.emit(
         "download-progress",
@@ -316,6 +361,9 @@ async fn convert_audio(
         "-y".into(),
         "-i".into(),
         src_path.to_string(),
+        "-vn".into(),
+        "-ar".into(),
+        target_sample_rate_hz.to_string(),
         "-c:a".into(),
         codec.into(),
         "-b:a".into(),
@@ -369,18 +417,277 @@ async fn convert_audio(
     Ok(())
 }
 
-fn parse_bitrate(ffmpeg_output: &str) -> Option<u32> {
-    for line in ffmpeg_output.lines() {
-        if line.contains("Audio:") || line.contains("bitrate:") {
-            let parts: Vec<&str> = line.split_whitespace().collect();
-            for (i, part) in parts.iter().enumerate() {
-                if *part == "kb/s" && i > 0 {
-                    if let Ok(br) = parts[i - 1].parse::<u32>() {
-                        return Some(br);
-                    }
-                }
+fn average_kbps_from_size_and_duration(file_size_bytes: u64, duration_seconds: f64) -> f64 {
+    if duration_seconds <= 0.0 {
+        return 0.0;
+    }
+    (file_size_bytes as f64 * 8.0) / duration_seconds / 1000.0
+}
+
+fn classify_target_bitrate_kbps(cutoff_hz: f64) -> u32 {
+    if cutoff_hz <= 16_500.0 {
+        128
+    } else if cutoff_hz <= 18_000.0 {
+        160
+    } else {
+        u32::MAX
+    }
+}
+
+async fn estimate_cutoff_hz(
+    app: &tauri::AppHandle,
+    window: &tauri::WebviewWindow,
+    src_path: &str,
+    analysis_sample_rate_hz: u32,
+) -> Option<f64> {
+    let _ = window.emit("download-progress", "[audio][probe] estimating cutoff (fft)...");
+
+    let max_seconds: u32 = 30;
+    let out = extract_pcm_preview_f32le(app, window, src_path, analysis_sample_rate_hz, max_seconds)
+        .await
+        .ok()?;
+
+    if out.len() < 2048 {
+        let _ = window.emit("download-progress", "[audio][probe] cutoff estimate skipped (too few samples)");
+        return None;
+    }
+
+    estimate_cutoff_hz_from_pcm(&out, analysis_sample_rate_hz)
+}
+
+async fn extract_pcm_preview_f32le(
+    app: &tauri::AppHandle,
+    window: &tauri::WebviewWindow,
+    src_path: &str,
+    sample_rate_hz: u32,
+    max_seconds: u32,
+) -> Result<Vec<f32>, String> {
+    let args: Vec<String> = vec![
+        "-v".into(),
+        "error".into(),
+        "-t".into(),
+        max_seconds.to_string(),
+        "-i".into(),
+        src_path.to_string(),
+        "-vn".into(),
+        "-ac".into(),
+        "1".into(),
+        "-ar".into(),
+        sample_rate_hz.to_string(),
+        "-f".into(),
+        "f32le".into(),
+        "pipe:1".into(),
+    ];
+
+    {
+        let mut parts = vec![String::from("[audio][probe] sidecar:ffmpeg")];
+        parts.extend(args.iter().map(|a| quote(a)));
+        let _ = window.emit("download-progress", parts.join(" "));
+    }
+
+    let cmd = app
+        .shell()
+        .sidecar("ffmpeg")
+        .map_err(|e| format!("sidecar init error (ffmpeg): {e}"))?
+        .args(args);
+
+    let output = cmd.output().await.map_err(|e| format!("ffmpeg probe output error: {e}"))?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("ffmpeg probe failed: {}", stderr.trim()));
+    }
+
+    let bytes = output.stdout;
+    if bytes.len() % 4 != 0 {
+        return Err("ffmpeg probe returned misaligned f32 data".into());
+    }
+
+    let mut samples = Vec::with_capacity(bytes.len() / 4);
+    for chunk in bytes.chunks_exact(4) {
+        samples.push(f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]));
+    }
+    Ok(samples)
+}
+
+fn estimate_cutoff_hz_from_pcm(samples: &[f32], sample_rate_hz: u32) -> Option<f64> {
+    const WINDOW: usize = 2048;
+    const HOP: usize = 512;
+    if samples.len() < WINDOW || sample_rate_hz == 0 {
+        return None;
+    }
+
+    let mut planner = rustfft::FftPlanner::<f32>::new();
+    let fft = planner.plan_fft_forward(WINDOW);
+    let window = (0..WINDOW)
+        .map(|i| {
+            let denom = (WINDOW as f32 - 1.0).max(1.0);
+            let ratio = i as f32 / denom;
+            0.5 - 0.5 * (2.0 * std::f32::consts::PI * ratio).cos()
+        })
+        .collect::<Vec<f32>>();
+
+    let freq_bins = WINDOW / 2 + 1;
+    let mut acc = vec![0.0f64; freq_bins];
+    let mut frames = 0u64;
+
+    let mut pos = 0usize;
+    while pos + WINDOW <= samples.len() {
+        let mut buf: Vec<rustfft::num_complex::Complex<f32>> = (0..WINDOW)
+            .map(|i| rustfft::num_complex::Complex::new(samples[pos + i] * window[i], 0.0))
+            .collect();
+        fft.process(&mut buf);
+        for (i, c) in buf.iter().take(freq_bins).enumerate() {
+            let mag = c.norm() as f64;
+            acc[i] += mag * mag;
+        }
+        frames += 1;
+        pos += HOP;
+    }
+    if frames == 0 {
+        return None;
+    }
+    for v in acc.iter_mut() {
+        *v /= frames as f64;
+    }
+
+    let max_p = acc.iter().cloned().fold(0.0f64, f64::max);
+    if max_p <= 0.0 {
+        return None;
+    }
+
+    let db = acc
+        .iter()
+        .map(|p| 10.0 * ((p / max_p).max(1e-12)).log10())
+        .collect::<Vec<f64>>();
+
+    let threshold_db = -45.0;
+    let run = 3usize;
+    for i in (0..freq_bins).rev() {
+        if i < run {
+            break;
+        }
+        let mut ok = true;
+        for j in 0..run {
+            if db[i - j] < threshold_db {
+                ok = false;
+                break;
             }
+        }
+        if ok {
+            let hz = (i as f64) * (sample_rate_hz as f64) / (WINDOW as f64);
+            return Some(hz);
         }
     }
     None
+}
+
+async fn ffprobe_duration_seconds(
+    app: &tauri::AppHandle,
+    window: &tauri::WebviewWindow,
+    src_path: &str,
+) -> Result<f64, String> {
+    async fn run(
+        app: &tauri::AppHandle,
+        name: &str,
+        args: Vec<String>,
+    ) -> Result<(i32, String, String), String> {
+        let cmd = app
+            .shell()
+            .sidecar(name)
+            .map_err(|e| format!("sidecar init error ({name}): {e}"))?
+            .args(args);
+        let out = cmd
+            .output()
+            .await
+            .map_err(|e| format!("{name} output error: {e}"))?;
+        let code = out.status.code().unwrap_or(-1);
+        Ok((
+            code,
+            String::from_utf8_lossy(&out.stdout).to_string(),
+            String::from_utf8_lossy(&out.stderr).to_string(),
+        ))
+    }
+
+    let args = vec![
+        "-v".into(),
+        "error".into(),
+        "-show_entries".into(),
+        "format=duration".into(),
+        "-of".into(),
+        "default=nk=1:nw=1".into(),
+        src_path.to_string(),
+    ];
+
+    let (code, stdout, stderr) = run(app, "ffprobe", args).await?;
+    if code != 0 {
+        let _ = window.emit(
+            "download-progress",
+            format!("[audio][probe-error] ffprobe(duration) failed: code={}, err={}", code, stderr.trim()),
+        );
+        return Err(format!("ffprobe failed: code={}", code));
+    }
+
+    let t = stdout.trim();
+    let dur = t
+        .parse::<f64>()
+        .map_err(|e| format!("failed to parse duration '{t}': {e}"))?;
+    Ok(dur)
+}
+
+async fn ffprobe_sample_rate_hz(
+    app: &tauri::AppHandle,
+    window: &tauri::WebviewWindow,
+    src_path: &str,
+) -> Result<Option<u32>, String> {
+    async fn run(
+        app: &tauri::AppHandle,
+        name: &str,
+        args: Vec<String>,
+    ) -> Result<(i32, String, String), String> {
+        let cmd = app
+            .shell()
+            .sidecar(name)
+            .map_err(|e| format!("sidecar init error ({name}): {e}"))?
+            .args(args);
+        let out = cmd
+            .output()
+            .await
+            .map_err(|e| format!("{name} output error: {e}"))?;
+        let code = out.status.code().unwrap_or(-1);
+        Ok((
+            code,
+            String::from_utf8_lossy(&out.stdout).to_string(),
+            String::from_utf8_lossy(&out.stderr).to_string(),
+        ))
+    }
+
+    let args = vec![
+        "-v".into(),
+        "error".into(),
+        "-select_streams".into(),
+        "a:0".into(),
+        "-show_entries".into(),
+        "stream=sample_rate".into(),
+        "-of".into(),
+        "default=nk=1:nw=1".into(),
+        src_path.to_string(),
+    ];
+
+    let (code, stdout, stderr) = run(app, "ffprobe", args).await?;
+    if code != 0 {
+        let _ = window.emit(
+            "download-progress",
+            format!("[audio][probe-error] ffprobe(sample_rate) failed: code={}, err={}", code, stderr.trim()),
+        );
+        return Err(format!("ffprobe failed: code={}", code));
+    }
+
+    let t = stdout.trim();
+    if t.is_empty() || t.eq_ignore_ascii_case("n/a") {
+        return Ok(None);
+    }
+    let sr = t
+        .parse::<u32>()
+        .map_err(|e| format!("failed to parse sample_rate '{t}': {e}"))?;
+    Ok(Some(sr))
 }

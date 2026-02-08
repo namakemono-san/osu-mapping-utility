@@ -21,7 +21,11 @@
             "--encoding",
             "utf-8",
             "-f",
-            "bestaudio",
+            "bestaudio[video=none]/bestaudio",
+            "-S",
+            {
+              "validator": "^[a-zA-Z0-9_:,]+$"
+            },
             "--no-playlist",
             "--windows-filenames",
             "--trim-filenames",
@@ -89,10 +93,58 @@
           "name": "ffmpeg",
           "sidecar": true,
           "args": [
+            "-v",
+            "error",
+            "-t",
+            {
+              "validator": "^[0-9]+$"
+            },
+            "-i",
+            {
+              "validator": ".+"
+            },
+            "-vn",
+            "-ac",
+            "1",
+            "-ar",
+            {
+              "validator": "^[0-9]+$"
+            },
+            "-f",
+            "f32le",
+            "pipe:1"
+          ]
+        },
+        {
+          "name": "ffprobe",
+          "sidecar": true,
+          "args": [
+            "-v",
+            "error",
+            "-show_entries",
+            {
+              "validator": "^(format=duration|stream=sample_rate)$"
+            },
+            "-of",
+            "default=nk=1:nw=1",
+            {
+              "validator": ".+"
+            }
+          ]
+        },
+        {
+          "name": "ffmpeg",
+          "sidecar": true,
+          "args": [
             "-y",
             "-i",
             {
               "validator": ".+"
+            },
+            "-vn",
+            "-ar",
+            {
+              "validator": "^[0-9]+$"
             },
             "-c:a",
             {

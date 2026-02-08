@@ -70,6 +70,7 @@
     "externalBin": [
       "binaries/yt-dlp",
       "binaries/ffmpeg",
+      "binaries/ffprobe",
       "binaries/deno",
       "binaries/waifu2x-ncnn-vulkan"
     ],
