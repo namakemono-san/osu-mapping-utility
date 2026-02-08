@@ -129,7 +129,6 @@ export function PreviewControls({
 
     return (
         <div className="space-y-4">
-            {/* Controls bar */}
             <div className="flex items-center gap-2">
                 <TooltipButton
                     onClick={togglePlayPause}
@@ -244,7 +243,6 @@ export function PreviewControls({
                 </div>
             </div>
 
-            {/* Debug panel */}
             {debugMode && (
                 <DebugPanel
                     t={t}
@@ -262,7 +260,6 @@ export function PreviewControls({
                 />
             )}
 
-            {/* Seek bar */}
             <div className="relative">
                 <div
                     className="h-2 bg-[#2a2a2a] rounded-full cursor-pointer relative overflow-visible"
@@ -304,7 +301,6 @@ export function PreviewControls({
                 </div>
             </div>
 
-            {/* Volume sliders */}
             <div className="grid grid-cols-2 gap-4">
                 <div>
                     <div className="flex items-center gap-2 mb-2">
