@@ -121,6 +121,8 @@
           "args": [
             "-v",
             "error",
+            "-select_streams",
+            "a:0",
             "-show_entries",
             {
               "validator": "^(format=duration|stream=sample_rate)$"
