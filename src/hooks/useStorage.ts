@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import { getStorage, setStorage, getStorageString, setStorageString, STORAGE_KEYS } from "../utils/storage";
+import { useAppState } from "../context/appState";
 
 type StorageKey = (typeof STORAGE_KEYS)[keyof typeof STORAGE_KEYS];
 
@@ -34,16 +35,12 @@ export function useStorageString(key: StorageKey, defaultValue: string = ""): [s
 }
 
 export function useSongsFolder(): [string | null, (value: string) => void] {
-    const [folder, setFolder] = useState<string | null>(() => {
-        return getStorageString(STORAGE_KEYS.SONGS_FOLDER) ?? null;
-    });
-
+    const { songsFolder, setSongsFolder } = useAppState();
     const setFolderAndSave = useCallback((value: string) => {
-        setFolder(value);
+        setSongsFolder(value);
         setStorageString(STORAGE_KEYS.SONGS_FOLDER, value);
-    }, []);
-
-    return [folder, setFolderAndSave];
+    }, [setSongsFolder]);
+    return [songsFolder, setFolderAndSave];
 }
 
 export function usePreviewSettings() {

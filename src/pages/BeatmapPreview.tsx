@@ -32,6 +32,7 @@ import {
 } from "../domain/osu/timingUtils";
 import { generateTicks as genTicks } from "../domain/osu/tickGenerator";
 import { sortDifficulties } from "../domain/osu/difficultyUtils";
+import { parseBasicBeatmapFields } from "../domain/osu";
 
 interface BeatmapPreviewProps {
     selectedBeatmap?: Beatmapset | null;
@@ -295,22 +296,11 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
                         setLoadingStep(`Parsed ${difficulties.length}/${osuFiles.length} difficulties...`);
 
                         if (!audioFilename) {
-                            const lines = content.split(/\r?\n/);
-                            for (const line of lines) {
-                                const trimmed = line.trim();
-                                if (trimmed.startsWith("AudioFilename:")) {
-                                    audioFilename = trimmed.split(":")[1].trim();
-                                }
-                                if (trimmed.startsWith("Title:")) {
-                                    title = trimmed.substring(trimmed.indexOf(":") + 1).trim();
-                                }
-                                if (trimmed.startsWith("Artist:")) {
-                                    artist = trimmed.substring(trimmed.indexOf(":") + 1).trim();
-                                }
-                                if (trimmed.startsWith("Creator:")) {
-                                    creator = trimmed.substring(trimmed.indexOf(":") + 1).trim();
-                                }
-                            }
+                            const basic = parseBasicBeatmapFields(content);
+                            audioFilename = basic.audioFilename;
+                            title = basic.title;
+                            artist = basic.artist;
+                            creator = basic.creator;
                         }
                     }
                 }

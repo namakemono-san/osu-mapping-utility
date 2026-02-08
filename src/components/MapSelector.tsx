@@ -217,6 +217,14 @@ export function MapSelector({
 
             setSongsFolder(selected);
             setDetectStatus({ key: "mapSelector.detect.selected", params: { path: selected } });
+            setSearch("");
+            setDebouncedSearch("");
+            setBeatmaps([]);
+            setCurrentIndex(0);
+            setHasMore(true);
+            if (scrollContainerRef.current) {
+                scrollContainerRef.current.scrollTop = 0;
+            }
             return selected;
         }
         return null;
@@ -425,10 +433,16 @@ export function MapSelector({
             return;
         }
 
-        if (songsFolder) {
-            reloadSearch(debouncedSearch);
-        }
-    }, [songsFolder]);
+        if (!songsFolder) return;
+
+        currentRequestRef.current += 1;
+        const requestId = currentRequestRef.current;
+        setBeatmaps([]);
+        setCurrentIndex(0);
+        setHasMore(true);
+        if (scrollContainerRef.current) scrollContainerRef.current.scrollTop = 0;
+        void loadStep(songsFolder, debouncedSearch, 0, false, requestId);
+    }, [songsFolder, debouncedSearch, loadStep]);
 
     useEffect(() => {
         (async () => {

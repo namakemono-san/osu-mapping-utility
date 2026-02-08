@@ -82,6 +82,43 @@ export function parseMetadataAndBackground(content: string): {
     return { metadata, background };
 }
 
+export function parseGeneralField(content: string, field: string): string {
+    const lines = content.split(/\r?\n/);
+    let inGeneral = false;
+    for (const line of lines) {
+        const trimmed = line.trim();
+        if (/^\[General\]$/i.test(trimmed)) {
+            inGeneral = true;
+            continue;
+        }
+        if (/^\[[A-Za-z]+\]$/i.test(trimmed)) {
+            inGeneral = false;
+            continue;
+        }
+        if (!inGeneral || !trimmed || trimmed.startsWith("//")) continue;
+        if (trimmed.toLowerCase().startsWith(field.toLowerCase() + ":")) {
+            return trimmed.substring(trimmed.indexOf(":") + 1).trim();
+        }
+    }
+    return "";
+}
+
+export function parseBasicBeatmapFields(content: string): {
+    audioFilename: string;
+    title: string;
+    artist: string;
+    creator: string;
+} {
+    const audioFilename = parseGeneralField(content, "AudioFilename");
+    const { metadata } = parseMetadataAndBackground(content);
+    return {
+        audioFilename,
+        title: metadata.Title,
+        artist: metadata.Artist,
+        creator: metadata.Creator,
+    };
+}
+
 export function applyMetadataAndBackground(
     content: string,
     mergedMetadata: Omit<OsuMetadata, "Version">,

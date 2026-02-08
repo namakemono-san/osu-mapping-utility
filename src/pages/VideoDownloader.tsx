@@ -101,8 +101,6 @@ export function VideoDownloader() {
             }
         } catch (e: any) {
             appendLog(`[ui][err] ${String(e)}`);
-        } finally {
-            setBusy(false);
         }
     }, [url, outDir, audioFormat, includeVideo, autoTaikoVideo, appendLog, t]);
 
@@ -196,6 +194,7 @@ export function VideoDownloader() {
 
             if (shouldOpen) {
                 openedRef.current = true;
+                setBusy(false);
                 void openPath(outDirRef.current);
             }
         }).then((fn) => (unlisten = fn));

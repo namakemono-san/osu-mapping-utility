@@ -12,6 +12,7 @@ import { StatusMessage } from "../components/common/StatusMessage";
 import { Beatmapset } from "../types/beatmap";
 import { useSongsFolder } from "../hooks/useStorage";
 import { useI18n } from "../hooks/i18nContext";
+import { parseMetadataAndBackground } from "../domain/osu";
 
 interface BeatmapCloneProps {
     selectedBeatmap?: Beatmapset | null;
@@ -190,53 +191,14 @@ export function BeatmapClone({ selectedBeatmap }: BeatmapCloneProps) {
                 const filePath = `${beatmapPath}\\${templateOsuFile}`;
                 const content = await invoke<string>("read_osu_file", { filePath });
 
-                const lines = content.split(/\r?\n/);
-                let inMetadata = false;
-
-                for (const line of lines) {
-                    const trimmed = line.trim();
-
-                    if (/^\[Metadata\]$/i.test(trimmed)) {
-                        inMetadata = true;
-                        continue;
-                    }
-
-                    if (/^\[[A-Za-z]+\]$/.test(trimmed)) {
-                        inMetadata = false;
-                        continue;
-                    }
-
-                    if (!inMetadata || !trimmed || trimmed.startsWith("//")) continue;
-
-                    const colonIndex = trimmed.indexOf(":");
-                    if (colonIndex === -1) continue;
-
-                    const key = trimmed.substring(0, colonIndex).trim();
-                    const value = trimmed.substring(colonIndex + 1).trim();
-
-                    if (!mounted) return;
-
-                    switch (key) {
-                        case "Title":
-                            setTitle(value);
-                            break;
-                        case "TitleUnicode":
-                            setTitleUnicode(value);
-                            break;
-                        case "Artist":
-                            setArtist(value);
-                            break;
-                        case "ArtistUnicode":
-                            setArtistUnicode(value);
-                            break;
-                        case "Source":
-                            setSource(value);
-                            break;
-                        case "Tags":
-                            setTags(value);
-                            break;
-                    }
-                }
+                const { metadata } = parseMetadataAndBackground(content);
+                if (!mounted) return;
+                setTitle(metadata.Title);
+                setTitleUnicode(metadata.TitleUnicode);
+                setArtist(metadata.Artist);
+                setArtistUnicode(metadata.ArtistUnicode);
+                setSource(metadata.Source);
+                setTags(metadata.Tags);
             } catch (err) {
                 console.error("[Clone] Failed to load metadata:", err);
             } finally {

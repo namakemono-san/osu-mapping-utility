@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 
 import "./App.css";
@@ -20,6 +20,7 @@ import { Beatmapset } from "./types/beatmap";
 import { ThumbnailDownloader } from "./pages/ThumbnailDownloader";
 
 import { useI18n } from "./hooks/i18nContext";
+import { useAppState } from "./context/appState";
 
 const MAP_TOOLS: SidebarKey[] = [
   "beatmap_clone",
@@ -32,7 +33,13 @@ function App() {
   const [activeTool, setActiveTool] = useState<SidebarKey>("beatmap_customizer");
   const [selectedBeatmap, setSelectedBeatmap] = useState<Beatmapset | null>(null);
 
+  const { songsFolder } = useAppState();
+
   const { t } = useI18n();
+
+  useEffect(() => {
+    setSelectedBeatmap(null);
+  }, [songsFolder]);
 
   const showMapSelector = MAP_TOOLS.includes(activeTool);
 
