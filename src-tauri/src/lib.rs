@@ -1,3 +1,4 @@
+mod audio;
 mod commands;
 mod models;
 mod utils;
@@ -71,6 +72,8 @@ pub fn run() {
             commands::clone_beatmap,
             commands::process_thumbnail,
             commands::save_thumbnail,
+            audio::commands::analyze_audio,
+            audio::commands::export_spectrogram,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

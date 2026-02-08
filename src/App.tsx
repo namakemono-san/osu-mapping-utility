@@ -14,6 +14,7 @@ import { BeatmapCustomizer } from "./pages/BeatmapCustomizer";
 import { VideoDownloader } from "./pages/VideoDownloader";
 import { BeatmapClone } from "./pages/BeatmapClone";
 import { MetadataEditor } from "./pages/MetadataEditor";
+import AudioAnalyzer from "./components/AudioAnalyzer/AudioAnalyzer";
 
 import { Beatmapset } from "./types/beatmap";
 import { ThumbnailDownloader } from "./pages/ThumbnailDownloader";
@@ -71,6 +72,8 @@ function App() {
         return <OffsetCalibrator />;
       case "video_downloader":
         return <VideoDownloader />;
+      case "audio_analyzer":
+        return <AudioAnalyzer />;
       case "thumbnail_downloader":
         return <ThumbnailDownloader />
       default:

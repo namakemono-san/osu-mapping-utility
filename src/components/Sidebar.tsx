@@ -10,6 +10,7 @@ import {
     MdEdit,
     MdFolderOpen,
     MdImage,
+    MdGraphicEq,
 } from "react-icons/md";
 import { appDataDir } from "@tauri-apps/api/path";
 import { openPath } from '@tauri-apps/plugin-opener';
@@ -22,6 +23,7 @@ export type SidebarKey =
     | "beatmap_preview"
     | "beatmap_customizer"
     | "offset_calibrator"
+    | "audio_analyzer"
     | "metadata_editor"
     | "video_downloader"
     | "thumbnail_downloader"
@@ -58,6 +60,7 @@ const CATEGORIES: SidebarCategory[] = [
         title: "sidebar.category.utilities",
         items: [
             { key: "offset_calibrator", label: "tool.offset_calibrator", Icon: MdSpeed },
+            { key: "audio_analyzer", label: "tool.audio_analyzer", Icon: MdGraphicEq },
             { key: "video_downloader", label: "tool.video_downloader", Icon: MdDownload },
             { key: "thumbnail_downloader", label: "tool.thumbnail_downloader", Icon: MdImage },
         ],

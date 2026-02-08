@@ -16,6 +16,7 @@ export const en = {
     "tool.beatmap_customizer": "Beatmap Customizer",
     "tool.metadata_editor": "Metadata Editor",
     "tool.offset_calibrator": "Offset Calibrator",
+    "tool.audio_analyzer": "Audio Analyzer",
     "tool.video_downloader": "Video Downloader",
     "tool.thumbnail_downloader": "Thumbnail Downloader",
 
@@ -234,6 +235,11 @@ export const en = {
     "calibrator.view": "View",
     "calibrator.bpmCandidates": "BPM Candidates:",
     "calibrator.noBpm": "No BPM detected",
+
+    "audio.button.select": "Select Audio File",
+    "audio.button.export": "Save PNG",
+    "audio.status.loading": "Analyzing audio...",
+    "audio.export.success": "Spectrogram exported successfully",
 
     "preview.debug.title": "Debug Info:",
     "preview.debug.mode": "Mode:",

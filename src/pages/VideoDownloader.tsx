@@ -55,7 +55,6 @@ export function VideoDownloader() {
                 if (p.length === 0) continue;
                 next.push(p);
             }
-            // keep log bounded to avoid UI slowdown
             if (next.length > 1500) return next.slice(next.length - 1500);
             return next;
         });
@@ -149,7 +148,6 @@ export function VideoDownloader() {
         autoTaikoVideoRef.current = autoTaikoVideo;
     }, [autoTaikoVideo]);
 
-    // Enforce dependency: taiko auto process requires video download
     useEffect(() => {
         if (!includeVideo && autoTaikoVideo) {
             setAutoTaikoVideo(false);
