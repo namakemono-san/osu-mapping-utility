@@ -11,6 +11,12 @@ use std::process::Command;
 use std::sync::{Arc, RwLock};
 use std::time::SystemTime;
 
+fn normalize_base_path(base_path: &str) -> String {
+    let trimmed = base_path.trim();
+    let replaced = trimmed.replace('\\', "/");
+    replaced.trim_end_matches('/').to_string()
+}
+
 #[derive(Clone)]
 struct FolderEntry {
     name: String,
@@ -110,14 +116,15 @@ fn try_common_locations() -> Option<String> {
 }
 
 fn get_folder_list(base_path: &str) -> Result<Arc<Vec<FolderEntry>>, String> {
+    let base_path = normalize_base_path(base_path);
     {
         let cache = FOLDER_CACHE.read().unwrap();
-        if let Some(folders) = cache.folders.get(base_path) {
+        if let Some(folders) = cache.folders.get(&base_path) {
             return Ok(folders.clone());
         }
     }
 
-    let base = Path::new(base_path);
+    let base = Path::new(&base_path);
     if !base.exists() {
         return Err(format!("Folder not found: {}", base_path));
     }
@@ -217,6 +224,8 @@ fn parse_beatmap_folder(folder_path: &Path, folder_name: &str) -> Option<Beatmap
 }
 
 fn get_or_parse_beatmap(base_path: &str, folder: &FolderEntry) -> Option<Beatmapset> {
+    let effective_folder_path = Path::new(base_path).join(&folder.name);
+
     {
         let cache = PARSED_CACHE.read().unwrap();
         if let Some(path_cache) = cache.get(base_path) {
@@ -226,7 +235,7 @@ fn get_or_parse_beatmap(base_path: &str, folder: &FolderEntry) -> Option<Beatmap
         }
     }
 
-    let beatmap = parse_beatmap_folder(&folder.path, &folder.name)?;
+    let beatmap = parse_beatmap_folder(&effective_folder_path, &folder.name)?;
 
     {
         let mut cache = PARSED_CACHE.write().unwrap();
@@ -246,6 +255,7 @@ pub fn scan_songs_step(
     step_size: usize,
     search_query: String,
 ) -> Result<(Vec<Beatmapset>, usize, bool), String> {
+    let base_path = normalize_base_path(&base_path);
     let folders = get_folder_list(&base_path)?;
 
     if search_query.is_empty() {
@@ -287,6 +297,7 @@ pub fn search_beatmaps_full(
     start_index: usize,
     step_size: usize,
 ) -> Result<(Vec<Beatmapset>, usize, bool), String> {
+    let base_path = normalize_base_path(&base_path);
     let folders = get_folder_list(&base_path)?;
     let query_lower = search_query.to_lowercase();
 
@@ -342,6 +353,7 @@ pub fn clear_beatmap_cache() {
 
 #[tauri::command]
 pub fn invalidate_cache_for_path(base_path: String) {
+    let base_path = normalize_base_path(&base_path);
     {
         let mut cache = FOLDER_CACHE.write().unwrap();
         cache.folders.remove(&base_path);
@@ -355,6 +367,7 @@ pub fn invalidate_cache_for_path(base_path: String) {
 
 #[tauri::command]
 pub fn reload_beatmaps(base_path: String) -> Result<usize, String> {
+    let base_path = normalize_base_path(&base_path);
     invalidate_cache_for_path(base_path.clone());
     let folders = get_folder_list(&base_path)?;
     Ok(folders.len())
