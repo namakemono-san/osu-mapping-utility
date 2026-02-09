@@ -72,6 +72,8 @@ pub fn run() {
             commands::clone_beatmap,
             commands::process_thumbnail,
             commands::save_thumbnail,
+            commands::process_image_to_thumbnail,
+            commands::process_url_to_thumbnail,
             audio::commands::analyze_audio,
             audio::commands::export_spectrogram,
         ])
