@@ -22,6 +22,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: pnpm
+
+      - name: Enable pnpm (corepack)
+        run: corepack enable
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -56,7 +60,7 @@ jobs:
 
       - name: Install frontend dependencies
         if: steps.check.outputs.should_release == 'true'
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       - name: Build and publish (Tauri Action)
         if: steps.check.outputs.should_release == 'true'
