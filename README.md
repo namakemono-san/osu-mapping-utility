@@ -20,13 +20,13 @@ To build from source, use the following commands:
 git clone https://github.com/namakemono-san/osu-mapping-utility.git
 cd osu-mapping-utility
 
-yarn install
+pnpm install
 
 # Development build (desktop)
-yarn tauri dev
+pnpm tauri dev
 
 # Production build
-yarn tauri build
+pnpm tauri build
 ```
 
 ## Features
