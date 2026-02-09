@@ -17,7 +17,7 @@ import { MetadataEditor } from "./pages/MetadataEditor";
 import AudioAnalyzer from "./components/AudioAnalyzer/AudioAnalyzer";
 
 import { Beatmapset } from "./types/beatmap";
-import { ThumbnailDownloader } from "./pages/ThumbnailDownloader";
+import { ImageDownloader } from "./pages/ImageDownloader";
 
 import { useI18n } from "./hooks/i18nContext";
 import { useAppState } from "./context/appState";
@@ -81,8 +81,8 @@ function App() {
         return <VideoDownloader />;
       case "audio_analyzer":
         return <AudioAnalyzer />;
-      case "thumbnail_downloader":
-        return <ThumbnailDownloader />
+      case "image_downloader":
+        return <ImageDownloader />
       default:
         return null;
     }

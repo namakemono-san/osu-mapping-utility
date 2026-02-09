@@ -21,6 +21,35 @@ async fn download(url: &str, path: &PathBuf) -> Result<(), String> {
     Ok(())
 }
 
+async fn download_image_to_bytes(url: &str) -> Result<Vec<u8>, String> {
+    let client = Client::new();
+    let resp = client.get(url).send().await.map_err(|e| e.to_string())?;
+
+    if !resp.status().is_success() {
+        return Err(format!("HTTP error: {}", resp.status()));
+    }
+
+    let bytes = resp.bytes().await.map_err(|e| e.to_string())?;
+    Ok(bytes.to_vec())
+}
+
+fn detect_image_ext_from_url(url: &str) -> &'static str {
+    let lowered = url.to_ascii_lowercase();
+    if lowered.contains(".png") {
+        return "png";
+    }
+    if lowered.contains(".webp") {
+        return "webp";
+    }
+    if lowered.contains(".bmp") {
+        return "bmp";
+    }
+    if lowered.contains(".jpeg") {
+        return "jpeg";
+    }
+    "jpg"
+}
+
 fn strip_unc(path: &PathBuf) -> String {
     let s = path.to_string_lossy();
     s.strip_prefix(r"\\?\").unwrap_or(&s).to_string()
@@ -142,6 +171,24 @@ async fn ensure_under_size(app: &tauri::AppHandle, input: &PathBuf, output: &Pat
     ))
 }
 
+async fn resize_to_thumbnail_pipeline(
+    app: &tauri::AppHandle,
+    input_path: &PathBuf,
+    out_path: &PathBuf,
+    use_waifu2x: bool,
+    work_dir: &PathBuf,
+    work_stem: &str,
+) -> Result<(), String> {
+    if use_waifu2x {
+        let upscaled = work_dir.join(format!("{}_upscaled.png", work_stem));
+        run_waifu2x(app, input_path, &upscaled).await?;
+        ensure_under_size(app, &upscaled, out_path).await?;
+    } else {
+        ensure_under_size(app, input_path, out_path).await?;
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn process_thumbnail(app: tauri::AppHandle, video_id: String) -> Result<String, String> {
     let base_dir = app
@@ -173,6 +220,95 @@ pub async fn process_thumbnail(app: tauri::AppHandle, video_id: String) -> Resul
     run_waifu2x(&app, &raw, &upscaled).await?;
     ensure_under_size(&app, &upscaled, &fhd).await?;
 
+    Ok(fhd.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+pub async fn process_image_to_thumbnail(
+    app: tauri::AppHandle,
+    src_path: String,
+    out_dir: String,
+    use_waifu2x: bool,
+) -> Result<String, String> {
+    if src_path.trim().is_empty() {
+        return Err("src_path is empty".into());
+    }
+    if out_dir.trim().is_empty() {
+        return Err("out_dir is empty".into());
+    }
+
+    let src = PathBuf::from(&src_path);
+    if !src.exists() {
+        return Err(format!("source not found: {}", src_path));
+    }
+
+    let out_dir_buf = PathBuf::from(&out_dir);
+    std::fs::create_dir_all(&out_dir_buf).map_err(|e| e.to_string())?;
+
+    let stem = src
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("image");
+    let out_path = out_dir_buf.join(format!("{}-thumbnail.jpg", stem));
+
+    let work_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?
+        .join("thumbnails");
+    std::fs::create_dir_all(&work_dir).map_err(|e| e.to_string())?;
+
+    resize_to_thumbnail_pipeline(
+        &app,
+        &src,
+        &out_path,
+        use_waifu2x,
+        &work_dir,
+        "local",
+    )
+    .await?;
+
+    Ok(out_path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+pub async fn process_url_to_thumbnail(
+    app: tauri::AppHandle,
+    image_url: String,
+    out_dir: String,
+    use_waifu2x: bool,
+) -> Result<String, String> {
+    let image_url = image_url.trim();
+    if image_url.is_empty() {
+        return Err("image_url is empty".into());
+    }
+    if out_dir.trim().is_empty() {
+        return Err("out_dir is empty".into());
+    }
+    if !(image_url.starts_with("http://") || image_url.starts_with("https://")) {
+        return Err("image_url must start with http:// or https://".into());
+    }
+
+    let out_dir_buf = PathBuf::from(&out_dir);
+    std::fs::create_dir_all(&out_dir_buf).map_err(|e| e.to_string())?;
+
+    let work_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?
+        .join("thumbnails");
+    std::fs::create_dir_all(&work_dir).map_err(|e| e.to_string())?;
+
+    let ext = detect_image_ext_from_url(image_url);
+    let raw = work_dir.join(format!("url_raw.{}", ext));
+    let fhd = out_dir_buf.join("url-thumbnail.jpg");
+
+    let bytes = download_image_to_bytes(image_url).await?;
+    tokio::fs::write(&raw, bytes)
+        .await
+        .map_err(|e| format!("failed to write downloaded image: {e}"))?;
+
+    resize_to_thumbnail_pipeline(&app, &raw, &fhd, use_waifu2x, &work_dir, "url").await?;
     Ok(fhd.to_string_lossy().to_string())
 }
 

@@ -26,7 +26,7 @@ export type SidebarKey =
     | "audio_analyzer"
     | "metadata_editor"
     | "video_downloader"
-    | "thumbnail_downloader"
+    | "image_downloader"
 
 type SidebarProps = {
     active?: SidebarKey;
@@ -62,7 +62,7 @@ const CATEGORIES: SidebarCategory[] = [
             { key: "offset_calibrator", label: "tool.offset_calibrator", Icon: MdSpeed },
             { key: "audio_analyzer", label: "tool.audio_analyzer", Icon: MdGraphicEq },
             { key: "video_downloader", label: "tool.video_downloader", Icon: MdDownload },
-            { key: "thumbnail_downloader", label: "tool.thumbnail_downloader", Icon: MdImage },
+            { key: "image_downloader", label: "tool.image_downloader", Icon: MdImage },
         ],
     },
 ];
