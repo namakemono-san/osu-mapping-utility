@@ -95,7 +95,7 @@ function App() {
 
       {hasBackground && (
         <div
-          className="fixed inset-0 mt-[40px] transition-opacity duration-500 ease-in-out"
+          className="fixed inset-0 mt-10 transition-opacity duration-500 ease-in-out"
           style={{
             backgroundImage: backgroundImage,
             backgroundSize: "cover",
@@ -106,7 +106,7 @@ function App() {
         />
       )}
 
-      <main className="relative flex h-[calc(100vh-40px)] mt-[40px] text-white font-sans selection:bg-blue-600/30 animate-in fade-in z-10">
+      <main className="relative flex h-[calc(100vh-40px)] mt-10 text-white font-sans selection:bg-blue-600/30 animate-in fade-in z-10">
         <Sidebar
           active={activeTool}
           onChange={setActiveTool}

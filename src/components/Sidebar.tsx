@@ -135,7 +135,7 @@ export function Sidebar({
                                             }`}
                                     >
                                         <Icon
-                                            className={`text-xl transition-colors duration-200 flex-shrink-0 ${isActive
+                                            className={`text-xl transition-colors duration-200 shrink-0 ${isActive
                                                 ? "text-[#eeeeee]"
                                                 : "text-[#7b7b7b] group-hover:text-[#eeeeee]"
                                                 }`}
@@ -165,7 +165,7 @@ export function Sidebar({
                     className={`group w-full h-10 rounded-lg flex items-center text-[#eeeeee] hover:bg-[#2a2a2a] transition-all duration-200 ease-out active:scale-95 ${isExpanded ? "px-3 gap-3" : "justify-center"
                         }`}
                 >
-                    <MdFolderOpen className="text-xl text-[#7b7b7b] group-hover:text-[#eeeeee] transition-colors duration-200 flex-shrink-0" />
+                    <MdFolderOpen className="text-xl text-[#7b7b7b] group-hover:text-[#eeeeee] transition-colors duration-200 shrink-0" />
                     {isExpanded && (
                         <span className="font-semibold text-sm text-[#e0e0e0] group-hover:text-[#eeeeee] transition-colors duration-200">
                             {t("sidebar.action.openAppFolder")}

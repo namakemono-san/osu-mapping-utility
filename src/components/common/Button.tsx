@@ -46,7 +46,7 @@ export function Button({
             disabled={disabled}
             {...props}
         >
-            {icon && <span className="flex-shrink-0">{icon}</span>}
+            {icon && <span className="shrink-0">{icon}</span>}
             <span>{children}</span>
         </button>
     );

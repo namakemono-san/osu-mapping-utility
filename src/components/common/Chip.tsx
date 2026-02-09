@@ -18,7 +18,7 @@ export function Chip({ icon, children, className, title }: ChipProps) {
             )}
             title={title}
         >
-            {icon && <span className="text-[#7b7b7b] flex-shrink-0">{icon}</span>}
+            {icon && <span className="text-[#7b7b7b] shrink-0">{icon}</span>}
             <span className="truncate">{children}</span>
         </div>
     );
