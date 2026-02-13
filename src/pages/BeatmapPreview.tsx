@@ -513,7 +513,7 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
     if (!selectedBeatmap) {
         return (
             <div className="flex items-center justify-center h-full">
-                <div className="text-center text-[#7b7b7b]">
+                <div className="text-center text-text-muted">
                     <div className="text-4xl mb-3 opacity-30">🥁</div>
                     <p>{t("preview.empty.selectBeatmap")}</p>
                 </div>
@@ -524,7 +524,7 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
     if (loading) {
         return (
             <div className="flex items-center justify-center h-full">
-                <div className="text-center text-[#7b7b7b]">
+                <div className="text-center text-text-muted">
                     <FiRefreshCw className="w-8 h-8 animate-spin mx-auto mb-3" />
                     <p className="font-semibold mb-1">{t("preview.loading")}</p>
                     {loadingStep && <p className="text-sm opacity-70">{loadingStep}</p>}
@@ -559,10 +559,10 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
                 <div className="max-w-7xl mx-auto space-y-4">
                     <Card className="p-4">
                         <div className="flex items-center gap-3 mb-3">
-                            <FiMusic className="w-5 h-5 text-[#2563eb]" />
+                            <FiMusic className="w-5 h-5 text-accent-primary" />
                             <div className="flex-1">
                                 <h2 className="text-lg font-bold">{beatmapData.title}</h2>
-                                <div className="text-sm text-[#7b7b7b]">
+                                <div className="text-sm text-text-muted">
                                     {t("preview.header.artistMapper", {
                                         artist: beatmapData.artist,
                                         creator: beatmapData.creator,
@@ -579,8 +579,8 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
                                         key={diff.version}
                                         onClick={() => toggleDifficulty(diff.version)}
                                         className={`px-3 py-1.5 rounded-lg border text-sm font-medium transition-all ${isSelected
-                                            ? "bg-[#2563eb]/20 border-[#2563eb] text-white"
-                                            : "bg-[#171717] border-[#2a2a2a] text-[#7b7b7b]"
+                                            ? "bg-accent-primary/20 border-accent-primary text-white"
+                                            : "bg-surface-panel border-border-muted text-text-muted"
                                             }`}
                                     >
                                         {diff.version}

@@ -45,10 +45,10 @@ export function OffsetCalibrator({ defaultBpm = 120 }: Props) {
     const mountedRef = useRef(true);
 
     const H = "h-9";
-    const BTN = `${H} inline-flex items-center gap-2 whitespace-nowrap px-3 rounded-md bg-[#2a2a2a] hover:bg-[#343434] transition-colors disabled:opacity-50`;
-    const CHIP = `px-2 ${H} inline-flex items-center gap-2 whitespace-nowrap rounded-md bg-[#1f1f1f] border border-[#2a2a2a] text-sm`;
-    const INPUT = `${H} px-2 py-1 rounded-md bg-[#101010] border border-[#2a2a2a] text-sm leading-tight`;
-    const PANEL = "rounded-lg bg-[#1c1c1c] border border-[#2a2a2a]";
+    const BTN = `${H} inline-flex items-center gap-2 whitespace-nowrap px-3 rounded-md bg-surface-hover hover:bg-surface-hover-soft transition-colors disabled:opacity-50`;
+    const CHIP = `px-2 ${H} inline-flex items-center gap-2 whitespace-nowrap rounded-md bg-surface-base border border-border-muted text-sm`;
+    const INPUT = `${H} px-2 py-1 rounded-md bg-surface-input border border-border-muted text-sm leading-tight`;
+    const PANEL = "rounded-lg bg-surface-base-soft border border-border-muted";
 
     const ensureAudioCtx = useCallback(() => {
         if (!audioCtxRef.current) {
@@ -198,7 +198,7 @@ export function OffsetCalibrator({ defaultBpm = 120 }: Props) {
 
             <div className={`flex items-center gap-2 ${PANEL} p-2`}>
                 <div
-                    className={`${CHIP} shrink min-w-0 max-w-[min(50%,520px)]`}
+                    className={`${CHIP} shrink min-w-0 max-w-min-50-520`}
                     title={fileName || t("calibrator.noAudio")}
                 >
                     <FiMusic className="opacity-80" />
@@ -236,7 +236,7 @@ export function OffsetCalibrator({ defaultBpm = 120 }: Props) {
                 <div className="flex-1" />
                 <button
                     onClick={() => setMetroOn(v => !v)}
-                    className={`${BTN} ${metroOn ? "!bg-[#16a34a] hover:!bg-[#148a41]" : ""}`}
+                    className={`${BTN} ${metroOn ? "bg-success-primary! hover:bg-success-hover!" : ""}`}
                     title={t("calibrator.metronome.title")}
                 >
                     {t("calibrator.metronome.label", { state: metroOn ? t("calibrator.on") : t("calibrator.off") })}
@@ -324,14 +324,14 @@ export function OffsetCalibrator({ defaultBpm = 120 }: Props) {
                 </div>
             </div>
 
-            <div className={`flex h-[55px] flex-wrap items-center gap-2 ${PANEL} p-2`}>
+            <div className={`flex h-55 flex-wrap items-center gap-2 ${PANEL} p-2`}>
                 <span className="text-xs opacity-80">{t("calibrator.bpmCandidates")}</span>
                 {bpmCandidates.length > 0 ? (
                     bpmCandidates.map((b) => (
                         <button
                             key={b}
                             onClick={() => setBpm(b)}
-                            className={`${H} inline-flex items-center whitespace-nowrap px-2 rounded-md text-sm transition-colors ${b === bpm ? "bg-[#2563eb]" : "bg-[#2a2a2a] hover:bg-[#343434]"
+                            className={`${H} inline-flex items-center whitespace-nowrap px-2 rounded-md text-sm transition-colors ${b === bpm ? "bg-accent-primary" : "bg-surface-hover hover:bg-surface-hover-soft"
                                 }`}
                         >
                             {b}

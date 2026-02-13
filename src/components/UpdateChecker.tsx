@@ -160,11 +160,11 @@ export function UpdateChecker() {
             <Modal isOpen={true} onClose={() => { }} title={t("update.downloadingTitle")} hideCloseButton>
                 <div className="space-y-4">
                     <ProgressBar percentage={progress.percentage} />
-                    <div className="flex justify-between text-sm text-[#7b7b7b]">
+                    <div className="flex justify-between text-sm text-text-muted">
                         <span>{progress.percentage}%</span>
                         {progressInfo && <span>{progressInfo}</span>}
                     </div>
-                    <p className="text-xs text-[#7b7b7b]">
+                    <p className="text-xs text-text-muted">
                         {t("update.restartNotice")}
                     </p>
                 </div>
@@ -178,7 +178,7 @@ export function UpdateChecker() {
                 <div className="space-y-4">
                     <div className="space-y-2">
                         <div className="flex items-center gap-2">
-                            <span className="text-sm text-[#7b7b7b]">{t("update.version")}</span>
+                            <span className="text-sm text-text-muted">{t("update.version")}</span>
                             <span className="text-sm text-white font-medium">
                                 {updateInfo.version}
                             </span>
@@ -186,13 +186,13 @@ export function UpdateChecker() {
 
                         {formattedDate && (
                             <div className="flex items-center gap-2">
-                                <span className="text-sm text-[#7b7b7b]">{t("update.releaseDate")}</span>
+                                <span className="text-sm text-text-muted">{t("update.releaseDate")}</span>
                                 <span className="text-sm text-white">{formattedDate}</span>
                             </div>
                         )}
 
-                        <div className="p-3 bg-[#101010] border border-[#2a2a2a] rounded-lg max-h-40 overflow-y-auto">
-                            <p className="text-sm text-[#e0e0e0] whitespace-pre-wrap">
+                        <div className="p-3 bg-surface-input border border-border-muted rounded-lg max-h-40 overflow-y-auto">
+                            <p className="text-sm text-text-secondary whitespace-pre-wrap">
                                 {updateInfo.notes}
                             </p>
                         </div>

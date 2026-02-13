@@ -17,9 +17,9 @@ function ToolButton({ icon, label, onClick }: { icon: React.ReactNode; label: st
             >
                 {icon}
             </button>
-            <div className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-[12px] px-2 py-1 text-sm text-white bg-[#2a2a2a] border border-zinc-600 rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-[60] whitespace-nowrap">
+            <div className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-3 px-2 py-1 text-sm text-white bg-surface-hover border border-zinc-600 rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-60 whitespace-nowrap">
                 {label}
-                <div className="absolute -top-[5px] left-1/2 -translate-x-1/2 w-2 h-2 bg-[#2a2a2a] border-l border-t border-zinc-600 rotate-45" />
+                <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-2 h-2 bg-surface-hover border-l border-t border-zinc-600 rotate-45" />
             </div>
         </div>
     );
@@ -48,7 +48,7 @@ export function Titlebar() {
         <div
             data-tauri-drag-region
             onDoubleClick={() => appWindow.toggleMaximize()}
-            className={`fixed top-0 left-0 w-full h-[40px] z-50 flex items-center pl-4 text-zinc-200 bg-[#131313] border-b border-zinc-800/70 select-none ${isMax ? '' : 'rounded-t-lg'}`}
+            className={`fixed top-0 left-0 w-full h-10 z-50 flex items-center pl-4 text-zinc-200 bg-surface-elevated border-b border-zinc-800/70 select-none ${isMax ? '' : 'rounded-t-lg'}`}
         >
             <span className="text-sm font-medium tracking-wide truncate">
                 osu! mapping utility
@@ -60,7 +60,7 @@ export function Titlebar() {
             <div className="flex items-center h-full" data-tauri-drag-region="false">
                 <div className="flex gap-2" onDoubleClickCapture={(e) => e.stopPropagation()}>
                     <ToolButton
-                        icon={<FiGlobe className="text-[18px]" />}
+                        icon={<FiGlobe className="text-18" />}
                         label={t("titlebar.language", { lang: lang.toUpperCase() })}
                         onClick={() => setLang(lang === "en" ? "ja" : "en")}
                     />

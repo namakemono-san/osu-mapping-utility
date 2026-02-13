@@ -94,7 +94,7 @@ export default function AudioAnalyzer({ className = "" }: AudioAnalyzerProps) {
           {t("audio.button.export")}
         </Button>
 
-        <div className="ml-auto text-xs text-[#8a8a8a] inline-flex items-center gap-2">
+        <div className="ml-auto text-xs text-text-faint inline-flex items-center gap-2">
           <FiImage />
           <span>{result ? `${result.image_width} x ${result.image_height}` : "800 x 450"}</span>
         </div>
@@ -105,7 +105,7 @@ export default function AudioAnalyzer({ className = "" }: AudioAnalyzerProps) {
       {exportSuccess && <StatusMessage type="success" message={exportSuccess} />}
 
       {result && (
-        <div className="grid grid-cols-1 xl:grid-cols-[280px_minmax(0,1fr)] gap-2 min-h-[520px]">
+        <div className="grid grid-cols-1 xl-grid-cols-layout gap-2 min-h-520">
           <MetadataPanel
             sampleRate={result.sample_rate}
             originalSampleRate={result.original_sample_rate}
@@ -122,7 +122,7 @@ export default function AudioAnalyzer({ className = "" }: AudioAnalyzerProps) {
           />
 
           <Card className="p-2 flex items-center justify-center overflow-auto">
-            <div className="w-full max-w-[860px]">
+            <div className="w-full max-w-860">
               <Spectrogram imageBase64={result.image_base64} />
             </div>
           </Card>

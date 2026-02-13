@@ -39,19 +39,19 @@ export function Switch({
             onKeyDown={onKeyDown}
             className={cn(
                 "inline-flex items-center gap-2 px-3 h-9 rounded-lg",
-                "bg-[#1f1f1f] border border-[#2a2a2a] text-sm",
+                "bg-surface-base border border-border-muted text-sm",
                 "cursor-pointer select-none transition-all",
-                checked && "ring-2 ring-[#16a34a]",
+                checked && "ring-2 ring-success-primary",
                 disabled && "opacity-50 cursor-not-allowed",
                 className
             )}
         >
-            {icon && <span className="text-[#7b7b7b]">{icon}</span>}
+            {icon && <span className="text-text-muted">{icon}</span>}
             {label && <span>{label}</span>}
             <span
                 className={cn(
-                    "ml-1 inline-flex items-center justify-center w-5 h-5 rounded-sm border border-[#3a3a3a] transition-colors",
-                    checked ? "bg-[#16a34a] text-white" : "bg-transparent"
+                    "ml-1 inline-flex items-center justify-center w-5 h-5 rounded-sm border border-border-strong transition-colors",
+                    checked ? "bg-success-primary text-white" : "bg-transparent"
                 )}
             >
                 {checked && <FiCheck />}

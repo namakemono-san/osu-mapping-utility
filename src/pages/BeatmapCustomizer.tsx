@@ -191,7 +191,7 @@ export function BeatmapCustomizer({ selectedBeatmap }: BeatmapCustomizerProps) {
     if (!selectedBeatmap) {
         return (
             <div className="flex items-center justify-center h-full">
-                <div className="text-center text-[#7b7b7b]">
+                <div className="text-center text-text-muted">
                     <div className="text-4xl mb-3 opacity-30">📝</div>
                     <p>{t("customizer.empty.selectBeatmap")}</p>
                 </div>
@@ -207,7 +207,7 @@ export function BeatmapCustomizer({ selectedBeatmap }: BeatmapCustomizerProps) {
                 <div className="max-w-5xl mx-auto space-y-3 p-3">
                     <Card className="p-3">
                         <h2 className="text-lg font-bold mb-1.5">{selectedBeatmap.title}</h2>
-                        <div className="flex items-end justify-between text-xs text-[#7b7b7b]">
+                        <div className="flex items-end justify-between text-xs text-text-muted">
                             <div>{t("mapSelector.mappedBy", { creator: selectedBeatmap.creator })}</div>
                             <div>
                                 {t("customizer.header.difficultiesFound", {
@@ -223,23 +223,23 @@ export function BeatmapCustomizer({ selectedBeatmap }: BeatmapCustomizerProps) {
                             <div className="w-full flex items-center justify-between p-3">
                                 <button
                                     onClick={() => setIsDiffExpanded(!isDiffExpanded)}
-                                    className="flex items-center gap-2 hover:text-[#eeeeee] transition-colors"
+                                    className="flex items-center gap-2 hover:text-text-primary transition-colors"
                                 >
                                     <h3 className="font-semibold text-sm">{t("customizer.section.selectDifficulties")}</h3>
-                                    <span className="text-xs text-[#7b7b7b]">
+                                    <span className="text-xs text-text-muted">
                                         ({selectedFiles.size}/{osuFiles.length})
                                     </span>
                                     {isDiffExpanded ? (
-                                        <FiChevronUp className="text-[#7b7b7b]" />
+                                        <FiChevronUp className="text-text-muted" />
                                     ) : (
-                                        <FiChevronDown className="text-[#7b7b7b]" />
+                                        <FiChevronDown className="text-text-muted" />
                                     )}
                                 </button>
                                 <Button
                                     variant="ghost"
                                     size="sm"
                                     onClick={toggleAll}
-                                    className="h-auto px-0 text-[#2563eb] hover:text-[#1f56cc] hover:bg-transparent"
+                                    className="h-auto px-0 text-accent-primary hover:text-accent-primary-hover hover:bg-transparent"
                                 >
                                     {selectedFiles.size === osuFiles.length
                                         ? t("customizer.button.deselectAll")
@@ -248,7 +248,7 @@ export function BeatmapCustomizer({ selectedBeatmap }: BeatmapCustomizerProps) {
                             </div>
 
                             {isDiffExpanded && (
-                                <div className="p-3 pt-0 border-t border-[#2a2a2a]">
+                                <div className="p-3 pt-0 border-t border-border-muted">
                                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-3">
                                         {osuFiles.map((fileName) => {
                                             const isSelected = selectedFiles.has(fileName);
@@ -259,8 +259,8 @@ export function BeatmapCustomizer({ selectedBeatmap }: BeatmapCustomizerProps) {
                                                     key={fileName}
                                                     onClick={() => toggleFile(fileName)}
                                                     className={`px-3 py-2 rounded-lg border text-sm font-medium transition-all duration-200 hover:scale-105 active:scale-95 ${isSelected
-                                                        ? "bg-[#2563eb]/20 border-[#2563eb] text-white shadow-lg shadow-[#2563eb]/20"
-                                                        : "bg-[#171717] border-[#2a2a2a] text-[#e0e0e0]"
+                                                        ? "bg-accent-primary/20 border-accent-primary text-white shadow-lg shadow-accent-primary/20"
+                                                        : "bg-surface-panel border-border-muted text-text-secondary"
                                                         }`}
                                                 >
                                                     {diffName}
@@ -304,12 +304,12 @@ export function BeatmapCustomizer({ selectedBeatmap }: BeatmapCustomizerProps) {
                                 key={opt.label}
                                 onClick={() => opt.set(!opt.checked)}
                                 className={`flex flex-col gap-1 px-3 py-2.5 rounded-lg border text-left transition-all duration-200 hover:scale-105 active:scale-95 ${opt.checked
-                                    ? "bg-[#2563eb]/20 border-[#2563eb] shadow-lg shadow-[#2563eb]/20"
-                                    : "bg-[#171717] border-[#2a2a2a]"
+                                    ? "bg-accent-primary/20 border-accent-primary shadow-lg shadow-accent-primary/20"
+                                    : "bg-surface-panel border-border-muted"
                                     }`}
                             >
                                 <div className="font-medium text-sm">{opt.label}</div>
-                                <div className="text-xs text-[#7b7b7b]">{opt.desc}</div>
+                                <div className="text-xs text-text-muted">{opt.desc}</div>
                             </button>
                         ))}
                     </div>
@@ -322,9 +322,9 @@ export function BeatmapCustomizer({ selectedBeatmap }: BeatmapCustomizerProps) {
                                 }`}
                         >
                             {result.success ? (
-                                <FiCheckCircle className="w-4 h-4 flex-shrink-0" />
+                                <FiCheckCircle className="w-4 h-4 shrink-0" />
                             ) : (
-                                <FiAlertCircle className="w-4 h-4 flex-shrink-0" />
+                                <FiAlertCircle className="w-4 h-4 shrink-0" />
                             )}
                             <span className="text-sm">{result.message}</span>
                         </Card>

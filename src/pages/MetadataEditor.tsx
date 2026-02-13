@@ -310,7 +310,7 @@ export function MetadataEditor({ selectedBeatmap }: MetadataEditorProps) {
     if (!selectedBeatmap) {
         return (
             <div className="flex items-center justify-center h-full">
-                <div className="text-center text-[#7b7b7b]">
+                <div className="text-center text-text-muted">
                     <div className="text-4xl mb-3 opacity-30">📝</div>
                     <p>{t("metadata.empty.selectBeatmap")}</p>
                 </div>
@@ -321,7 +321,7 @@ export function MetadataEditor({ selectedBeatmap }: MetadataEditorProps) {
     if (loading) {
         return (
             <div className="flex items-center justify-center h-full">
-                <div className="text-center text-[#7b7b7b]">
+                <div className="text-center text-text-muted">
                     <FiRefreshCw className="w-8 h-8 animate-spin mx-auto mb-3" />
                     <p>{t("metadata.loading")}</p>
                 </div>
@@ -335,7 +335,7 @@ export function MetadataEditor({ selectedBeatmap }: MetadataEditorProps) {
                 <div className="max-w-5xl mx-auto space-y-3 p-3">
                     <Card className="p-3">
                         <h2 className="text-lg font-bold mb-1.5">{selectedBeatmap.title}</h2>
-                        <div className="flex items-center gap-2 text-xs text-[#7b7b7b]">
+                        <div className="flex items-center gap-2 text-xs text-text-muted">
                             <FiFileText className="w-3 h-3" />
                             <span>
                                 {t("metadata.header.filesLoaded", {
@@ -359,7 +359,7 @@ export function MetadataEditor({ selectedBeatmap }: MetadataEditorProps) {
                         <div className="space-y-3">
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="block text-xs text-[#7b7b7b] mb-1">
+                                    <label className="block text-xs text-text-muted mb-1">
                                         {t("metadata.label.title")}
                                     </label>
                                     <Input
@@ -374,7 +374,7 @@ export function MetadataEditor({ selectedBeatmap }: MetadataEditorProps) {
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-xs text-[#7b7b7b] mb-1">
+                                    <label className="block text-xs text-text-muted mb-1">
                                         {t("metadata.label.romanisedTitle")}
                                     </label>
                                     <Input
@@ -392,7 +392,7 @@ export function MetadataEditor({ selectedBeatmap }: MetadataEditorProps) {
 
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="block text-xs text-[#7b7b7b] mb-1">
+                                    <label className="block text-xs text-text-muted mb-1">
                                         {t("metadata.label.artist")}
                                     </label>
                                     <Input
@@ -410,7 +410,7 @@ export function MetadataEditor({ selectedBeatmap }: MetadataEditorProps) {
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-xs text-[#7b7b7b] mb-1">
+                                    <label className="block text-xs text-text-muted mb-1">
                                         {t("metadata.label.romanisedArtist")}
                                     </label>
                                     <Input
@@ -428,7 +428,7 @@ export function MetadataEditor({ selectedBeatmap }: MetadataEditorProps) {
                             </div>
 
                             <div>
-                                <label className="block text-xs text-[#7b7b7b] mb-1">
+                                <label className="block text-xs text-text-muted mb-1">
                                     {t("metadata.label.creator")}
                                 </label>
                                 <Input
@@ -441,7 +441,7 @@ export function MetadataEditor({ selectedBeatmap }: MetadataEditorProps) {
                             </div>
 
                             <div>
-                                <label className="block text-xs text-[#7b7b7b] mb-1">{t("metadata.label.source")}</label>
+                                <label className="block text-xs text-text-muted mb-1">{t("metadata.label.source")}</label>
                                 <Input
                                     value={mergedData.Source}
                                     onChange={(e) =>
@@ -452,7 +452,7 @@ export function MetadataEditor({ selectedBeatmap }: MetadataEditorProps) {
                             </div>
 
                             <div>
-                                <label className="block text-xs text-[#7b7b7b] mb-1">{t("metadata.label.tags")}</label>
+                                <label className="block text-xs text-text-muted mb-1">{t("metadata.label.tags")}</label>
                                 <textarea
                                     value={mergedData.Tags}
                                     onChange={(e) =>
@@ -460,20 +460,20 @@ export function MetadataEditor({ selectedBeatmap }: MetadataEditorProps) {
                                     }
                                     placeholder={t("metadata.placeholder.tags")}
                                     rows={3}
-                                    className="w-full px-3 py-2 rounded-lg bg-[#101010] border border-[#2a2a2a] text-sm text-white placeholder-[#7b7b7b] focus:outline-none focus:border-[#4a4a4a] transition-colors resize-none"
+                                    className="w-full px-3 py-2 rounded-lg bg-surface-input border border-border-muted text-sm text-white placeholder-text-muted focus:outline-none focus:border-border-focus transition-colors resize-none"
                                 />
                             </div>
                         </div>
 
                         {conflicts.length > 0 && (
-                            <div className="mt-4 p-3 rounded-lg bg-[#171717] border border-[#2a2a2a]">
-                                <div className="text-xs font-semibold text-[#7b7b7b] mb-2">
+                            <div className="mt-4 p-3 rounded-lg bg-surface-panel border border-border-muted">
+                                <div className="text-xs font-semibold text-text-muted mb-2">
                                     {t("metadata.conflicts.details")}
                                 </div>
                                 <div className="space-y-2 text-xs">
                                     {conflicts.map((conflict) => (
                                         <div key={conflict.field} className="space-y-1">
-                                            <div className="text-[#e0e0e0] font-medium">
+                                            <div className="text-text-secondary font-medium">
                                                 {t(FIELD_LABELS[conflict.field])}:
                                             </div>
                                             {Array.from(conflict.values.entries()).map(
@@ -487,14 +487,14 @@ export function MetadataEditor({ selectedBeatmap }: MetadataEditorProps) {
                                                             })
                                                         }
                                                         className={`block w-full text-left px-2 py-1.5 rounded border transition-colors ${mergedData[conflict.field] === value
-                                                            ? "bg-[#2563eb]/20 border-[#2563eb] text-white"
-                                                            : "bg-[#101010] border-[#2a2a2a] text-[#7b7b7b] hover:border-[#4a4a4a]"
+                                                            ? "bg-accent-primary/20 border-accent-primary text-white"
+                                                            : "bg-surface-input border-border-muted text-text-muted hover:border-border-focus"
                                                             }`}
                                                     >
                                                         <div className="font-mono">
                                                             "{value || "(empty)"}"
                                                         </div>
-                                                        <div className="text-[10px] opacity-60 mt-0.5">
+                                                        <div className="text-10 opacity-60 mt-0.5">
                                                             {filenames.join(", ")}
                                                         </div>
                                                     </button>
@@ -519,15 +519,15 @@ export function MetadataEditor({ selectedBeatmap }: MetadataEditorProps) {
                                     return (
                                         <div
                                             key={file.filename}
-                                            className="rounded-lg border px-3 py-2.5 bg-[#2563eb]/10 border-[#2563eb]/40"
+                                            className="rounded-lg border px-3 py-2.5 bg-accent-primary/10 border-accent-primary/40"
                                         >
                                             <div className="text-xs font-semibold text-white mb-1 truncate">
                                                 {file.metadata.Version}
                                             </div>
-                                            <div className="text-[11px] text-[#7b7b7b] font-mono break-all">
+                                            <div className="text-11 text-text-muted font-mono break-all">
                                                 {t("metadata.filenamePreview.old")} {file.filename}
                                             </div>
-                                            <div className="text-[11px] text-[#e0e0e0] font-mono break-all mt-1">
+                                            <div className="text-11 text-text-secondary font-mono break-all mt-1">
                                                 {t("metadata.filenamePreview.new")} {next}
                                             </div>
                                         </div>
@@ -539,7 +539,7 @@ export function MetadataEditor({ selectedBeatmap }: MetadataEditorProps) {
 
                     <Card className="p-3">
                         <div className="flex items-center gap-2 mb-3">
-                            <FiImage className="w-4 h-4 text-[#7b7b7b]" />
+                            <FiImage className="w-4 h-4 text-text-muted" />
                             <h3 className="font-semibold text-sm">{t("metadata.background.title")}</h3>
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
@@ -547,12 +547,12 @@ export function MetadataEditor({ selectedBeatmap }: MetadataEditorProps) {
                                 <button
                                     key={index}
                                     onClick={() => openBgModal(index)}
-                                    className="px-3 py-2.5 rounded-lg border border-[#2a2a2a] bg-[#171717] hover:border-[#4a4a4a] transition-all text-left"
+                                    className="px-3 py-2.5 rounded-lg border border-border-muted bg-surface-panel hover:border-border-focus transition-all text-left"
                                 >
                                     <div className="text-xs font-semibold text-white mb-1 truncate">
                                         {file.metadata.Version}
                                     </div>
-                                    <div className="text-[10px] text-[#7b7b7b] space-y-0.5">
+                                    <div className="text-10 text-text-muted space-y-0.5">
                                         <div className="truncate">
                                             {file.background.filename || "(no background)"}, Offset:
                                             ({file.background.xOffset}, {file.background.yOffset})
@@ -595,7 +595,7 @@ export function MetadataEditor({ selectedBeatmap }: MetadataEditorProps) {
                 >
                     <div className="space-y-4">
                         <div>
-                            <label className="block text-xs text-[#7b7b7b] mb-1">
+                            <label className="block text-xs text-text-muted mb-1">
                                 {t("metadata.background.filename")}
                             </label>
                             <Input
@@ -609,7 +609,7 @@ export function MetadataEditor({ selectedBeatmap }: MetadataEditorProps) {
 
                         <div className="grid grid-cols-2 gap-3">
                             <div>
-                                <label className="block text-xs text-[#7b7b7b] mb-1">
+                                <label className="block text-xs text-text-muted mb-1">
                                     {t("metadata.background.xOffset")}
                                 </label>
                                 <Input
@@ -625,7 +625,7 @@ export function MetadataEditor({ selectedBeatmap }: MetadataEditorProps) {
                                 />
                             </div>
                             <div>
-                                <label className="block text-xs text-[#7b7b7b] mb-1">
+                                <label className="block text-xs text-text-muted mb-1">
                                     {t("metadata.background.yOffset")}
                                 </label>
                                 <Input

@@ -132,7 +132,7 @@ export function PreviewControls({
             <div className="flex items-center gap-2">
                 <TooltipButton
                     onClick={togglePlayPause}
-                    className="bg-[#2563eb] hover:bg-[#1f56cc] text-white shadow-lg transition-colors"
+                    className="bg-accent-primary hover:bg-accent-primary-hover text-white shadow-lg transition-colors"
                     tooltip={isPlaying ? t("preview.controls.pause") : t("preview.controls.play")}
                 >
                     {isPlaying ? <FiPause className="w-4 h-4" /> : <FiPlay className="w-4 h-4" />}
@@ -165,8 +165,8 @@ export function PreviewControls({
                 <TooltipButton
                     onClick={toggleDT}
                     className={`border font-bold ${mods.isDT
-                        ? "border-[#2563eb] bg-[#2563eb]/20 text-white"
-                        : "border-[#2a2a2a] bg-[#171717] text-[#7b7b7b] hover:border-[#3a3a3a]"
+                        ? "border-accent-primary bg-accent-primary/20 text-white"
+                        : "border-border-muted bg-surface-panel text-text-muted hover:border-border-strong"
                         }`}
                     tooltip={mods.isDT ? t("preview.controls.disableDt") : t("preview.controls.enableDt")}
                 >
@@ -177,7 +177,7 @@ export function PreviewControls({
                     onClick={toggleHR}
                     className={`border font-bold ${mods.isHR
                         ? "border-red-500 bg-red-500/20 text-white"
-                        : "border-[#2a2a2a] bg-[#171717] text-[#7b7b7b] hover:border-[#3a3a3a]"
+                        : "border-border-muted bg-surface-panel text-text-muted hover:border-border-strong"
                         }`}
                     tooltip={mods.isHR ? t("preview.controls.disableHr") : t("preview.controls.enableHr")}
                 >
@@ -200,7 +200,7 @@ export function PreviewControls({
                                 value={timeInput}
                                 onChange={(e) => setTimeInput(e.target.value)}
                                 placeholder="00:00:000"
-                                className="w-28 px-2 py-1 bg-[#1a1a1a] border border-[#2a2a2a] rounded text-[#e0e0e0] text-xs font-mono focus:outline-none focus:border-[#2563eb]"
+                                className="w-28 px-2 py-1 bg-surface-control border border-border-muted rounded text-text-secondary text-xs font-mono focus:outline-none focus:border-accent-primary"
                                 onKeyDown={(e) => {
                                     if (e.key === "Enter") handleTimeInputSubmit();
                                     if (e.key === "Escape") {
@@ -232,14 +232,14 @@ export function PreviewControls({
                                 setTimeInput(formatTime(currentTime));
                                 setIsEditingTime(true);
                             }}
-                            className="flex items-center gap-1 text-[#7b7b7b] hover:text-[#e0e0e0] transition-colors"
+                            className="flex items-center gap-1 text-text-muted hover:text-text-secondary transition-colors"
                         >
                             <span>{formatTime(currentTime)}</span>
                             <FiEdit2 className="w-3 h-3" />
                         </button>
                     )}
-                    <span className="text-[#7b7b7b]">/</span>
-                    <span className="text-[#7b7b7b]">{formatTime(duration)}</span>
+                    <span className="text-text-muted">/</span>
+                    <span className="text-text-muted">{formatTime(duration)}</span>
                 </div>
             </div>
 
@@ -262,7 +262,7 @@ export function PreviewControls({
 
             <div className="relative">
                 <div
-                    className="h-2 bg-[#2a2a2a] rounded-full cursor-pointer relative overflow-visible"
+                    className="h-2 bg-surface-hover rounded-full cursor-pointer relative overflow-visible"
                     onClick={(e) => {
                         const rect = e.currentTarget.getBoundingClientRect();
                         const x = e.clientX - rect.left;
@@ -271,7 +271,7 @@ export function PreviewControls({
                     }}
                 >
                     <div
-                        className="h-full bg-[#2563eb] rounded-full"
+                        className="h-full bg-accent-primary rounded-full"
                         style={{ width: `${(currentTime / duration) * 100}%` }}
                     />
                     <div
@@ -304,9 +304,9 @@ export function PreviewControls({
             <div className="grid grid-cols-2 gap-4">
                 <div>
                     <div className="flex items-center gap-2 mb-2">
-                        <FiMusic className="w-4 h-4 text-[#7b7b7b]" />
-                        <span className="text-sm text-[#7b7b7b]">{t("preview.volume.music")}</span>
-                        <span className="text-sm text-[#e0e0e0] ml-auto">{Math.round(musicVolume * 100)}%</span>
+                        <FiMusic className="w-4 h-4 text-text-muted" />
+                        <span className="text-sm text-text-muted">{t("preview.volume.music")}</span>
+                        <span className="text-sm text-text-secondary ml-auto">{Math.round(musicVolume * 100)}%</span>
                     </div>
                     <input
                         type="range"
@@ -315,15 +315,15 @@ export function PreviewControls({
                         step="0.01"
                         value={musicVolume}
                         onChange={(e) => setMusicVolume(parseFloat(e.target.value))}
-                        className="w-full h-2 bg-[#2a2a2a] rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#2563eb]"
+                        className="w-full h-2 bg-surface-hover rounded-full appearance-none cursor-pointer slider-thumb"
                     />
                 </div>
 
                 <div>
                     <div className="flex items-center gap-2 mb-2">
-                        {hitsoundVolume === 0 ? <FiVolumeX className="w-4 h-4 text-[#7b7b7b]" /> : <FiVolume2 className="w-4 h-4 text-[#7b7b7b]" />}
-                        <span className="text-sm text-[#7b7b7b]">{t("preview.volume.hitsound")}</span>
-                        <span className="text-sm text-[#e0e0e0] ml-auto">{Math.round(hitsoundVolume * 100)}%</span>
+                        {hitsoundVolume === 0 ? <FiVolumeX className="w-4 h-4 text-text-muted" /> : <FiVolume2 className="w-4 h-4 text-text-muted" />}
+                        <span className="text-sm text-text-muted">{t("preview.volume.hitsound")}</span>
+                        <span className="text-sm text-text-secondary ml-auto">{Math.round(hitsoundVolume * 100)}%</span>
                     </div>
                     <input
                         type="range"
@@ -332,7 +332,7 @@ export function PreviewControls({
                         step="0.01"
                         value={hitsoundVolume}
                         onChange={(e) => setHitsoundVolume(parseFloat(e.target.value))}
-                        className="w-full h-2 bg-[#2a2a2a] rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#2563eb]"
+                        className="w-full h-2 bg-surface-hover rounded-full appearance-none cursor-pointer slider-thumb"
                     />
                 </div>
             </div>
