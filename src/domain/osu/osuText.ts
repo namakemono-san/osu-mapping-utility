@@ -87,7 +87,6 @@ export function parseOsuHeaderFields(content: string): {
         return { audioFilename, title, artist, creator };
     }
 
-    // Fallback: legacy behavior that looks outside section boundaries.
     const lines = content.split(/\r?\n/);
     const fallback: { audioFilename?: string; title?: string; artist?: string; creator?: string } = {};
     for (const line of lines) {
