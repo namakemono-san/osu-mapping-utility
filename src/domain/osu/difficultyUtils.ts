@@ -1,4 +1,4 @@
-import type { Difficulty } from "./osuFileParser";
+import type { OsuBeatmap } from "./types";
 
 export const DIFFICULTY_ORDER = [
     "Kantan",
@@ -30,10 +30,10 @@ export function categorizeDifficulty(version: string): string {
     return "Custom";
 }
 
-export function sortDifficulties(difficulties: Difficulty[]): { sorted: Difficulty[], error?: string } {
+export function sortDifficulties(difficulties: OsuBeatmap[]): { sorted: OsuBeatmap[], error?: string } {
     const categorized = difficulties.map(diff => ({
         difficulty: diff,
-        category: categorizeDifficulty(diff.version)
+        category: categorizeDifficulty(diff.metadata.version)
     }));
 
     const sorted = categorized.sort((a, b) => {

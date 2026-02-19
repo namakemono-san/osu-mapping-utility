@@ -16,23 +16,33 @@ import { useI18n } from "../hooks/i18nContext";
 import { useAudioPlayer } from "../hooks/useAudioPlayer";
 import { useHitSounds } from "../hooks/useHitSounds";
 import {
-    parseOsuFile,
-    type HitObjectWithStart,
-    type TimingPoint,
-    type Difficulty,
-    type BeatmapData,
-    type Tick,
-    type HitAnimation,
-    type ModState,
-} from "../domain/osu/osuFileParser";
+    adaptOsuBeatmapToTaiko,
+    type TaikoHitObjectWithStart,
+    type TaikoDifficulty,
+    type TaikoBeatmapData,
+} from "../domain/osu/taikoMapper";
+import type { OsuTimingPoint, OsuBeatmap } from "../domain/osu/types";
+import { osuApi } from "../domain/osu";
 import {
     getCurrentBPM as getBPM,
     getCurrentSV as getSV,
     calculateGameplayStart as calcGameplayStart,
 } from "../domain/osu/timingUtils";
-import { generateTicks as genTicks } from "../domain/osu/tickGenerator";
+import { generateTicks as genTicks, type Tick } from "../domain/osu/tickGenerator";
 import { sortDifficulties } from "../domain/osu/difficultyUtils";
-import { parseBasicBeatmapFields } from "../domain/osu";
+
+interface HitAnimation {
+    id: number;
+    x: number;
+    y: number;
+    color: string;
+    timestamp: number;
+}
+
+interface ModState {
+    isDT: boolean;
+    isHR: boolean;
+}
 
 interface BeatmapPreviewProps {
     selectedBeatmap?: Beatmapset | null;
@@ -53,7 +63,7 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
     const [loading, setLoading] = useState(false);
     const [loadingStep, setLoadingStep] = useState("");
     const [error, setError] = useState<string | null>(null);
-    const [beatmapData, setBeatmapData] = useState<BeatmapData | null>(null);
+    const [beatmapData, setBeatmapData] = useState<TaikoBeatmapData | null>(null);
     const [selectedDifficulties, setSelectedDifficulties] = useState<Set<string>>(new Set());
 
     const {
@@ -110,7 +120,7 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
     const animationFrameRef = useRef<number | null>(null);
     const animationIdCounterRef = useRef<number>(0);
 
-    const processedDifficultiesRef = useRef<Map<string, { hitObjects: HitObjectWithStart[], ticks: Tick[] }>>(new Map());
+    const processedDifficultiesRef = useRef<Map<string, { hitObjects: TaikoHitObjectWithStart[], ticks: Tick[] }>>(new Map());
 
     const seekTo = useCallback((timeMs: number) => {
         seekToRaw(timeMs);
@@ -151,37 +161,26 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
         return () => cancelAnimationFrame(id);
     }, [hitAnimations]);
 
-    const getCurrentBPM = useCallback((time: number, timingPoints: TimingPoint[]): number => {
+    const getCurrentBPM = useCallback((time: number, timingPoints: OsuTimingPoint[]): number => {
         return getBPM(time, timingPoints);
     }, []);
 
-    const getCurrentSV = useCallback((time: number, timingPoints: TimingPoint[]): number => {
+    const getCurrentSV = useCallback((time: number, timingPoints: OsuTimingPoint[]): number => {
         const { svMultiplier: hrMultiplier } = getModMultipliers();
         return getSV(time, timingPoints, hrMultiplier);
     }, [getModMultipliers]);
 
-    const calculateGameplayStart = useCallback((objectTime: number, timingPoints: TimingPoint[]): number => {
+    const calculateGameplayStart = useCallback((objectTime: number, timingPoints: OsuTimingPoint[]): number => {
         const { arMultiplier, svMultiplier: hrSVMultiplier } = getModMultipliers();
         return calcGameplayStart(objectTime, timingPoints, isGameplayMode, APPROACH_TIME, arMultiplier, hrSVMultiplier);
-    }, [isGameplayMode, APPROACH_TIME, getModMultipliers]);
+    }, [isGameplayMode, getModMultipliers]);
 
-    const generateTicks = useCallback((timingPoint: TimingPoint, nextTime: number, timingPoints: TimingPoint[]): Tick[] => {
+    const generateTicks = useCallback((timingPoint: OsuTimingPoint, nextTime: number, timingPoints: OsuTimingPoint[]): Tick[] => {
         return genTicks(timingPoint, nextTime, timingPoints, isGameplayMode, calculateGameplayStart);
     }, [calculateGameplayStart, isGameplayMode]);
 
-    const parseOsuFileAndSetLeadIn = useCallback((content: string, fileName: string): Difficulty | null => {
-        const result = parseOsuFile(content, fileName);
-        if (!result) return null;
-
-        if (result.leadIn > 0 && audioLeadIn === 0) {
-            setAudioLeadIn(result.leadIn);
-        }
-
-        return result.difficulty;
-    }, [audioLeadIn]);
-
-    const processDifficulty = useCallback((difficulty: Difficulty) => {
-        const hitObjectsWithStart: HitObjectWithStart[] = difficulty.hitObjects.map(obj => ({
+    const processDifficulty = useCallback((difficulty: TaikoDifficulty) => {
+        const hitObjectsWithStart: TaikoHitObjectWithStart[] = difficulty.hitObjects.map(obj => ({
             ...obj,
             gameplayStart: calculateGameplayStart(obj.time, difficulty.timingPoints)
         }));
@@ -229,7 +228,7 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
             return;
         }
 
-        const newProcessed = new Map<string, { hitObjects: HitObjectWithStart[], ticks: Tick[] }>();
+        const newProcessed = new Map<string, { hitObjects: TaikoHitObjectWithStart[], ticks: Tick[] }>();
 
         beatmapData.difficulties.forEach(diff => {
             newProcessed.set(diff.version, processDifficulty(diff));
@@ -271,49 +270,51 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
                 const beatmapPath = `${songsFolder}\\${selectedBeatmap.folder_name}`;
 
                 setLoadingStep("Finding .osu files...");
-                const osuFiles = await invoke<string[]>("list_osu_files", {
-                    beatmapFolder: beatmapPath
-                });
+                const osuFiles = await osuApi.listOsuFiles(beatmapPath);
 
                 if (osuFiles.length === 0) {
                     throw new Error("No .osu files found");
                 }
 
                 setLoadingStep(`Parsing ${osuFiles.length} difficulties...`);
-                const difficulties: Difficulty[] = [];
+                const rawBeatmaps: OsuBeatmap[] = [];
                 let audioFilename = "";
                 let title = "";
                 let artist = "";
                 let creator = "";
+                let leadIn = 0;
 
                 for (const file of osuFiles) {
                     const filePath = `${beatmapPath}\\${file}`;
-                    const content = await invoke<string>("read_osu_file", { filePath });
+                    const beatmap = await osuApi.parseOsuFile(filePath);
+                    rawBeatmaps.push(beatmap);
+                    setLoadingStep(`Parsed ${rawBeatmaps.length}/${osuFiles.length} difficulties...`);
 
-                    const difficulty = parseOsuFileAndSetLeadIn(content, file);
-                    if (difficulty) {
-                        difficulties.push(difficulty);
-                        setLoadingStep(`Parsed ${difficulties.length}/${osuFiles.length} difficulties...`);
-
-                        if (!audioFilename) {
-                            const basic = parseBasicBeatmapFields(content);
-                            audioFilename = basic.audioFilename;
-                            title = basic.title;
-                            artist = basic.artist;
-                            creator = basic.creator;
-                        }
+                    if (!audioFilename) {
+                        audioFilename = beatmap.general.audioFilename;
+                        title = beatmap.metadata.title;
+                        artist = beatmap.metadata.artist;
+                        creator = beatmap.metadata.creator;
+                        leadIn = beatmap.general.audioLeadIn;
                     }
                 }
 
-                if (difficulties.length === 0) {
+                if (rawBeatmaps.length === 0) {
                     throw new Error("No taiko difficulties found");
                 }
 
                 setLoadingStep("Sorting difficulties...");
-                const { sorted, error: sortError } = sortDifficulties(difficulties);
+                const { sorted: sortedBeatmaps } = sortDifficulties(rawBeatmaps);
+                const taikoBeatmaps = sortedBeatmaps.filter(b => b.general.mode === 1);
 
-                if (sortError) {
-                    throw new Error(sortError);
+                if (taikoBeatmaps.length === 0) {
+                    throw new Error("No taiko difficulties found");
+                }
+
+                const sorted = taikoBeatmaps.map(adaptOsuBeatmapToTaiko);
+
+                if (leadIn > 0) {
+                    setAudioLeadIn(leadIn);
                 }
 
                 setBeatmapData({
@@ -352,7 +353,7 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
                 cancelAnimationFrame(animationFrameRef.current);
             }
         };
-    }, [selectedBeatmap, parseOsuFileAndSetLeadIn, cleanupAudio, loadAudio]);
+    }, [selectedBeatmap, cleanupAudio, loadAudio]);
 
     useEffect(() => {
         lastHitTimeRef.current.clear();
@@ -372,7 +373,7 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
         setCurrentTime(adjustedTimeMs);
 
         const now = Date.now();
-        setHitAnimations(prev => prev.filter(anim => now - anim.timestamp < 300));
+        setHitAnimations(prev => prev.filter(anim => now - anim.timestamp < HIT_ANIMATION_DURATION_MS));
 
         if (beatmapData && hitsoundVolume > 0) {
             beatmapData.difficulties

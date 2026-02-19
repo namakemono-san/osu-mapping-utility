@@ -1,6 +1,7 @@
 mod audio;
 mod commands;
 mod models;
+mod osu;
 mod utils;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -30,6 +31,15 @@ pub fn run() {
 
             let path = PathBuf::from(&decoded);
 
+            for component in path.components() {
+                if matches!(component, std::path::Component::ParentDir) {
+                    return Response::builder()
+                        .status(404)
+                        .body(Vec::new())
+                        .unwrap_or_else(|_| Response::new(Vec::new()));
+                }
+            }
+
             match fs::read(&path) {
                 Ok(data) => {
                     let mime = match path.extension().and_then(|e| e.to_str()) {
@@ -44,14 +54,14 @@ pub fn run() {
                     Response::builder()
                         .header("Content-Type", mime)
                         .body(data)
-                        .expect("failed to build response")
+                        .unwrap_or_else(|_| Response::new(Vec::new()))
                 }
                 Err(err) => {
                     eprintln!("[ASSET ERROR] {:?} ({})", err, path.display());
                     Response::builder()
                         .status(404)
                         .body(Vec::new())
-                        .expect("failed to build 404 response")
+                        .unwrap_or_else(|_| Response::new(Vec::new()))
                 }
             }
         })
@@ -70,12 +80,17 @@ pub fn run() {
             commands::read_audio_file,
             commands::rename_osu_files,
             commands::clone_beatmap,
+            commands::parse_osu_file,
+            commands::parse_osu_files_batch,
+            commands::write_osu_metadata,
             commands::process_thumbnail,
             commands::save_thumbnail,
             commands::process_image_to_thumbnail,
             commands::process_url_to_thumbnail,
             audio::commands::analyze_audio,
             audio::commands::export_spectrogram,
+            audio::commands::check_audio_info,
+            commands::list_folder_files,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -27,7 +27,41 @@ const MAP_TOOLS: SidebarKey[] = [
   "beatmap_preview",
   "beatmap_customizer",
   "metadata_editor",
+  "rc_checks",
 ];
+
+const BeatmapClone = lazy(async () => ({
+  default: (await import("./pages/BeatmapClone")).BeatmapClone,
+}));
+const BeatmapPreview = lazy(async () => ({
+  default: (await import("./pages/BeatmapPreview")).BeatmapPreview,
+}));
+const MetadataEditor = lazy(async () => ({
+  default: (await import("./pages/MetadataEditor")).MetadataEditor,
+}));
+const OffsetCalibrator = lazy(async () => ({
+  default: (await import("./pages/OffsetCalibrator")).OffsetCalibrator,
+}));
+const VideoDownloader = lazy(async () => ({
+  default: (await import("./pages/VideoDownloader")).VideoDownloader,
+}));
+const ImageDownloader = lazy(async () => ({
+  default: (await import("./pages/ImageDownloader")).ImageDownloader,
+}));
+const AudioAnalyzer = lazy(async () => ({
+  default: (await import("./pages/AudioAnalyzer")).AudioAnalyzer,
+}));
+const RankingCriteriaChecker = lazy(async () => ({
+  default: (await import("./pages/RankingCriteriaChecker")).RankingCriteriaChecker,
+}));
+
+function ToolLoading() {
+  return (
+    <div className="flex h-full items-center justify-center text-text-muted">
+      Loading...
+    </div>
+  );
+}
 
 function App() {
   const [activeTool, setActiveTool] = useState<SidebarKey>("beatmap_customizer");
@@ -70,11 +104,13 @@ function App() {
       case "beatmap_clone":
         return <BeatmapClone selectedBeatmap={selectedBeatmap} />;
       case "beatmap_preview":
-        return <BeatmapPreview selectedBeatmap={selectedBeatmap} />
+        return <BeatmapPreview selectedBeatmap={selectedBeatmap} />;
       case "beatmap_customizer":
         return <BeatmapCustomizer selectedBeatmap={selectedBeatmap} />;
       case "metadata_editor":
-        return <MetadataEditor selectedBeatmap={selectedBeatmap} />
+        return <MetadataEditor selectedBeatmap={selectedBeatmap} />;
+      case "rc_checks":
+        return <RankingCriteriaChecker selectedBeatmap={selectedBeatmap} />;
       case "offset_calibrator":
         return <OffsetCalibrator />;
       case "video_downloader":
@@ -82,7 +118,7 @@ function App() {
       case "audio_analyzer":
         return <AudioAnalyzer />;
       case "image_downloader":
-        return <ImageDownloader />
+        return <ImageDownloader />;
       default:
         return null;
     }

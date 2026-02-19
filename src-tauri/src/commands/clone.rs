@@ -1,4 +1,6 @@
 use crate::models::beatmapset::BeatmapMetadata;
+use crate::osu::parser::parse as parse_osu;
+use crate::osu::writer::reset_timing_points;
 use crate::utils::filename::sanitize_windows_filename_component;
 use chrono::Local;
 use std::collections::HashSet;
@@ -38,160 +40,6 @@ fn zip_path(p: &Path) -> String {
     p.to_string_lossy().replace('\\', "/")
 }
 
-fn first_quoted(s: &str) -> Option<String> {
-    let start = s.find('"')?;
-    let rest = &s[start + 1..];
-    let end = rest.find('"')?;
-    Some(rest[..end].to_string())
-}
-
-fn parse_event_filename(trimmed: &str, unquoted_index: usize) -> Option<String> {
-    if let Some(q) = first_quoted(trimmed) {
-        let v = q.trim();
-        return if v.is_empty() {
-            None
-        } else {
-            Some(v.to_string())
-        };
-    }
-
-    let parts: Vec<&str> = trimmed.split(',').collect();
-    let raw = parts.get(unquoted_index)?.trim();
-    let raw = raw.split_once("//").map(|(a, _)| a).unwrap_or(raw).trim();
-    let raw = raw.trim_matches('"').trim();
-    if raw.is_empty() {
-        None
-    } else {
-        Some(raw.to_string())
-    }
-}
-
-fn parse_audio_filename(content: &str) -> Option<String> {
-    let mut in_general = false;
-    for line in content.lines() {
-        let trimmed = line.trim();
-
-        if trimmed.starts_with('[') && trimmed.ends_with(']') {
-            in_general = trimmed.eq_ignore_ascii_case("[General]");
-            continue;
-        }
-
-        if !in_general {
-            continue;
-        }
-
-        if let Some(rest) = trimmed.strip_prefix("AudioFilename:") {
-            let v = rest.trim();
-            if !v.is_empty() {
-                return Some(v.to_string());
-            }
-        }
-    }
-
-    None
-}
-
-fn is_background_event_line(trimmed: &str) -> bool {
-    trimmed.starts_with("0,0,") || trimmed.starts_with("Background,")
-}
-
-fn is_video_event_line(trimmed: &str) -> bool {
-    trimmed.starts_with("Video,") || trimmed.starts_with("1,")
-}
-
-fn parse_events_background_and_video(content: &str) -> (Option<String>, Option<String>) {
-    let mut in_events = false;
-    let mut bg: Option<String> = None;
-    let mut video: Option<String> = None;
-
-    for line in content.lines() {
-        let trimmed = line.trim();
-
-        if trimmed.starts_with('[') && trimmed.ends_with(']') {
-            in_events = trimmed.eq_ignore_ascii_case("[Events]");
-            continue;
-        }
-
-        if !in_events || trimmed.is_empty() || trimmed.starts_with("//") {
-            continue;
-        }
-
-        if bg.is_none() && is_background_event_line(trimmed) {
-            let idx = if trimmed.starts_with("Background,") {
-                3
-            } else {
-                2
-            };
-            bg = parse_event_filename(trimmed, idx);
-            continue;
-        }
-
-        if video.is_none() && is_video_event_line(trimmed) {
-            video = parse_event_filename(trimmed, 2);
-            continue;
-        }
-
-        if bg.is_some() && video.is_some() {
-            break;
-        }
-    }
-
-    (bg, video)
-}
-
-fn process_timing_points_reset(lines: &[&str], keep_kiai: bool) -> Vec<String> {
-    let mut result: Vec<String> = Vec::new();
-    let mut in_kiai = false;
-    let mut last_bpm_beat_length: Option<&str> = None;
-    let mut last_bpm_meter: Option<&str> = None;
-
-    for line in lines {
-        let trimmed = line.trim();
-
-        if trimmed.is_empty() || trimmed.starts_with("//") {
-            continue;
-        }
-
-        let parts: Vec<&str> = trimmed.split(',').collect();
-        if parts.len() < 8 {
-            continue;
-        }
-
-        let time = parts[0].trim();
-        let beat_length = parts[1].trim();
-        let meter = parts[2].trim();
-        let uninherited = parts[6].trim();
-        let looks_like_uninherited = uninherited == "1" || !beat_length.starts_with('-');
-
-        let effects_raw = parts[7].trim().parse::<i32>().unwrap_or(0);
-        let has_kiai = (effects_raw & 1) == 1;
-        let effects_out = if keep_kiai && has_kiai { 1 } else { 0 };
-
-        if looks_like_uninherited {
-            last_bpm_beat_length = Some(beat_length);
-            last_bpm_meter = Some(meter);
-            result.push(format!(
-                "{},{},{},1,0,100,1,{}",
-                time, beat_length, meter, effects_out
-            ));
-            in_kiai = has_kiai;
-            continue;
-        }
-
-        if keep_kiai && has_kiai != in_kiai {
-            if let (Some(bpm_bl), Some(bpm_meter)) = (last_bpm_beat_length, last_bpm_meter) {
-                result.push(format!(
-                    "{},{},{},1,0,100,0,{}",
-                    time, bpm_bl, bpm_meter, effects_out
-                ));
-            }
-            in_kiai = has_kiai;
-        }
-    }
-
-    result
-}
-
 fn next_available_file_path(mut path: PathBuf) -> PathBuf {
     if !path.exists() {
         return path;
@@ -220,278 +68,6 @@ fn next_available_file_path(mut path: PathBuf) -> PathBuf {
     }
 
     path
-}
-
-#[allow(dead_code)]
-fn is_skin_file(filename: &str) -> bool {
-    let lower = filename.to_lowercase();
-    let name_without_ext = lower.rsplit_once('.').map(|(n, _)| n).unwrap_or(&lower);
-
-    if name_without_ext.starts_with("comboburst") {
-        return true;
-    }
-
-    if name_without_ext.starts_with("default-") {
-        return true;
-    }
-
-    let hitcircle_elements = [
-        "approachcircle",
-        "hit",
-        "hitcircle",
-        "hitcircleoverlay",
-        "hitcircleselect",
-        "followpoint",
-        "lighting",
-    ];
-    for elem in &hitcircle_elements {
-        if name_without_ext.starts_with(elem) {
-            return true;
-        }
-    }
-
-    let slider_elements = [
-        "sliderstartcircle",
-        "sliderstartcircleoverlay",
-        "sliderendcircle",
-        "sliderendcircleoverlay",
-        "reversearrow",
-        "sliderfollowcircle",
-        "sliderb",
-        "sliderb-nd",
-        "sliderb-spec",
-        "sliderpoint10",
-        "sliderpoint30",
-        "sliderscorepoint",
-    ];
-    for elem in &slider_elements {
-        if name_without_ext.starts_with(elem) {
-            return true;
-        }
-    }
-
-    let spinner_elements = [
-        "spinner-background",
-        "spinner-circle",
-        "spinner-metre",
-        "spinner-osu",
-        "spinner-glow",
-        "spinner-bottom",
-        "spinner-top",
-        "spinner-middle",
-        "spinner-middle2",
-        "spinner-approachcircle",
-        "spinner-rpm",
-        "spinner-clear",
-        "spinner-spin",
-    ];
-    for elem in &spinner_elements {
-        if name_without_ext.starts_with(elem) {
-            return true;
-        }
-    }
-
-    if name_without_ext.starts_with("particle") {
-        return true;
-    }
-
-    if name_without_ext == "sliderendmiss" || name_without_ext == "slidertickmiss" {
-        return true;
-    }
-
-    let taiko_elements = [
-        "taiko-bar-left",
-        "taiko-bar-right",
-        "taiko-bar-right-glow",
-        "taiko-drum-inner",
-        "taiko-drum-outer",
-        "taiko-barline",
-        "taiko-hit0",
-        "taiko-hit100",
-        "taiko-hit100k",
-        "taiko-hit300",
-        "taiko-hit300k",
-        "taiko-hit300g",
-        "taiko-flower-group",
-        "taikobigcircle",
-        "taikohitcircle",
-        "taikohitcircleoverlay",
-        "taiko-glow",
-        "taiko-slider",
-        "taiko-slider-fail",
-        "pippidon",
-        "taiko-roll-middle",
-        "taiko-roll-end",
-    ];
-    for elem in &taiko_elements {
-        if name_without_ext.starts_with(elem) {
-            return true;
-        }
-    }
-
-    let catch_elements = [
-        "fruit-apple",
-        "fruit-bananas",
-        "fruit-grapes",
-        "fruit-orange",
-        "fruit-pear",
-        "fruit-apple-overlay",
-        "fruit-bananas-overlay",
-        "fruit-grapes-overlay",
-        "fruit-orange-overlay",
-        "fruit-pear-overlay",
-        "fruit-drop",
-        "fruit-drop-overlay",
-        "fruit-catcher-idle",
-        "fruit-catcher-kiai",
-        "fruit-catcher-fail",
-        "fruit-ryuuta",
-        "lighting",
-    ];
-    for elem in &catch_elements {
-        if name_without_ext.starts_with(elem) {
-            return true;
-        }
-    }
-
-    let mania_elements = [
-        "mania-stage-left",
-        "mania-stage-right",
-        "mania-stage-bottom",
-        "mania-stage-light",
-        "mania-stage-hint",
-        "mania-note1",
-        "mania-note2",
-        "mania-note3",
-        "mania-key1",
-        "mania-key2",
-        "mania-key3",
-        "mania-hit0",
-        "mania-hit50",
-        "mania-hit100",
-        "mania-hit200",
-        "mania-hit300",
-        "mania-hit300g",
-        "lightingn",
-        "lightingl",
-    ];
-    for elem in &mania_elements {
-        if name_without_ext.starts_with(elem) {
-            return true;
-        }
-    }
-
-    let interface_elements = [
-        "menu-back",
-        "menu-button",
-        "selection-",
-        "button-",
-        "mode-",
-        "mode-osu",
-        "mode-taiko",
-        "mode-catch",
-        "mode-mania",
-        "cursor",
-        "cursortrail",
-        "cursormiddle",
-        "star",
-        "star2",
-        "scorebar-",
-        "score-",
-        "ranking-",
-        "pause-",
-        "fail-",
-        "ready",
-        "section-",
-        "multi-",
-        "play-",
-        "count",
-        "go",
-        "ready",
-        "inputoverlay-",
-        "arrow-",
-        "hitcircle-",
-        "reversearrow",
-        "selection-mode",
-        "selection-mods",
-        "selection-random",
-        "selection-options",
-        "options-offset-tick",
-    ];
-    for elem in &interface_elements {
-        if name_without_ext.starts_with(elem) {
-            return true;
-        }
-    }
-
-    let hitsound_prefixes = ["normal-", "soft-", "drum-", "taiko-"];
-    for prefix in &hitsound_prefixes {
-        if name_without_ext.starts_with(prefix) {
-            let remainder = &name_without_ext[prefix.len()..];
-            if remainder.starts_with("hit")
-                || remainder.starts_with("slider")
-                || remainder == "hitnormal"
-                || remainder == "hitclap"
-                || remainder == "hitfinish"
-                || remainder == "hitwhistle"
-                || remainder == "slidertick"
-                || remainder == "sliderslide"
-                || remainder == "sliderwhistle"
-            {
-                return true;
-            }
-        }
-    }
-
-    if name_without_ext.starts_with("spinner") {
-        return true;
-    }
-
-    let gameplay_sounds = [
-        "comboburst",
-        "combobreak",
-        "failsound",
-        "sectionpass",
-        "sectionfail",
-        "applause",
-        "pause-loop",
-        "metronomelow",
-        "nightcore-kick",
-        "nightcore-clap",
-        "nightcore-hat",
-        "nightcore-finish",
-    ];
-    for sound in &gameplay_sounds {
-        if name_without_ext.starts_with(sound) {
-            return true;
-        }
-    }
-
-    let interface_sounds = [
-        "heartbeat",
-        "seeya",
-        "welcome",
-        "key-",
-        "back-button-",
-        "check-",
-        "click-",
-        "menuback",
-        "menuhit",
-        "menu-",
-        "pause-",
-        "select-",
-        "shutter",
-        "sliderbar",
-        "whoosh",
-        "match-",
-    ];
-    for sound in &interface_sounds {
-        if name_without_ext.starts_with(sound) {
-            return true;
-        }
-    }
-
-    false
 }
 
 struct OsuContentConfig<'a> {
@@ -532,19 +108,19 @@ fn process_osu_content(content: &str, config: &OsuContentConfig) -> String {
             let leaving_timing_points = current_section == "[TimingPoints]" && in_timing_section;
 
             if leaving_events {
-                if output.last().map(|s| !s.is_empty()).unwrap_or(true) {
+                if output.last().map(|s: &String| !s.is_empty()).unwrap_or(true) {
                     output.push(String::new());
                 }
             }
 
             if leaving_timing_points && config.reset_timing_points {
-                let processed = process_timing_points_reset(&timing_lines, config.keep_kiai);
+                let processed = reset_timing_points(&timing_lines, config.keep_kiai);
                 output.extend(processed);
                 timing_lines.clear();
             }
 
             if leaving_timing_points {
-                if output.last().map(|s| !s.is_empty()).unwrap_or(true) {
+                if output.last().map(|s: &String| !s.is_empty()).unwrap_or(true) {
                     output.push(String::new());
                 }
             }
@@ -707,7 +283,7 @@ fn process_osu_content(content: &str, config: &OsuContentConfig) -> String {
     }
 
     if current_section == "[TimingPoints]" && in_timing_section && config.reset_timing_points {
-        let processed = process_timing_points_reset(&timing_lines, config.keep_kiai);
+        let processed = reset_timing_points(&timing_lines, config.keep_kiai);
         output.extend(processed);
     }
 
@@ -756,10 +332,16 @@ pub fn clone_beatmap(app: tauri::AppHandle, config: CloneConfig) -> Result<Strin
     let template_content = fs::read_to_string(&template_path)
         .map_err(|e| format!("Failed to read template .osu: {}", e))?;
 
-    let audio_filename = parse_audio_filename(&template_content)
-        .ok_or_else(|| "AudioFilename not found in .osu".to_string())?;
+    let parsed = parse_osu(&template_content, &config.template_osu_file);
 
-    let (bg_from_events, video_from_events) = parse_events_background_and_video(&template_content);
+    let audio_filename = if parsed.general.audio_filename.is_empty() {
+        return Err("AudioFilename not found in .osu".to_string());
+    } else {
+        parsed.general.audio_filename.clone()
+    };
+
+    let bg_from_events = parsed.background.as_ref().map(|b| b.filename.clone());
+    let video_from_events = parsed.video_filename.clone();
 
     let audio_rel = safe_rel_path(&audio_filename)?;
     let audio_abs = source_path.join(&audio_rel);

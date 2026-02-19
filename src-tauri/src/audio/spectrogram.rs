@@ -21,19 +21,21 @@ static UI_FONTS: Lazy<Vec<FontArc>> = Lazy::new(|| {
         fonts.push(font);
     }
 
-    let fallback_paths = [
-        "E:/Developments/applications/osu-mapping-utility/src-tauri/fonts/NotoSansJP-Regular.otf",
-        "C:/Windows/Fonts/NotoSansJP-Regular.otf",
-        "C:/Windows/Fonts/NotoSansCJK-Regular.ttc",
-        "C:/Windows/Fonts/meiryo.ttc",
-        "C:/Windows/Fonts/YuGothR.ttc",
-    ];
+    #[cfg(target_os = "windows")]
+    {
+        let fallback_paths = [
+            "C:/Windows/Fonts/NotoSansJP-Regular.otf",
+            "C:/Windows/Fonts/NotoSansCJK-Regular.ttc",
+            "C:/Windows/Fonts/meiryo.ttc",
+            "C:/Windows/Fonts/YuGothR.ttc",
+        ];
 
-    for path in fallback_paths {
-        if Path::new(path).exists() {
-            if let Ok(bytes) = std::fs::read(path) {
-                if let Ok(font) = FontArc::try_from_vec(bytes) {
-                    fonts.push(font);
+        for path in fallback_paths {
+            if Path::new(path).exists() {
+                if let Ok(bytes) = std::fs::read(path) {
+                    if let Ok(font) = FontArc::try_from_vec(bytes) {
+                        fonts.push(font);
+                    }
                 }
             }
         }
