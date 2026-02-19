@@ -253,7 +253,7 @@ export function PlayfieldSVG({
     return (
         <div className="flex items-center justify-center mb-4">
             <div
-                className="relative bg-[#101010] rounded-lg border border-[#2a2a2a] overflow-hidden"
+                className="relative bg-surface-input rounded-lg border border-border-muted overflow-hidden"
                 style={{ width: `${PLAYFIELD_WIDTH}px`, height: `${filteredDifficulties.length * 100}px` }}
             >
                 <svg width={PLAYFIELD_WIDTH} height={filteredDifficulties.length * 100}>

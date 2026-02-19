@@ -12,10 +12,10 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variantStyles = {
-    primary: "bg-[#2563eb] hover:bg-[#1f56cc] text-white shadow-lg",
-    secondary: "bg-[#2a2a2a] hover:bg-[#343434] text-white",
-    danger: "bg-[#ef4444] hover:bg-[#d63a3a] text-white",
-    ghost: "hover:bg-[#2a2a2a] text-[#e0e0e0]",
+    primary: "bg-accent-primary hover:bg-accent-primary-hover text-white shadow-lg",
+    secondary: "bg-surface-hover hover:bg-surface-hover-soft text-white",
+    danger: "bg-danger-primary hover:bg-danger-hover text-white",
+    ghost: "hover:bg-surface-hover text-text-secondary",
 };
 
 const sizeStyles = {
@@ -46,7 +46,7 @@ export function Button({
             disabled={disabled}
             {...props}
         >
-            {icon && <span className="flex-shrink-0">{icon}</span>}
+            {icon && <span className="shrink-0">{icon}</span>}
             <span>{children}</span>
         </button>
     );

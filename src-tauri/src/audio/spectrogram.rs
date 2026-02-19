@@ -16,7 +16,7 @@ static UI_FONTS: Lazy<Vec<FontArc>> = Lazy::new(|| {
     let mut fonts = Vec::new();
 
     if let Ok(font) = FontArc::try_from_slice(include_bytes!(
-        "../../../src/assets/fonts/Roboto-Regular.ttf"
+        "../../assets/fonts/roboto/Roboto-Variable.ttf"
     )) {
         fonts.push(font);
     }

@@ -210,8 +210,8 @@ export function VideoDownloader() {
     return (
         <div className="flex flex-col gap-2 text-zinc-200">
             <Card className="flex items-center gap-2 p-2">
-                <div className="flex items-center gap-2 px-3 h-9 rounded-lg bg-[#1f1f1f] border border-[#2a2a2a] w-full max-w-[min(60%,720px)]">
-                    <FiLink className="text-[#7b7b7b] flex-shrink-0" />
+                <div className="flex items-center gap-2 px-3 h-9 rounded-lg bg-surface-base border border-border-muted w-full max-w-min-60-720">
+                    <FiLink className="text-text-muted shrink-0" />
                     <Input
                         value={url}
                         onChange={(e) => setUrl(e.target.value)}
@@ -226,7 +226,7 @@ export function VideoDownloader() {
                     onChange={(e) => setAudioFormat(e.target.value as "mp3" | "ogg")}
                     disabled={busy}
                     icon={<FiMusic />}
-                    className="min-w-[220px]"
+                    className="min-w-220"
                 >
                     <option value="mp3">{t("video.option.mp3")}</option>
                     <option value="ogg">{t("video.option.ogg")}</option>
@@ -258,7 +258,7 @@ export function VideoDownloader() {
             <Card className="flex items-center gap-2 p-2">
                 <Chip
                     icon={<FiFolder />}
-                    className="min-w-0 max-w-[min(60%,720px)]"
+                    className="min-w-0 max-w-min-60-720"
                     title={outDir || t("video.noFolderSelected")}
                 >
                     {outDir || t("video.noFolderSelected")}
@@ -310,13 +310,13 @@ export function VideoDownloader() {
             </Card>
 
             <Card className="flex flex-col">
-                <div className="flex items-center justify-between px-3 py-2 border-b border-[#2a2a2a]">
+                <div className="flex items-center justify-between px-3 py-2 border-b border-border-muted">
                     <span className="text-sm opacity-80">{t("video.log.title")}</span>
                     <span className="text-xs opacity-60">{formatMeta}</span>
                 </div>
                 <pre
                     ref={logRef}
-                    className="font-mono text-sm whitespace-pre-wrap break-words px-3 py-2 h-[62vh] overflow-auto"
+                    className="font-mono text-sm whitespace-pre-wrap wrap-break-word px-3 py-2 h-62vh overflow-auto"
                 >
                     {logLines.length > 0 ? logLines.join("\n") : t("video.log.ready")}
                 </pre>

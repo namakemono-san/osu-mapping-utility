@@ -4,7 +4,7 @@ interface SpectrogramProps {
 
 export default function Spectrogram({ imageBase64 }: SpectrogramProps) {
   return (
-    <div className="w-full rounded-lg border border-[#2a2a2a] bg-black p-2">
+    <div className="w-full rounded-lg border border-border-muted bg-black p-2">
       <img
         src={`data:image/png;base64,${imageBase64}`}
         alt="Spectrogram"

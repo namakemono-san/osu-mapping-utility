@@ -210,7 +210,7 @@ export function BeatmapClone({ selectedBeatmap }: BeatmapCloneProps) {
     if (!selectedBeatmap) {
         return (
             <div className="flex items-center justify-center h-full">
-                <div className="text-center text-[#7b7b7b]">
+                <div className="text-center text-text-muted">
                     <div className="text-4xl mb-3 opacity-30">📝</div>
                     <p>{t("clone.empty.selectBeatmap")}</p>
                 </div>
@@ -221,7 +221,7 @@ export function BeatmapClone({ selectedBeatmap }: BeatmapCloneProps) {
     if (loading) {
         return (
             <div className="flex items-center justify-center h-full">
-                <div className="text-center text-[#7b7b7b]">
+                <div className="text-center text-text-muted">
                     <FiRefreshCw className="w-8 h-8 animate-spin mx-auto mb-3" />
                     <p>{t("clone.loading")}</p>
                 </div>
@@ -237,7 +237,7 @@ export function BeatmapClone({ selectedBeatmap }: BeatmapCloneProps) {
                         <h2 className="text-lg font-bold mb-1.5">
                             {t("clone.header.clone", { title: title || selectedBeatmap.title })}
                         </h2>
-                        <div className="text-xs text-[#7b7b7b]">
+                        <div className="text-xs text-text-muted">
                             {t("clone.header.originalBy", { creator: selectedBeatmap.creator })}
                         </div>
                     </Card>
@@ -255,7 +255,7 @@ export function BeatmapClone({ selectedBeatmap }: BeatmapCloneProps) {
                             </div>
 
                             <div>
-                                <label className="block text-xs text-[#7b7b7b] mb-1">
+                                <label className="block text-xs text-text-muted mb-1">
                                     {t("clone.sourceOsu.label")}
                                 </label>
                                 <Select value={templateOsuFile} onChange={handleTemplateChange}>
@@ -275,7 +275,7 @@ export function BeatmapClone({ selectedBeatmap }: BeatmapCloneProps) {
                         <div className="space-y-3">
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="block text-xs text-[#7b7b7b] mb-1">
+                                    <label className="block text-xs text-text-muted mb-1">
                                         {t("clone.metadata.titleOriginal")}
                                     </label>
                                     <Input
@@ -285,7 +285,7 @@ export function BeatmapClone({ selectedBeatmap }: BeatmapCloneProps) {
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-xs text-[#7b7b7b] mb-1">
+                                    <label className="block text-xs text-text-muted mb-1">
                                         {t("clone.metadata.titleRomanised")}
                                     </label>
                                     <Input
@@ -298,7 +298,7 @@ export function BeatmapClone({ selectedBeatmap }: BeatmapCloneProps) {
 
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="block text-xs text-[#7b7b7b] mb-1">
+                                    <label className="block text-xs text-text-muted mb-1">
                                         {t("clone.metadata.artistOriginal")}
                                     </label>
                                     <Input
@@ -308,7 +308,7 @@ export function BeatmapClone({ selectedBeatmap }: BeatmapCloneProps) {
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-xs text-[#7b7b7b] mb-1">
+                                    <label className="block text-xs text-text-muted mb-1">
                                         {t("clone.metadata.artistRomanised")}
                                     </label>
                                     <Input
@@ -320,7 +320,7 @@ export function BeatmapClone({ selectedBeatmap }: BeatmapCloneProps) {
                             </div>
 
                             <div>
-                                <label className="block text-xs text-[#7b7b7b] mb-1">
+                                <label className="block text-xs text-text-muted mb-1">
                                     {t("clone.metadata.source")}
                                 </label>
                                 <Input
@@ -331,13 +331,13 @@ export function BeatmapClone({ selectedBeatmap }: BeatmapCloneProps) {
                             </div>
 
                             <div>
-                                <label className="block text-xs text-[#7b7b7b] mb-1">{t("clone.metadata.tags")}</label>
+                                <label className="block text-xs text-text-muted mb-1">{t("clone.metadata.tags")}</label>
                                 <textarea
                                     value={tags}
                                     onChange={(e) => setTags(e.target.value)}
                                     placeholder={t("clone.metadata.tagsPlaceholder")}
                                     rows={3}
-                                    className="w-full px-3 py-2 rounded-lg bg-[#101010] border border-[#2a2a2a] text-sm text-white placeholder-[#7b7b7b] focus:outline-none focus:border-[#4a4a4a] transition-colors resize-none"
+                                    className="w-full px-3 py-2 rounded-lg bg-surface-input border border-border-muted text-sm text-white placeholder-text-muted focus:outline-none focus:border-border-focus transition-colors resize-none"
                                 />
                             </div>
                         </div>
@@ -355,14 +355,14 @@ export function BeatmapClone({ selectedBeatmap }: BeatmapCloneProps) {
                                     }
                                 }}
                                 className={`flex flex-col gap-1 px-3 py-2.5 rounded-lg border text-left transition-all duration-200 hover:scale-105 active:scale-95 w-full ${resetTimingPoints
-                                    ? "bg-[#2563eb]/20 border-[#2563eb] shadow-lg shadow-[#2563eb]/20"
-                                    : "bg-[#171717] border-[#2a2a2a]"
+                                    ? "bg-accent-primary/20 border-accent-primary shadow-lg shadow-accent-primary/20"
+                                    : "bg-surface-panel border-border-muted"
                                     }`}
                             >
                                 <div className="font-medium text-sm">
                                     {t("clone.advanced.keepTimingPoints.title")}
                                 </div>
-                                <div className="text-xs text-[#7b7b7b]">
+                                <div className="text-xs text-text-muted">
                                     {t("clone.advanced.keepTimingPoints.desc")}
                                 </div>
                             </button>
@@ -371,25 +371,25 @@ export function BeatmapClone({ selectedBeatmap }: BeatmapCloneProps) {
                                 onClick={() => setKeepKiai(!keepKiai)}
                                 disabled={!resetTimingPoints}
                                 className={`flex flex-col gap-1 px-3 py-2.5 rounded-lg border text-left transition-all duration-200 w-full ${!resetTimingPoints
-                                    ? "bg-[#171717] border-[#2a2a2a] opacity-50 cursor-not-allowed"
+                                    ? "bg-surface-panel border-border-muted opacity-50 cursor-not-allowed"
                                     : keepKiai
-                                        ? "bg-[#2563eb]/20 border-[#2563eb] shadow-lg shadow-[#2563eb]/20 hover:scale-105 active:scale-95"
-                                        : "bg-[#171717] border-[#2a2a2a] hover:scale-105 active:scale-95"
+                                        ? "bg-accent-primary/20 border-accent-primary shadow-lg shadow-accent-primary/20 hover:scale-105 active:scale-95"
+                                        : "bg-surface-panel border-border-muted hover:scale-105 active:scale-95"
                                     }`}
                             >
                                 <div className="font-medium text-sm">{t("clone.advanced.keepKiai.title")}</div>
-                                <div className="text-xs text-[#7b7b7b]">{t("clone.advanced.keepKiai.desc")}</div>
+                                <div className="text-xs text-text-muted">{t("clone.advanced.keepKiai.desc")}</div>
                             </button>
 
                             <button
                                 onClick={() => setRemoveSkinFiles(!removeSkinFiles)}
                                 className={`flex flex-col gap-1 px-3 py-2.5 rounded-lg border text-left transition-all duration-200 hover:scale-105 active:scale-95 w-full ${removeSkinFiles
-                                    ? "bg-[#2563eb]/20 border-[#2563eb] shadow-lg shadow-[#2563eb]/20"
-                                    : "bg-[#171717] border-[#2a2a2a]"
+                                    ? "bg-accent-primary/20 border-accent-primary shadow-lg shadow-accent-primary/20"
+                                    : "bg-surface-panel border-border-muted"
                                     }`}
                             >
                                 <div className="font-medium text-sm">{t("clone.advanced.removeSkinFiles.title")}</div>
-                                <div className="text-xs text-[#7b7b7b]">
+                                <div className="text-xs text-text-muted">
                                     {t("clone.advanced.removeSkinFiles.desc")}
                                 </div>
                             </button>
@@ -397,12 +397,12 @@ export function BeatmapClone({ selectedBeatmap }: BeatmapCloneProps) {
                             <button
                                 onClick={() => setResetDifficulty(!resetDifficulty)}
                                 className={`flex flex-col gap-1 px-3 py-2.5 rounded-lg border text-left transition-all duration-200 hover:scale-105 active:scale-95 w-full ${resetDifficulty
-                                    ? "bg-[#2563eb]/20 border-[#2563eb] shadow-lg shadow-[#2563eb]/20"
-                                    : "bg-[#171717] border-[#2a2a2a]"
+                                    ? "bg-accent-primary/20 border-accent-primary shadow-lg shadow-accent-primary/20"
+                                    : "bg-surface-panel border-border-muted"
                                     }`}
                             >
                                 <div className="font-medium text-sm">{t("clone.advanced.resetDifficulty.title")}</div>
-                                <div className="text-xs text-[#7b7b7b]">
+                                <div className="text-xs text-text-muted">
                                     HP:5, CS:5, OD:5, AR:5, SliderMultiplier:1.4, SliderTickRate:1
                                 </div>
                             </button>
@@ -410,12 +410,12 @@ export function BeatmapClone({ selectedBeatmap }: BeatmapCloneProps) {
                             <button
                                 onClick={() => setCopyPreviewTime(!copyPreviewTime)}
                                 className={`flex flex-col gap-1 px-3 py-2.5 rounded-lg border text-left transition-all duration-200 hover:scale-105 active:scale-95 w-full ${copyPreviewTime
-                                    ? "bg-[#2563eb]/20 border-[#2563eb] shadow-lg shadow-[#2563eb]/20"
-                                    : "bg-[#171717] border-[#2a2a2a]"
+                                    ? "bg-accent-primary/20 border-accent-primary shadow-lg shadow-accent-primary/20"
+                                    : "bg-surface-panel border-border-muted"
                                     }`}
                             >
                                 <div className="font-medium text-sm">{t("clone.advanced.copyPreviewTime.title")}</div>
-                                <div className="text-xs text-[#7b7b7b]">{t("clone.advanced.copyPreviewTime.desc")}</div>
+                                <div className="text-xs text-text-muted">{t("clone.advanced.copyPreviewTime.desc")}</div>
                             </button>
                         </div>
                     </Card>

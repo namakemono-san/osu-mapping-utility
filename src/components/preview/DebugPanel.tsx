@@ -34,9 +34,9 @@ export function DebugPanel({
     beatmapData,
 }: DebugPanelProps) {
     return (
-        <div className="bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg p-3">
-            <div className="text-xs font-mono text-[#7b7b7b] space-y-1">
-                <div className="text-[#e0e0e0] mb-2">{t("preview.debug.title")}</div>
+        <div className="bg-surface-deep border border-border-muted rounded-lg p-3">
+            <div className="text-xs font-mono text-text-muted space-y-1">
+                <div className="text-text-secondary mb-2">{t("preview.debug.title")}</div>
                 <div>
                     {t("preview.debug.mode")} {isGameplayMode ? t("preview.debug.gameplay") : t("preview.debug.edit")}
                 </div>
@@ -54,8 +54,8 @@ export function DebugPanel({
                         <div>{t("preview.debug.currentSv", { sv: getCurrentSV(currentTime, filteredDifficulties[0].timingPoints).toFixed(2) })}</div>
                     </>
                 )}
-                <div className="border-t border-[#2a2a2a] pt-2 mt-2">
-                    <div className="text-[#e0e0e0] mb-1">{t("preview.debug.recentHits")}</div>
+                <div className="border-t border-border-muted pt-2 mt-2">
+                    <div className="text-text-secondary mb-1">{t("preview.debug.recentHits")}</div>
                     {debugInfo.length === 0 ? (
                         <div className="opacity-50">{t("preview.debug.noHits")}</div>
                     ) : (
@@ -66,8 +66,8 @@ export function DebugPanel({
                 </div>
 
                 {beatmapData && (
-                    <div className="border-t border-[#2a2a2a] pt-2 mt-2">
-                        <div className="text-[#e0e0e0] mb-1">{t("preview.debug.nextNotes")}</div>
+                    <div className="border-t border-border-muted pt-2 mt-2">
+                        <div className="text-text-secondary mb-1">{t("preview.debug.nextNotes")}</div>
                         {filteredDifficulties
                             .flatMap(diff =>
                                 diff.hitObjects

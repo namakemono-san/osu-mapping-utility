@@ -39,7 +39,7 @@ export default function MetadataPanel(props: MetadataPanelProps) {
 
   return (
     <Card className="p-2">
-      <div className="text-xs font-semibold mb-2 border-b border-[#2f3746] pb-1">Vitals</div>
+      <div className="text-xs font-semibold mb-2 border-b border-border-subtle pb-1">Vitals</div>
       <div className="text-xs leading-5 space-y-0.5">
         <div>Sample Rate: {Math.round(props.sampleRate / 1000)}kHz</div>
         <div>Channels: {props.channels} {channelText}</div>
@@ -54,7 +54,7 @@ export default function MetadataPanel(props: MetadataPanelProps) {
           <div>Frequency Cutoff: {(props.frequencyCutoffHz / 1000).toFixed(1)}kHz</div>
         )}
       </div>
-      <div className="mt-3 text-[11px] leading-4 border-t border-[#2f3746] pt-2">{executionText}</div>
+      <div className="mt-3 text-11 leading-4 border-t border-border-subtle pt-2">{executionText}</div>
     </Card>
   );
 }

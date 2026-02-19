@@ -7,7 +7,7 @@ use tauri_plugin_shell::ShellExt;
 
 const FILTER_TAIKO_720P: &str = "[0]split=3[blur][scale][output];[output]scale=1280:720[output];[scale]scale=-1:340[scale];[blur]scale=1280:-1,boxblur=10,crop=1280:340[blur];[output][1]overlay=0:0[output];[output][blur]overlay=0:387[output];[output][scale]overlay=(W-w)/2:387[output]";
 
-fn ensure_blank720p(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+fn ensure_blank(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     let base_dir = app
         .path()
         .app_data_dir()
@@ -16,12 +16,12 @@ fn ensure_blank720p(app: &tauri::AppHandle) -> Result<PathBuf, String> {
 
     std::fs::create_dir_all(&base_dir).map_err(|e| e.to_string())?;
 
-    let out = base_dir.join("Blank720p.png");
+    let out = base_dir.join("blank.png");
     if out.exists() {
         return Ok(out);
     }
 
-    let bytes: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/Blank720p.png"));
+    let bytes: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/blank.png"));
     std::fs::write(&out, bytes).map_err(|e| e.to_string())?;
     Ok(out)
 }
@@ -47,7 +47,7 @@ pub async fn convert_taiko_video_impl(
     src_path: &str,
     out_dir: &str,
 ) -> Result<String, String> {
-    let blank = ensure_blank720p(app)?;
+    let blank = ensure_blank(app)?;
 
     let src_path_buf = PathBuf::from(src_path);
     let out_dir_buf = PathBuf::from(out_dir);
@@ -73,7 +73,10 @@ pub async fn convert_taiko_video_impl(
 
     let _ = window.emit(
         "download-progress",
-        format!("[taiko][spawn] sidecar:ffmpeg -i {} -> {}", src_path, out_path_str),
+        format!(
+            "[taiko][spawn] sidecar:ffmpeg -i {} -> {}",
+            src_path, out_path_str
+        ),
     );
 
     let cmd = app

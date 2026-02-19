@@ -24,9 +24,8 @@ export interface UseWaveformRendererReturn {
     onMouseUp: () => void;
     onMouseDownClick: () => void;
     onMouseMoveCancelClick: () => void;
-    onClickSetOffset: (e: React.MouseEvent) => void;
+    onClickSeek: (e: React.MouseEvent) => void;
     setZoom: React.Dispatch<React.SetStateAction<number>>;
-    setOffsetMs: (ms: number) => void;
 }
 
 export function useWaveformRenderer(
@@ -37,7 +36,7 @@ export function useWaveformRenderer(
         isPlaying,
         getCurrentPlayheadMs,
     }: UseWaveformRendererOptions,
-    setOffsetMs: (ms: number) => void,
+    onSeekMs: (ms: number) => void,
 ): UseWaveformRendererReturn {
     const containerRef = useRef<HTMLDivElement>(null!);
     const canvasRef = useRef<HTMLCanvasElement>(null!);
@@ -86,8 +85,24 @@ export function useWaveformRenderer(
 
         if (!audioBuffer || durationMs <= 0) return;
 
-        const vStart = clampViewStart(viewStartMs);
-        const vEnd = Math.min(durationMs, vStart + visibleRangeMs);
+        const headForCenter = getCurrentPlayheadMs();
+        const clampedStart = clampViewStart(viewStartMs);
+        const clampedEnd = Math.min(durationMs, clampedStart + visibleRangeMs);
+
+        let vStart: number;
+        let vEnd: number;
+
+        if (isPlaying) {
+            vStart = headForCenter - visibleRangeMs / 2;
+            vEnd = vStart + visibleRangeMs;
+        } else {
+            const headOutsideView = headForCenter < clampedStart || headForCenter > clampedEnd;
+            const baseStart = headOutsideView
+                ? clampViewStart(headForCenter - visibleRangeMs / 2)
+                : clampedStart;
+            vStart = baseStart;
+            vEnd = Math.min(durationMs, vStart + visibleRangeMs);
+        }
         const sr = audioBuffer.sampleRate;
         const ch0 = audioBuffer.getChannelData(0);
         const ch1 = audioBuffer.numberOfChannels > 1 ? audioBuffer.getChannelData(1) : null;
@@ -115,13 +130,23 @@ export function useWaveformRenderer(
 
         if (bpm > 0) {
             const beatMs = 60000 / bpm;
-            gtx.lineWidth = 1;
             for (let t = offsetMs; t <= vEnd; t += beatMs) {
                 if (t < vStart) continue;
                 const x = ((t - vStart) / (vEnd - vStart)) * w + 0.5;
                 const idx = Math.round((t - offsetMs) / beatMs);
-                gtx.strokeStyle = (idx % 4 === 0) ? "rgba(255,255,255,0.20)" : "rgba(255,255,255,0.08)";
+                const isMeasureStart = idx % 4 === 0;
+                gtx.strokeStyle = isMeasureStart
+                    ? "rgba(239, 68, 68, 0.6)"
+                    : "rgba(255, 255, 255, 0.3)";
+                gtx.lineWidth = isMeasureStart ? 2 : 1;
                 gtx.beginPath(); gtx.moveTo(x, 0); gtx.lineTo(x, h); gtx.stroke();
+
+                if (isMeasureStart && zoom > 3) {
+                    const measureNum = Math.floor(idx / 4) + 1;
+                    gtx.fillStyle = "rgba(239, 68, 68, 0.8)";
+                    gtx.font = "11px monospace";
+                    gtx.fillText(`${measureNum}`, x + 4, 14);
+                }
             }
         }
 
@@ -129,32 +154,29 @@ export function useWaveformRenderer(
             const ox = ((offsetMs - vStart) / (vEnd - vStart)) * w + 0.5;
             gtx.strokeStyle = "#22c55e"; gtx.lineWidth = 2;
             gtx.beginPath(); gtx.moveTo(ox, 0); gtx.lineTo(ox, h); gtx.stroke();
+            gtx.fillStyle = "#22c55e";
+            gtx.font = "10px sans-serif";
+            gtx.fillText("Offset", ox + 4, h - 6);
         }
 
-        if (isPlaying) {
-            const head = getCurrentPlayheadMs();
-            if (head >= vStart && head <= vEnd) {
-                const hx = ((head - vStart) / (vEnd - vStart)) * w + 0.5;
-                gtx.strokeStyle = "#eab308"; gtx.lineWidth = 2;
-                gtx.beginPath(); gtx.moveTo(hx, 0); gtx.lineTo(hx, h); gtx.stroke();
-            }
+        const head = getCurrentPlayheadMs();
+        if (head >= vStart && head <= vEnd) {
+            const hx = ((head - vStart) / (vEnd - vStart)) * w + 0.5;
+            gtx.strokeStyle = isPlaying ? "#eab308" : "rgba(234, 179, 8, 0.7)";
+            gtx.lineWidth = isPlaying ? 3 : 2;
+            gtx.beginPath(); gtx.moveTo(hx, 0); gtx.lineTo(hx, h); gtx.stroke();
         }
-    }, [audioBuffer, durationMs, bpm, offsetMs, isPlaying, viewStartMs, visibleRangeMs, clampViewStart, getCurrentPlayheadMs]);
+    }, [audioBuffer, durationMs, bpm, offsetMs, isPlaying, viewStartMs, visibleRangeMs, clampViewStart, getCurrentPlayheadMs, zoom]);
 
     useEffect(() => {
         if (rafRef.current) cancelAnimationFrame(rafRef.current);
         const tick = () => {
-            if (isPlaying && zoom > 1) {
-                const head = getCurrentPlayheadMs();
-                const desired = clampViewStart(head - visibleRangeMs / 2);
-                if (Math.abs(desired - viewStartMs) > 0.5) setViewStartMs(desired);
-            }
             drawWave();
             rafRef.current = requestAnimationFrame(tick);
         };
         rafRef.current = requestAnimationFrame(tick);
         return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
-    }, [isPlaying, zoom, getCurrentPlayheadMs, clampViewStart, visibleRangeMs, viewStartMs, drawWave]);
+    }, [drawWave]);
 
     useEffect(() => {
         if (!containerRef.current) return;
@@ -177,10 +199,10 @@ export function useWaveformRenderer(
         const prev = zoom, next = Math.max(1, Math.min(128, prev * factor));
         if (next === prev) return;
         const rangeNext = durationMs / next;
-        const anchor = isPlaying ? getCurrentPlayheadMs() : offsetMs;
+        const anchor = getCurrentPlayheadMs();
         setZoomState(next);
         setViewStartMs(clampViewStart(anchor - rangeNext / 2));
-    }, [durationMs, zoom, isPlaying, getCurrentPlayheadMs, offsetMs, clampViewStart]);
+    }, [durationMs, zoom, getCurrentPlayheadMs, clampViewStart]);
 
     const onWheel = useCallback((e: React.WheelEvent) => {
         if (!durationMs) return;
@@ -213,14 +235,14 @@ export function useWaveformRenderer(
     const clickArmed = useRef(false);
     const onMouseDownClick = useCallback(() => { clickArmed.current = true; }, []);
     const onMouseMoveCancelClick = useCallback(() => { if (draggingRef.current) clickArmed.current = false; }, []);
-    const onClickSetOffset = useCallback((e: React.MouseEvent) => {
+    const onClickSeek = useCallback((e: React.MouseEvent) => {
         if (!clickArmed.current || !durationMs) return;
         const parent = containerRef.current!;
         const rect = parent.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const ms = viewStartMs + (x / rect.width) * visibleRangeMs;
-        setOffsetMs(Math.max(0, Math.min(durationMs, ms)));
-    }, [durationMs, viewStartMs, visibleRangeMs, setOffsetMs]);
+        onSeekMs(Math.max(0, Math.min(durationMs, ms)));
+    }, [durationMs, viewStartMs, visibleRangeMs, onSeekMs]);
 
     return {
         containerRef,
@@ -238,8 +260,7 @@ export function useWaveformRenderer(
         onMouseUp,
         onMouseDownClick,
         onMouseMoveCancelClick,
-        onClickSetOffset,
+        onClickSeek,
         setZoom: setZoomState,
-        setOffsetMs,
     };
 }

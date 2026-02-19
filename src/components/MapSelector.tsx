@@ -70,12 +70,12 @@ const ContextMenu = memo(function ContextMenu({
     return createPortal(
         <div
             ref={menuRef}
-            className="fixed z-[9999] min-w-[160px] py-1 bg-[#2a2a2a] border border-[#3a3a3a] rounded-lg shadow-xl"
+            className="fixed z-9999 min-w-160 py-1 bg-surface-hover border border-border-strong rounded-lg shadow-xl"
             style={{ left: x, top: y }}
         >
             <button
                 onClick={onOpenFolder}
-                className="w-full px-3 py-2 flex items-center gap-2 text-sm text-[#eeeeee] hover:bg-[#3a3a3a] transition-colors text-left"
+                className="w-full px-3 py-2 flex items-center gap-2 text-sm text-text-primary hover:bg-surface-hover-strong transition-colors text-left"
             >
                 <MdFolderOpen className="text-base" />
                 {t("mapSelector.context.openFolder")}
@@ -125,20 +125,17 @@ const BeatmapCard = memo(function BeatmapCard({
         <div
             onClick={handleClick}
             onContextMenu={handleContextMenu}
-            className={`group relative rounded-lg overflow-hidden cursor-pointer transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] ${isSelected ? "ring-2 ring-white/30" : ""
+            className={`group relative rounded-lg overflow-hidden cursor-pointer transition-all duration-200 hover-scale-soft active-scale-soft ${isSelected ? "ring-2 ring-white/30" : ""
                 }`}
             style={{ minHeight: "90px" }}
         >
-            <div
-                className="absolute inset-0 brightness-[0.4] blur-[2px]"
-                style={bgStyle}
-            />
+            <div className="preview-overlay-filter absolute inset-0" style={bgStyle} />
             <div className="absolute inset-0 bg-black/50 group-hover:bg-black/40 transition-colors duration-200" />
-            <div className="relative h-full p-3 flex flex-col justify-between min-h-[90px]">
+            <div className="relative h-full p-3 flex flex-col justify-between min-h-90">
                 <div className="text-white font-normal text-sm leading-snug line-clamp-2">
                     {data.title || data.folder_name}
                 </div>
-                <div className="text-[#c0c0c0] text-xs font-light">
+                <div className="text-text-subtle text-xs font-light">
                     {t("mapSelector.mappedBy", { creator: data.creator })}
                 </div>
             </div>
@@ -491,9 +488,9 @@ export function MapSelector({
 
     return (
         <aside
-            className={`h-full w-64 shrink-0 bg-[#191919] text-[#eeeeee] border-r border-[#2a2a2a] flex flex-col ${className}`}
+            className={`h-full w-64 shrink-0 bg-surface-sidebar text-text-primary border-r border-border-muted flex flex-col ${className}`}
         >
-            <div className="px-3 py-3 border-b border-[#2a2a2a]">
+            <div className="px-3 py-3 border-b border-border-muted">
                 <div className="space-y-2">
                     <div className="flex gap-2">
                         <Button
@@ -523,26 +520,26 @@ export function MapSelector({
                     </div>
 
                     <div className="relative">
-                        <MdSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-[#7b7b7b] text-base" />
+                        <MdSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-base" />
                         <input
                             type="text"
                             placeholder={t("mapSelector.search.placeholder")}
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
-                            className="w-full h-8 pl-9 pr-3 rounded-lg bg-[#2a2a2a] border border-[#3a3a3a] text-sm placeholder-[#7b7b7b] focus:outline-none focus:border-[#4a4a4a] transition-colors"
+                            className="w-full h-8 pl-9 pr-3 rounded-lg bg-surface-hover border border-border-strong text-sm placeholder-text-muted focus:outline-none focus:border-border-focus transition-colors"
                         />
                     </div>
 
                     {detectStatus && (
                         <div
-                            className="text-xs text-[#7b7b7b] truncate"
+                            className="text-xs text-text-muted truncate"
                             title={t(detectStatus.key, detectStatus.params)}
                         >
                             {t(detectStatus.key, detectStatus.params)}
                         </div>
                     )}
 
-                    <div className="text-xs text-[#7b7b7b]">{statusText}</div>
+                    <div className="text-xs text-text-muted">{statusText}</div>
                 </div>
             </div>
 
@@ -566,7 +563,7 @@ export function MapSelector({
                     </div>
                 )}
                 {!isScanning && beatmaps.length === 0 && (
-                    <div className="text-center py-8 text-[#7b7b7b]">
+                    <div className="text-center py-8 text-text-muted">
                         <p className="text-sm">{t("mapSelector.empty.noBeatmaps")}</p>
                         {search && (
                             <p className="text-xs mt-2">{t("mapSelector.empty.tryDifferent")}</p>

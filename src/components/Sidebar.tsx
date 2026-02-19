@@ -90,13 +90,13 @@ export function Sidebar({
 
     return (
         <aside
-            className={`h-full shrink-0 bg-[#191919] text-[#eeeeee] border-r border-[#2a2a2a] flex flex-col transition-all duration-300 ease-in-out ${isExpanded ? "w-56" : "w-16"
+            className={`h-full shrink-0 border-r border-border-muted bg-surface-sidebar text-text-primary flex flex-col transition-all duration-300 ease-in-out ${isExpanded ? "w-56" : "w-16"
                 } ${className}`}
         >
-            <div className="px-2 py-2 border-b border-[#2a2a2a]">
+            <div className="border-b border-border-muted px-2 py-2">
                 <button
                     onClick={() => setIsExpanded(!isExpanded)}
-                    className="w-full h-9 flex items-center justify-center rounded-lg text-[#7b7b7b] hover:bg-[#2a2a2a] hover:text-[#eeeeee] transition-all duration-200 active:scale-95"
+                    className="h-9 w-full rounded-lg text-text-muted hover:bg-surface-hover hover:text-text-primary transition-all duration-200 active:scale-95 flex items-center justify-center"
                     aria-label={isExpanded ? t("sidebar.action.collapse") : t("sidebar.action.expand")}
                 >
                     {isExpanded ? (
@@ -111,13 +111,13 @@ export function Sidebar({
                 {CATEGORIES.map((category, categoryIndex) => (
                     <div key={category.title}>
                                 {isExpanded && (
-                                    <div className="px-3 mb-2 text-xs font-bold text-[#7b7b7b] uppercase tracking-wider">
+                                    <div className="mb-2 px-3 text-xs font-bold uppercase tracking-wider text-text-muted">
                                 {t(category.title)}
                                     </div>
                                 )}
 
                         {!isExpanded && categoryIndex > 0 && (
-                            <div className="my-2 mx-auto w-8 h-px bg-[#2a2a2a]" />
+                            <div className="my-2 mx-auto h-px w-8 bg-border-muted" />
                         )}
 
                         <div className="space-y-1">
@@ -133,21 +133,21 @@ export function Sidebar({
                                         title={!isExpanded ? translatedLabel : undefined}
                                         className={`group w-full h-10 rounded-lg flex items-center transition-all duration-200 ease-out active:scale-95 ${isExpanded ? "px-3 gap-3" : "justify-center"
                                             } ${isActive
-                                                ? "bg-[#2f2f2f] text-[#eeeeee] shadow-inner"
-                                                : "text-[#eeeeee] hover:bg-[#2a2a2a]"
+                                                ? "bg-surface-active text-text-primary shadow-inner"
+                                                : "text-text-primary hover:bg-surface-hover"
                                             }`}
                                     >
                                         <Icon
-                                            className={`text-xl transition-colors duration-200 flex-shrink-0 ${isActive
-                                                ? "text-[#eeeeee]"
-                                                : "text-[#7b7b7b] group-hover:text-[#eeeeee]"
+                                            className={`text-xl transition-colors duration-200 shrink-0 ${isActive
+                                                ? "text-text-primary"
+                                                : "text-text-muted group-hover:text-text-primary"
                                                 }`}
                                         />
                                         {isExpanded && (
                                             <span
                                                 className={`font-semibold text-sm truncate transition-colors duration-200 ${isActive
-                                                    ? "text-[#eeeeee]"
-                                                    : "text-[#e0e0e0] group-hover:text-[#eeeeee]"
+                                                    ? "text-text-primary"
+                                                    : "text-text-secondary group-hover:text-text-primary"
                                                     }`}
                                             >
                                                 {translatedLabel}
@@ -161,16 +161,16 @@ export function Sidebar({
                 ))}
             </nav>
 
-            <div className="px-2 py-2 border-t border-[#2a2a2a]">
+            <div className="border-t border-border-muted px-2 py-2">
                 <button
                     onClick={handleOpenAppFolder}
                     title={!isExpanded ? t("sidebar.action.openAppFolder") : undefined}
-                    className={`group w-full h-10 rounded-lg flex items-center text-[#eeeeee] hover:bg-[#2a2a2a] transition-all duration-200 ease-out active:scale-95 ${isExpanded ? "px-3 gap-3" : "justify-center"
+                    className={`group w-full h-10 rounded-lg flex items-center text-text-primary hover:bg-surface-hover transition-all duration-200 ease-out active:scale-95 ${isExpanded ? "px-3 gap-3" : "justify-center"
                         }`}
                 >
-                    <MdFolderOpen className="text-xl text-[#7b7b7b] group-hover:text-[#eeeeee] transition-colors duration-200 flex-shrink-0" />
+                    <MdFolderOpen className="text-xl text-text-muted group-hover:text-text-primary transition-colors duration-200 shrink-0" />
                     {isExpanded && (
-                        <span className="font-semibold text-sm text-[#e0e0e0] group-hover:text-[#eeeeee] transition-colors duration-200">
+                        <span className="font-semibold text-sm text-text-secondary group-hover:text-text-primary transition-colors duration-200">
                             {t("sidebar.action.openAppFolder")}
                         </span>
                     )}

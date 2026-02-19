@@ -12,16 +12,16 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             <div className="w-full">
                 <div className="relative">
                     {icon && (
-                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[#7b7b7b]">
+                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted">
                             {icon}
                         </div>
                     )}
                     <input
                         ref={ref}
                         className={cn(
-                            "h-9 w-full px-3 rounded-lg bg-[#101010] border border-[#2a2a2a]",
-                            "text-sm text-white placeholder-[#7b7b7b]",
-                            "focus:outline-none focus:border-[#4a4a4a] transition-colors",
+                            "h-9 w-full px-3 rounded-lg bg-surface-input border border-border-muted",
+                            "text-sm text-white placeholder-text-muted",
+                            "focus:outline-none focus:border-border-focus transition-colors",
                             "disabled:opacity-50 disabled:cursor-not-allowed",
                             icon && "pl-9",
                             error && "border-red-500",

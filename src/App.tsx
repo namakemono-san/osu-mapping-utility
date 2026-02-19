@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 
 import "./App.css";
@@ -7,17 +7,9 @@ import { Titlebar } from "./components/Titlebar";
 import { Sidebar, SidebarKey } from "./components/Sidebar";
 import { MapSelector } from "./components/MapSelector";
 import { UpdateChecker } from "./components/UpdateChecker";
-
-import { OffsetCalibrator } from "./pages/OffsetCalibrator";
-import { BeatmapPreview } from "./pages/BeatmapPreview";
 import { BeatmapCustomizer } from "./pages/BeatmapCustomizer";
-import { VideoDownloader } from "./pages/VideoDownloader";
-import { BeatmapClone } from "./pages/BeatmapClone";
-import { MetadataEditor } from "./pages/MetadataEditor";
-import AudioAnalyzer from "./components/AudioAnalyzer/AudioAnalyzer";
 
 import { Beatmapset } from "./types/beatmap";
-import { ImageDownloader } from "./pages/ImageDownloader";
 
 import { useI18n } from "./hooks/i18nContext";
 import { useAppState } from "./context/appState";
@@ -89,10 +81,10 @@ function App() {
         <div className="flex items-center justify-center h-full">
           <div className="text-center">
             <div className="text-6xl mb-4 opacity-20">🎵</div>
-            <h2 className="text-2xl font-bold text-[#eeeeee] mb-2">
+            <h2 className="mb-2 text-2xl font-bold text-text-primary">
               {t("app.selectBeatmap.title")}
             </h2>
-            <p className="text-[#7b7b7b]">
+            <p className="text-text-muted">
               {t("app.selectBeatmap.desc")}
             </p>
           </div>
@@ -131,7 +123,7 @@ function App() {
 
       {hasBackground && (
         <div
-          className="fixed inset-0 mt-[40px] transition-opacity duration-500 ease-in-out"
+          className="app-offset-top fixed inset-0 transition-opacity duration-500 ease-in-out"
           style={{
             backgroundImage: backgroundImage,
             backgroundSize: "cover",
@@ -142,26 +134,29 @@ function App() {
         />
       )}
 
-      <main className="relative flex h-[calc(100vh-40px)] mt-[40px] text-white font-sans selection:bg-blue-600/30 animate-in fade-in z-10">
+      <main className="app-main-height app-offset-top relative z-10 flex animate-in fade-in font-sans text-white selection:bg-blue-600/30">
         <Sidebar
           active={activeTool}
           onChange={setActiveTool}
-          className={hasBackground ? "bg-[#191919]/90 backdrop-blur-md" : ""}
+          className={hasBackground ? "bg-surface-sidebar/90 backdrop-blur-md" : ""}
         />
 
         {showMapSelector && (
           <MapSelector
             onSelect={setSelectedBeatmap}
             selectedBeatmap={selectedBeatmap}
-            className={hasBackground ? "bg-[#191919]/90 backdrop-blur-md" : ""}
+            className={hasBackground ? "bg-surface-sidebar/90 backdrop-blur-md" : ""}
           />
         )}
 
-        <div className={`flex-1 text-white p-3 overflow-auto transition-colors duration-300 ${hasBackground
-          ? "bg-[#1f1f1f]/70 backdrop-blur-sm"
-          : "bg-[#1f1f1f]"
-          }`}>
-          {renderContent()}
+        <div
+          className={`flex-1 overflow-auto p-3 text-white transition-colors duration-300 ${
+            hasBackground
+              ? "bg-surface-base/70 backdrop-blur-sm"
+              : "bg-surface-base"
+          }`}
+        >
+          <Suspense fallback={<ToolLoading />}>{renderContent()}</Suspense>
         </div>
       </main>
     </>

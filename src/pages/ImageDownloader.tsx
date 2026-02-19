@@ -126,8 +126,8 @@ export function ImageDownloader() {
   return (
     <div className="flex flex-col gap-2 text-zinc-200">
       <Card className="flex items-center gap-2 p-2">
-        <div className="flex items-center gap-2 px-3 h-9 rounded-lg bg-[#1f1f1f] border border-[#2a2a2a] w-full max-w-[min(44%,620px)]">
-          <FiLink className="text-[#7b7b7b] shrink-0" />
+        <div className="flex items-center gap-2 px-3 h-9 rounded-lg bg-surface-base border border-border-muted w-full max-w-min-44-620">
+          <FiLink className="text-text-muted shrink-0" />
           <Input
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -157,7 +157,7 @@ export function ImageDownloader() {
           type="button"
           onClick={pickedFile ? clearPickedFile : undefined}
           disabled={busy || !pickedFile}
-          className="min-w-0 max-w-[min(48%,820px)] text-left disabled:opacity-100"
+          className="min-w-0 max-w-min-48-820 text-left disabled:opacity-100"
           title={pickedFile ? t("image.button.clearImageTitle") : (pickedFile || t("image.noImage"))}
           aria-label={pickedFile ? t("image.button.clearImage") : undefined}
         >
@@ -165,7 +165,7 @@ export function ImageDownloader() {
             {pickedFile || t("image.noImage")}
           </Chip>
         </button>
-        <Chip icon={<FiFolder />} className="min-w-0 max-w-[min(48%,820px)]" title={outDir || t("image.noFolder")}>
+        <Chip icon={<FiFolder />} className="min-w-0 max-w-min-48-820" title={outDir || t("image.noFolder")}>
           {outDir || t("image.noFolder")}
         </Chip>
       </Card>
@@ -179,12 +179,12 @@ export function ImageDownloader() {
 
       {imageSrc && (
         <Card className="flex flex-col">
-          <div className="flex items-center justify-between px-3 py-2 border-b border-[#2a2a2a]">
+          <div className="flex items-center justify-between px-3 py-2 border-b border-border-muted">
             <span className="text-sm opacity-80">{t("image.preview")}</span>
             <span className="text-xs opacity-60">{t("image.previewSize")}</span>
           </div>
           <div className="p-3">
-            <img src={imageSrc} alt="image" className="w-full rounded border border-[#2a2a2a]" />
+            <img src={imageSrc} alt="image" className="w-full rounded border border-border-muted" />
           </div>
         </Card>
       )}

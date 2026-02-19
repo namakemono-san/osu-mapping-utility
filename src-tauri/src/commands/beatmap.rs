@@ -19,7 +19,6 @@ fn normalize_base_path(base_path: &str) -> String {
 #[derive(Clone)]
 struct FolderEntry {
     name: String,
-    path: std::path::PathBuf,
     modified: SystemTime,
 }
 
@@ -140,7 +139,6 @@ fn get_folder_list(base_path: &str) -> Result<Arc<Vec<FolderEntry>>, String> {
             let modified = fs::metadata(entry.path()).and_then(|m| m.modified()).ok()?;
             Some(FolderEntry {
                 name: entry.file_name().to_string_lossy().to_string(),
-                path: entry.path(),
                 modified,
             })
         })
