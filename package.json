@@ -1,7 +1,11 @@
 {
   "name": "osu-mapping-utility",
   "private": true,
+<<<<<<< HEAD
   "version": "0.7.2",
+=======
+  "version": "0.8.0",
+>>>>>>> 3f6fcbd7cdc53c255e5667a818a78a544bc8ee8c
   "packageManager": "pnpm@10.28.2",
   "type": "module",
   "scripts": {
