@@ -1,5 +1,9 @@
 import { useCallback } from "react";
-import type { Difficulty, HitObjectWithStart, Tick, HitAnimation } from "../../domain/osu/osuFileParser";
+import type { TaikoDifficulty, TaikoHitObjectWithStart } from "../../domain/osu/taikoMapper";
+import type { OsuTimingPoint } from "../../domain/osu/types";
+import type { Tick } from "../../domain/osu/tickGenerator";
+
+interface HitAnimation { id: number; x: number; y: number; color: string; timestamp: number; }
 
 const PLAYFIELD_WIDTH = 800;
 const JUDGMENT_LINE_X = 100;
@@ -10,14 +14,14 @@ const HIT_ANIMATION_DURATION_MS = 300;
 const HIT_ANIMATION_FLOAT_DISTANCE = 50;
 
 export interface PlayfieldSVGProps {
-    filteredDifficulties: Difficulty[];
-    processedDifficulties: Map<string, { hitObjects: HitObjectWithStart[]; ticks: Tick[] }>;
+    filteredDifficulties: TaikoDifficulty[];
+    processedDifficulties: Map<string, { hitObjects: TaikoHitObjectWithStart[]; ticks: Tick[] }>;
     currentSVBPMMap: Map<string, { sv: number; bpm: number }>;
     currentTime: number;
     isGameplayMode: boolean;
     isViewSVLine: boolean;
     hitAnimations: HitAnimation[];
-    calculateGameplayStart: (objectTime: number, timingPoints: Difficulty["timingPoints"]) => number;
+    calculateGameplayStart: (objectTime: number, timingPoints: OsuTimingPoint[]) => number;
 }
 
 export function PlayfieldSVG({
@@ -40,7 +44,7 @@ export function PlayfieldSVG({
         return JUDGMENT_LINE_X + VISIBLE_LENGTH * (1 - progress);
     }, [currentTime]);
 
-    const renderHitObject = useCallback((obj: HitObjectWithStart, difficulty: Difficulty, yOffset: number, index: number) => {
+    const renderHitObject = useCallback((obj: TaikoHitObjectWithStart, difficulty: TaikoDifficulty, yOffset: number, index: number) => {
         const headX = getObjectX(obj.time, obj.gameplayStart);
         const size = obj.type.includes("big") ? 60 : 40;
         const centerY = yOffset + 50;
@@ -126,7 +130,7 @@ export function PlayfieldSVG({
         }
     }, [getObjectX, calculateGameplayStart]);
 
-    const renderSVLines = useCallback((difficulty: Difficulty, yOffset: number) => {
+    const renderSVLines = useCallback((difficulty: TaikoDifficulty, yOffset: number) => {
         if (isGameplayMode || !isViewSVLine) return null;
 
         const lines: JSX.Element[] = [];
@@ -170,7 +174,7 @@ export function PlayfieldSVG({
         return lines;
     }, [getObjectX, isGameplayMode, calculateGameplayStart, isViewSVLine]);
 
-    const renderTicks = useCallback((difficulty: Difficulty, yOffset: number) => {
+    const renderTicks = useCallback((difficulty: TaikoDifficulty, yOffset: number) => {
         const ticks: JSX.Element[] = [];
         const centerY = yOffset + 50;
 

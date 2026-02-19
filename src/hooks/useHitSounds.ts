@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
-import type { HitObject } from "../domain/osu/osuFileParser";
+import type { TaikoHitType } from "../domain/osu/taikoMapper";
 
 function bufferToWave(abuffer: AudioBuffer, len: number): Blob {
     const numOfChan = abuffer.numberOfChannels;
@@ -86,7 +86,7 @@ function createKatSound(): string {
     return URL.createObjectURL(wavBlob);
 }
 
-export type HitSoundType = HitObject["type"];
+export type HitSoundType = TaikoHitType;
 
 export interface UseHitSoundsReturn {
     playHitSound: (type: HitSoundType) => void;

@@ -21,12 +21,23 @@ async fn download(url: &str, path: &PathBuf) -> Result<(), String> {
     Ok(())
 }
 
+const MAX_IMAGE_DOWNLOAD_BYTES: u64 = 50 * 1024 * 1024;
+
 async fn download_image_to_bytes(url: &str) -> Result<Vec<u8>, String> {
     let client = Client::new();
     let resp = client.get(url).send().await.map_err(|e| e.to_string())?;
 
     if !resp.status().is_success() {
         return Err(format!("HTTP error: {}", resp.status()));
+    }
+
+    if let Some(content_length) = resp.content_length() {
+        if content_length > MAX_IMAGE_DOWNLOAD_BYTES {
+            return Err(format!(
+                "Image too large: {} bytes (max {} bytes)",
+                content_length, MAX_IMAGE_DOWNLOAD_BYTES
+            ));
+        }
     }
 
     let bytes = resp.bytes().await.map_err(|e| e.to_string())?;
