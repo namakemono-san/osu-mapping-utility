@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useState, useMemo } from "react";
 import { FiRefreshCw, FiSave, FiFileText, FiImage } from "react-icons/fi";
 
-import { invoke } from "@tauri-apps/api/core";
-
 import { Card } from "../components/common/Card";
 import { Input } from "../components/common/Input";
 import { Modal } from "../components/common/Modal";
@@ -14,13 +12,11 @@ import { useSongsFolder } from "../hooks/useStorage";
 import { useI18n } from "../hooks/i18nContext";
 import type { LocaleKey } from "../locale";
 import {
-    applyMetadataAndBackground,
     buildOsuFilename,
     makeUniqueOsuFilename,
-    parseMetadataAndBackground,
-    type OsuBackgroundData,
-    type OsuMetadata,
+    osuApi,
 } from "../domain/osu";
+import type { OsuBackground, OsuMetadata, MetadataWriteInput } from "../domain/osu/types";
 
 interface MetadataEditorProps {
     selectedBeatmap?: Beatmapset | null;
@@ -29,10 +25,10 @@ interface MetadataEditorProps {
 interface FileMetadata {
     filename: string;
     metadata: OsuMetadata;
-    background: OsuBackgroundData;
+    background: OsuBackground;
 }
 
-type ConflictField = keyof Omit<OsuMetadata, "Version">;
+type ConflictField = keyof Omit<OsuMetadata, "version" | "beatmapId" | "beatmapSetId">;
 
 interface Conflict {
     field: ConflictField;
@@ -40,13 +36,13 @@ interface Conflict {
 }
 
 const FIELD_LABELS: Record<ConflictField, LocaleKey> = {
-    Title: "metadata.label.romanisedTitle",
-    TitleUnicode: "metadata.label.title",
-    Artist: "metadata.label.romanisedArtist",
-    ArtistUnicode: "metadata.label.artist",
-    Creator: "metadata.label.creator",
-    Source: "metadata.label.source",
-    Tags: "metadata.label.tags",
+    title: "metadata.label.romanisedTitle",
+    titleUnicode: "metadata.label.title",
+    artist: "metadata.label.romanisedArtist",
+    artistUnicode: "metadata.label.artist",
+    creator: "metadata.label.creator",
+    source: "metadata.label.source",
+    tags: "metadata.label.tags",
 };
 
 export function MetadataEditor({ selectedBeatmap }: MetadataEditorProps) {
@@ -57,20 +53,20 @@ export function MetadataEditor({ selectedBeatmap }: MetadataEditorProps) {
     const [saving, setSaving] = useState(false);
     const [files, setFiles] = useState<FileMetadata[]>([]);
     const [conflicts, setConflicts] = useState<Conflict[]>([]);
-    const [mergedData, setMergedData] = useState<Omit<OsuMetadata, "Version">>({
-        Title: "",
-        TitleUnicode: "",
-        Artist: "",
-        ArtistUnicode: "",
-        Creator: "",
-        Source: "",
-        Tags: "",
+    const [mergedData, setMergedData] = useState<Omit<OsuMetadata, "version" | "beatmapId" | "beatmapSetId">>({
+        title: "",
+        titleUnicode: "",
+        artist: "",
+        artistUnicode: "",
+        creator: "",
+        source: "",
+        tags: "",
     });
     const [result, setResult] = useState<{ success: boolean; message: string } | null>(null);
 
     const [bgModalOpen, setBgModalOpen] = useState(false);
     const [editingBgIndex, setEditingBgIndex] = useState<number | null>(null);
-    const [tempBgData, setTempBgData] = useState<OsuBackgroundData>({
+    const [tempBgData, setTempBgData] = useState<OsuBackground>({
         filename: "",
         xOffset: 0,
         yOffset: 0,
@@ -79,13 +75,13 @@ export function MetadataEditor({ selectedBeatmap }: MetadataEditorProps) {
     const detectConflicts = useCallback((filesData: FileMetadata[]): Conflict[] => {
         const conflicts: Conflict[] = [];
         const fields: ConflictField[] = [
-            "Title",
-            "TitleUnicode",
-            "Artist",
-            "ArtistUnicode",
-            "Creator",
-            "Source",
-            "Tags",
+            "title",
+            "titleUnicode",
+            "artist",
+            "artistUnicode",
+            "creator",
+            "source",
+            "tags",
         ];
 
         for (const field of fields) {
@@ -147,9 +143,9 @@ export function MetadataEditor({ selectedBeatmap }: MetadataEditorProps) {
     }, []);
 
     const romanisedArtistDisabled = useMemo(() => {
-        const a = mergedData.ArtistUnicode;
-        return a.length > 0 && isAsciiPrintable(a) && a === mergedData.Artist;
-    }, [mergedData.ArtistUnicode, mergedData.Artist, isAsciiPrintable]);
+        const a = mergedData.artistUnicode;
+        return a.length > 0 && isAsciiPrintable(a) && a === mergedData.artist;
+    }, [mergedData.artistUnicode, mergedData.artist, isAsciiPrintable]);
 
     const filenamePlan = useMemo(() => {
         const used = new Set<string>();
@@ -157,10 +153,10 @@ export function MetadataEditor({ selectedBeatmap }: MetadataEditorProps) {
 
         for (const file of files) {
             const desired = buildOsuFilename({
-                artist: mergedData.Artist,
-                title: mergedData.Title,
-                creator: mergedData.Creator,
-                difficulty: file.metadata.Version,
+                artist: mergedData.artist,
+                title: mergedData.title,
+                creator: mergedData.creator,
+                difficulty: file.metadata.version,
             });
             const unique = makeUniqueOsuFilename(desired, used);
             planned.set(file.filename, unique);
@@ -171,7 +167,7 @@ export function MetadataEditor({ selectedBeatmap }: MetadataEditorProps) {
             .filter((op) => op.from !== op.to);
 
         return { planned, renames };
-    }, [files, mergedData.Artist, mergedData.Title, mergedData.Creator]);
+    }, [files, mergedData.artist, mergedData.title, mergedData.creator]);
 
     const showFilenamePreview = filenamePlan.renames.length > 0;
 
@@ -190,17 +186,20 @@ export function MetadataEditor({ selectedBeatmap }: MetadataEditorProps) {
 
             for (const file of files) {
                 const filePath = `${beatmapPath}\\${file.filename}`;
-                const content = await invoke<string>("read_osu_file", { filePath });
-
-                const newContent = applyMetadataAndBackground(content, mergedData, file.background);
-                await invoke("write_osu_file", { filePath, content: newContent });
+                const metadata: MetadataWriteInput = {
+                    title: mergedData.title,
+                    titleUnicode: mergedData.titleUnicode,
+                    artist: mergedData.artist,
+                    artistUnicode: mergedData.artistUnicode,
+                    creator: mergedData.creator,
+                    source: mergedData.source,
+                    tags: mergedData.tags,
+                };
+                await osuApi.writeOsuMetadata(filePath, metadata, file.background);
             }
 
             if (filenamePlan.renames.length > 0) {
-                await invoke("rename_osu_files", {
-                    beatmapFolder: beatmapPath,
-                    renames: filenamePlan.renames,
-                });
+                await osuApi.renameOsuFiles(beatmapPath, filenamePlan.renames);
                 setFiles((prev) =>
                     prev.map((f) => ({
                         ...f,
@@ -249,9 +248,7 @@ export function MetadataEditor({ selectedBeatmap }: MetadataEditorProps) {
                 }
 
                 const beatmapPath = `${songsFolder}\\${selectedBeatmap.folder_name}`;
-                const osuFiles = await invoke<string[]>("list_osu_files", {
-                    beatmapFolder: beatmapPath,
-                });
+                const osuFiles = await osuApi.listOsuFiles(beatmapPath);
 
                 if (osuFiles.length === 0) {
                     throw new Error(t("metadata.error.noOsu"));
@@ -261,9 +258,9 @@ export function MetadataEditor({ selectedBeatmap }: MetadataEditorProps) {
 
                 for (const filename of osuFiles) {
                     const filePath = `${beatmapPath}\\${filename}`;
-                    const content = await invoke<string>("read_osu_file", { filePath });
-                    const { metadata, background } = parseMetadataAndBackground(content);
-                    filesData.push({ filename, metadata, background });
+                    const beatmap = await osuApi.parseOsuFile(filePath);
+                    const background: OsuBackground = beatmap.background ?? { filename: "", xOffset: 0, yOffset: 0 };
+                    filesData.push({ filename, metadata: beatmap.metadata, background });
                 }
 
                 if (!mounted) return;
@@ -274,10 +271,10 @@ export function MetadataEditor({ selectedBeatmap }: MetadataEditorProps) {
                 setConflicts(detectedConflicts);
 
                 if (detectedConflicts.length === 0) {
-                    const { Version, ...rest } = filesData[0].metadata;
+                    const { version: _v, beatmapId: _bi, beatmapSetId: _bsi, ...rest } = filesData[0].metadata;
                     setMergedData(rest);
                 } else {
-                    const { Version, ...rest } = filesData[0].metadata;
+                    const { version: _v, beatmapId: _bi, beatmapSetId: _bsi, ...rest } = filesData[0].metadata;
                     const initialData = { ...rest };
                     for (const conflict of detectedConflicts) {
                         const mostCommon = Array.from(conflict.values.entries()).sort(
@@ -363,11 +360,11 @@ export function MetadataEditor({ selectedBeatmap }: MetadataEditorProps) {
                                         {t("metadata.label.title")}
                                     </label>
                                     <Input
-                                        value={mergedData.TitleUnicode}
+                                        value={mergedData.titleUnicode}
                                         onChange={(e) =>
                                             setMergedData({
                                                 ...mergedData,
-                                                TitleUnicode: e.target.value,
+                                                titleUnicode: e.target.value,
                                             })
                                         }
                                         placeholder={t("metadata.placeholder.title")}
@@ -378,11 +375,11 @@ export function MetadataEditor({ selectedBeatmap }: MetadataEditorProps) {
                                         {t("metadata.label.romanisedTitle")}
                                     </label>
                                     <Input
-                                        value={mergedData.Title}
+                                        value={mergedData.title}
                                         onChange={(e) =>
                                             setMergedData({
                                                 ...mergedData,
-                                                Title: e.target.value,
+                                                title: e.target.value,
                                             })
                                         }
                                         placeholder={t("metadata.placeholder.romanisedTitle")}
@@ -396,14 +393,14 @@ export function MetadataEditor({ selectedBeatmap }: MetadataEditorProps) {
                                         {t("metadata.label.artist")}
                                     </label>
                                     <Input
-                                        value={mergedData.ArtistUnicode}
+                                        value={mergedData.artistUnicode}
                                         onChange={(e) =>
                                             setMergedData((prev) => {
                                                 const v = e.target.value;
                                                 if (isAsciiPrintable(v)) {
-                                                    return { ...prev, ArtistUnicode: v, Artist: v };
+                                                    return { ...prev, artistUnicode: v, artist: v };
                                                 }
-                                                return { ...prev, ArtistUnicode: v };
+                                                return { ...prev, artistUnicode: v };
                                             })
                                         }
                                         placeholder={t("metadata.placeholder.artist")}
@@ -414,11 +411,11 @@ export function MetadataEditor({ selectedBeatmap }: MetadataEditorProps) {
                                         {t("metadata.label.romanisedArtist")}
                                     </label>
                                     <Input
-                                        value={mergedData.Artist}
+                                        value={mergedData.artist}
                                         onChange={(e) =>
                                             setMergedData({
                                                 ...mergedData,
-                                                Artist: e.target.value,
+                                                artist: e.target.value,
                                             })
                                         }
                                         placeholder={t("metadata.placeholder.romanisedArtist")}
@@ -432,9 +429,9 @@ export function MetadataEditor({ selectedBeatmap }: MetadataEditorProps) {
                                     {t("metadata.label.creator")}
                                 </label>
                                 <Input
-                                    value={mergedData.Creator}
+                                    value={mergedData.creator}
                                     onChange={(e) =>
-                                        setMergedData({ ...mergedData, Creator: e.target.value })
+                                        setMergedData({ ...mergedData, creator: e.target.value })
                                     }
                                     placeholder={t("metadata.placeholder.creator")}
                                 />
@@ -443,9 +440,9 @@ export function MetadataEditor({ selectedBeatmap }: MetadataEditorProps) {
                             <div>
                                 <label className="block text-xs text-text-muted mb-1">{t("metadata.label.source")}</label>
                                 <Input
-                                    value={mergedData.Source}
+                                    value={mergedData.source}
                                     onChange={(e) =>
-                                        setMergedData({ ...mergedData, Source: e.target.value })
+                                        setMergedData({ ...mergedData, source: e.target.value })
                                     }
                                     placeholder={t("metadata.placeholder.source")}
                                 />
@@ -454,9 +451,9 @@ export function MetadataEditor({ selectedBeatmap }: MetadataEditorProps) {
                             <div>
                                 <label className="block text-xs text-text-muted mb-1">{t("metadata.label.tags")}</label>
                                 <textarea
-                                    value={mergedData.Tags}
+                                    value={mergedData.tags}
                                     onChange={(e) =>
-                                        setMergedData({ ...mergedData, Tags: e.target.value })
+                                        setMergedData({ ...mergedData, tags: e.target.value })
                                     }
                                     placeholder={t("metadata.placeholder.tags")}
                                     rows={3}
@@ -522,7 +519,7 @@ export function MetadataEditor({ selectedBeatmap }: MetadataEditorProps) {
                                             className="rounded-lg border px-3 py-2.5 bg-accent-primary/10 border-accent-primary/40"
                                         >
                                             <div className="text-xs font-semibold text-white mb-1 truncate">
-                                                {file.metadata.Version}
+                                                {file.metadata.version}
                                             </div>
                                             <div className="text-11 text-text-muted font-mono break-all">
                                                 {t("metadata.filenamePreview.old")} {file.filename}
@@ -550,7 +547,7 @@ export function MetadataEditor({ selectedBeatmap }: MetadataEditorProps) {
                                     className="px-3 py-2.5 rounded-lg border border-border-muted bg-surface-panel hover:border-border-focus transition-all text-left"
                                 >
                                     <div className="text-xs font-semibold text-white mb-1 truncate">
-                                        {file.metadata.Version}
+                                        {file.metadata.version}
                                     </div>
                                     <div className="text-10 text-text-muted space-y-0.5">
                                         <div className="truncate">
@@ -591,7 +588,7 @@ export function MetadataEditor({ selectedBeatmap }: MetadataEditorProps) {
                 <Modal
                     isOpen={true}
                     onClose={closeBgModal}
-                    title={t("metadata.background.modalTitle", { version: files[editingBgIndex].metadata.Version })}
+                    title={t("metadata.background.modalTitle", { version: files[editingBgIndex].metadata.version })}
                 >
                     <div className="space-y-4">
                         <div>

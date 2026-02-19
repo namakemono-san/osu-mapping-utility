@@ -11,6 +11,7 @@ import {
     MdFolderOpen,
     MdImage,
     MdGraphicEq,
+    MdCheckCircle,
 } from "react-icons/md";
 import { appDataDir } from "@tauri-apps/api/path";
 import { openPath } from '@tauri-apps/plugin-opener';
@@ -27,6 +28,7 @@ export type SidebarKey =
     | "metadata_editor"
     | "video_downloader"
     | "image_downloader"
+    | "rc_checks"
 
 type SidebarProps = {
     active?: SidebarKey;
@@ -54,6 +56,7 @@ const CATEGORIES: SidebarCategory[] = [
             { key: "beatmap_preview", label: "tool.beatmap_preview", Icon: MdRemoveRedEye },
             { key: "beatmap_customizer", label: "tool.beatmap_customizer", Icon: MdContentCut },
             { key: "metadata_editor", label: "tool.metadata_editor", Icon: MdEdit },
+            { key: "rc_checks", label: "tool.rc_checks", Icon: MdCheckCircle },
         ],
     },
     {

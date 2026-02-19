@@ -19,7 +19,10 @@ import { Button } from "../common/Button";
 import { TooltipButton } from "../common/TooltipButton";
 import { DebugPanel } from "./DebugPanel";
 
-import type { Difficulty, ModState, BeatmapData } from "../../domain/osu/osuFileParser";
+import type { TaikoDifficulty, TaikoBeatmapData } from "../../domain/osu/taikoMapper";
+import type { OsuTimingPoint } from "../../domain/osu/types";
+
+interface ModState { isDT: boolean; isHR: boolean; }
 import type { LocaleKey } from "../../locale";
 
 function formatTime(ms: number): string {
@@ -53,36 +56,31 @@ export interface PreviewControlsProps {
     duration: number;
     seekTo: (timeMs: number) => void;
 
-    // Mode toggles
     isGameplayMode: boolean;
     togglePlayMode: () => void;
     isViewSVLine: boolean;
     toggleViewSVLine: () => void;
 
-    // Mods
     mods: ModState;
     toggleDT: () => void;
     toggleHR: () => void;
 
-    // Debug
     debugMode: boolean;
     setDebugMode: (value: boolean | ((prev: boolean) => boolean)) => void;
 
-    // Volume
     musicVolume: number;
     setMusicVolume: (value: number | ((prev: number) => number)) => void;
     hitsoundVolume: number;
     setHitsoundVolume: (value: number | ((prev: number) => number)) => void;
 
-    // Debug panel passthrough
     getCurrentTimeMs: () => number;
     audioLeadIn: number;
     hitWindow: number;
-    filteredDifficulties: Difficulty[];
-    getCurrentBPM: (time: number, timingPoints: Difficulty["timingPoints"]) => number;
-    getCurrentSV: (time: number, timingPoints: Difficulty["timingPoints"]) => number;
+    filteredDifficulties: TaikoDifficulty[];
+    getCurrentBPM: (time: number, timingPoints: OsuTimingPoint[]) => number;
+    getCurrentSV: (time: number, timingPoints: OsuTimingPoint[]) => number;
     debugInfo: string[];
-    beatmapData: BeatmapData | null;
+    beatmapData: TaikoBeatmapData | null;
 }
 
 export function PreviewControls({

@@ -1,27 +1,20 @@
-import type { TimingPoint, Tick } from "./osuFileParser";
+import type { OsuTimingPoint } from "./types";
 
-/**
- * Callback type for computing when a hit object starts becoming visible.
- */
+export interface Tick {
+    time: number;
+    type: "measure" | "beat" | "half" | "quarter";
+    gameplayStart: number;
+}
+
 export type CalculateGameplayStartFn = (
     objectTime: number,
-    timingPoints: TimingPoint[],
+    timingPoints: OsuTimingPoint[],
 ) => number;
 
-/**
- * Generates tick marks (measure, beat, half-beat, quarter-beat) for a given
- * uninherited timing point section.
- *
- * @param timingPoint  The uninherited timing point that starts this section
- * @param nextTime     End boundary of this section (next TP time or duration)
- * @param timingPoints Full list of timing points (passed through to calculateGameplayStartFn)
- * @param isGameplayMode When true, only measure ticks are generated
- * @param calculateGameplayStartFn Computes the gameplay-start time for a given object time
- */
 export function generateTicks(
-    timingPoint: TimingPoint,
+    timingPoint: OsuTimingPoint,
     nextTime: number,
-    timingPoints: TimingPoint[],
+    timingPoints: OsuTimingPoint[],
     isGameplayMode: boolean,
     calculateGameplayStartFn: CalculateGameplayStartFn,
 ): Tick[] {

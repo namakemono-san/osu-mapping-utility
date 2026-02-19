@@ -12,7 +12,7 @@ import { StatusMessage } from "../components/common/StatusMessage";
 import { Beatmapset } from "../types/beatmap";
 import { useSongsFolder } from "../hooks/useStorage";
 import { useI18n } from "../hooks/i18nContext";
-import { parseMetadataAndBackground } from "../domain/osu";
+import { osuApi } from "../domain/osu";
 
 interface BeatmapCloneProps {
     selectedBeatmap?: Beatmapset | null;
@@ -159,9 +159,7 @@ export function BeatmapClone({ selectedBeatmap }: BeatmapCloneProps) {
             setTemplateOsuFile("");
 
             try {
-                const files = await invoke<string[]>("list_osu_files", {
-                    beatmapFolder: beatmapPath,
-                });
+                const files = await osuApi.listOsuFiles(beatmapPath);
 
                 if (!mounted) return;
 
@@ -189,16 +187,14 @@ export function BeatmapClone({ selectedBeatmap }: BeatmapCloneProps) {
 
             try {
                 const filePath = `${beatmapPath}\\${templateOsuFile}`;
-                const content = await invoke<string>("read_osu_file", { filePath });
-
-                const { metadata } = parseMetadataAndBackground(content);
+                const beatmap = await osuApi.parseOsuFile(filePath);
                 if (!mounted) return;
-                setTitle(metadata.Title);
-                setTitleUnicode(metadata.TitleUnicode);
-                setArtist(metadata.Artist);
-                setArtistUnicode(metadata.ArtistUnicode);
-                setSource(metadata.Source);
-                setTags(metadata.Tags);
+                setTitle(beatmap.metadata.title);
+                setTitleUnicode(beatmap.metadata.titleUnicode);
+                setArtist(beatmap.metadata.artist);
+                setArtistUnicode(beatmap.metadata.artistUnicode);
+                setSource(beatmap.metadata.source);
+                setTags(beatmap.metadata.tags);
             } catch (err) {
                 console.error("[Clone] Failed to load metadata:", err);
             } finally {

@@ -67,7 +67,7 @@ pub async fn analyze_audio(file_path: String) -> Result<AudioAnalysisResult, Str
     let render_ms = render_start.elapsed().as_millis() as u64;
 
     if png_bytes.is_empty() {
-        return Err("ファイルの読み込みに失敗しました".to_string());
+        return Err("Failed to render spectrogram image".to_string());
     }
 
     let image_base64 = STANDARD.encode(&png_bytes);
@@ -121,10 +121,10 @@ pub async fn export_spectrogram(file_path: String, output_path: String) -> Resul
     );
 
     if png_bytes.is_empty() {
-        return Err("ファイルの読み込みに失敗しました".to_string());
+        return Err("Failed to render spectrogram image".to_string());
     }
 
-    std::fs::write(output_path, png_bytes).map_err(|_| "ファイルの読み込みに失敗しました".to_string())
+    std::fs::write(output_path, png_bytes).map_err(|_| "Failed to write spectrogram file".to_string())
 }
 
 fn build_source_display(file_path: &str) -> String {
@@ -219,4 +219,54 @@ fn average_bitrate_kbps_from_data(file_size_bytes: u64, duration_seconds: f64) -
     } else {
         0
     }
+}
+
+const CHECK_TARGET_TIME_BINS: usize = 200;
+const CHECK_SLICE_SECONDS: f64 = 30.0;
+
+#[derive(Serialize)]
+pub struct AudioCheckInfo {
+    pub format: String,
+    pub average_bitrate_kbps: u32,
+    pub frequency_cutoff_hz: u32,
+    pub sample_rate: u32,
+    pub duration_seconds: f64,
+}
+
+#[tauri::command]
+pub async fn check_audio_info(file_path: String) -> Result<AudioCheckInfo, String> {
+    let path = Path::new(&file_path);
+    let format = path
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .map(|ext| ext.to_ascii_lowercase())
+        .unwrap_or_default();
+
+    let decoded = decoder::decode_audio(&file_path)?;
+
+    let slice_samples = (CHECK_SLICE_SECONDS * decoded.sample_rate as f64) as usize;
+    let samples_for_analysis = if decoded.samples.len() > slice_samples {
+        let start = (decoded.samples.len() - slice_samples) / 2;
+        &decoded.samples[start..start + slice_samples]
+    } else {
+        &decoded.samples
+    };
+
+    let spectrum = analyzer::compute_spectrogram(
+        samples_for_analysis,
+        decoded.sample_rate,
+        CHECK_TARGET_TIME_BINS,
+    );
+
+    let frequency_cutoff_hz = estimate_frequency_cutoff_hz(&spectrum, decoded.sample_rate);
+    let average_bitrate_kbps =
+        average_bitrate_kbps_from_data(decoded.file_size_bytes, decoded.duration_seconds);
+
+    Ok(AudioCheckInfo {
+        format,
+        average_bitrate_kbps,
+        frequency_cutoff_hz,
+        sample_rate: decoded.sample_rate,
+        duration_seconds: decoded.duration_seconds,
+    })
 }
