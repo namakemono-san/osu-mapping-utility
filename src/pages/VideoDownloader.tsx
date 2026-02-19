@@ -99,7 +99,7 @@ export function VideoDownloader() {
             if (res !== "started") {
                 appendLog(res);
             }
-        } catch (e: unknown) {
+        } catch (e: any) {
             appendLog(`[ui][err] ${String(e)}`);
         }
     }, [url, outDir, audioFormat, includeVideo, autoTaikoVideo, appendLog, t]);
@@ -121,7 +121,7 @@ export function VideoDownloader() {
                 outDir,
             });
             appendLog(`[ui][taiko] output=${outPath}`);
-        } catch (e: unknown) {
+        } catch (e: any) {
             appendLog(`[ui][taiko-err] ${String(e)}`);
         } finally {
             setBusy(false);

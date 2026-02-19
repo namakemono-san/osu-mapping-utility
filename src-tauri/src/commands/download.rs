@@ -401,9 +401,7 @@ async fn convert_audio(
                         "download-progress",
                         format!("[audio][done] code={:?}, output={}", payload, out_path),
                     );
-                    if let Err(e) = std::fs::remove_file(src_path) {
-                        eprintln!("[download] Failed to remove temp file: {}", e);
-                    }
+                    let _ = std::fs::remove_file(src_path);
                 } else {
                     let _ = window.emit(
                         "download-progress",

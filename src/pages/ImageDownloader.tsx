@@ -116,7 +116,7 @@ export function ImageDownloader() {
 
       setImageSrc(convertFileSrc(path));
       void openPath(outDir);
-    } catch (e: unknown) {
+    } catch (e: any) {
       setError(String(e));
     } finally {
       setBusy(false);

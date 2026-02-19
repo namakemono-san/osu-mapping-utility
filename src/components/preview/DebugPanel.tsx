@@ -1,8 +1,5 @@
-import type { TaikoDifficulty } from "../../domain/osu/taikoMapper";
-import type { OsuTimingPoint } from "../../domain/osu/types";
+import type { Difficulty, ModState } from "../../domain/osu/osuFileParser";
 import type { LocaleKey } from "../../locale";
-
-interface ModState { isDT: boolean; isHR: boolean; }
 
 export interface DebugPanelProps {
     t: (key: LocaleKey, params?: Record<string, string | number>) => string;
@@ -12,11 +9,11 @@ export interface DebugPanelProps {
     getCurrentTimeMs: () => number;
     audioLeadIn: number;
     hitWindow: number;
-    filteredDifficulties: TaikoDifficulty[];
-    getCurrentBPM: (time: number, timingPoints: OsuTimingPoint[]) => number;
-    getCurrentSV: (time: number, timingPoints: OsuTimingPoint[]) => number;
+    filteredDifficulties: Difficulty[];
+    getCurrentBPM: (time: number, timingPoints: Difficulty["timingPoints"]) => number;
+    getCurrentSV: (time: number, timingPoints: Difficulty["timingPoints"]) => number;
     debugInfo: string[];
-    beatmapData: { difficulties: TaikoDifficulty[] } | null;
+    beatmapData: { difficulties: Difficulty[] } | null;
 }
 
 export function DebugPanel({

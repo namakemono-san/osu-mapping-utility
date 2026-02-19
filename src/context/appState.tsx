@@ -27,6 +27,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       if (next) localStorage.setItem("songsFolder", next);
       else localStorage.removeItem("songsFolder");
     } catch {
+      // ignore
     }
   }, []);
 

@@ -25,7 +25,3 @@ dist-ssr
 
 # Rust
 target/
-
-# Claude
-.claude/
-CLAUDE.md

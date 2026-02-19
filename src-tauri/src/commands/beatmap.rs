@@ -1,10 +1,11 @@
 use crate::models::beatmapset::Beatmapset;
-use crate::osu::parser::parse_header;
+use crate::utils::parser::scrape;
 use once_cell::sync::Lazy;
 use rayon::prelude::*;
-use serde::Serialize;
+use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs;
+use std::io::Write;
 use std::path::Path;
 use std::process::Command;
 use std::sync::{Arc, RwLock};
@@ -116,7 +117,7 @@ fn try_common_locations() -> Option<String> {
 fn get_folder_list(base_path: &str) -> Result<Arc<Vec<FolderEntry>>, String> {
     let base_path = normalize_base_path(base_path);
     {
-        let cache = FOLDER_CACHE.read().map_err(|e| format!("Lock error: {}", e))?;
+        let cache = FOLDER_CACHE.read().unwrap();
         if let Some(folders) = cache.folders.get(&base_path) {
             return Ok(folders.clone());
         }
@@ -149,7 +150,7 @@ fn get_folder_list(base_path: &str) -> Result<Arc<Vec<FolderEntry>>, String> {
     let arc_folders = Arc::new(folders);
 
     {
-        let mut cache = FOLDER_CACHE.write().map_err(|e| format!("Lock error: {}", e))?;
+        let mut cache = FOLDER_CACHE.write().unwrap();
         cache
             .folders
             .insert(base_path.to_string(), arc_folders.clone());
@@ -176,19 +177,12 @@ fn parse_beatmap_folder(folder_path: &Path, folder_name: &str) -> Option<Beatmap
             Err(_) => continue,
         };
 
-        let file_name = path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("")
-            .to_string();
-        let header = parse_header(&data, &file_name);
-
-        let title = header.title;
-        let artist = header.artist;
-        let creator = header.creator;
-        let beatmap_id = header.beatmap_id;
-        let beatmapset_id = header.beatmap_set_id;
-        let bg_file = header.background_filename.unwrap_or_default();
+        let title = scrape(&data, "Title:", "\n");
+        let artist = scrape(&data, "Artist:", "\n");
+        let creator = scrape(&data, "Creator:", "\n");
+        let beatmap_id = scrape(&data, "BeatmapID:", "\n");
+        let beatmapset_id = scrape(&data, "BeatmapSetID:", "\n");
+        let bg_file = scrape(&data, "0,0,\"", "\"");
 
         let display_title = if !title.is_empty() && !artist.is_empty() {
             format!("{} - {}", artist, title)
@@ -231,7 +225,7 @@ fn get_or_parse_beatmap(base_path: &str, folder: &FolderEntry) -> Option<Beatmap
     let effective_folder_path = Path::new(base_path).join(&folder.name);
 
     {
-        let cache = PARSED_CACHE.read().ok()?;
+        let cache = PARSED_CACHE.read().unwrap();
         if let Some(path_cache) = cache.get(base_path) {
             if let Some(beatmap) = path_cache.data.get(&folder.name) {
                 return Some(beatmap.clone());
@@ -242,7 +236,7 @@ fn get_or_parse_beatmap(base_path: &str, folder: &FolderEntry) -> Option<Beatmap
     let beatmap = parse_beatmap_folder(&effective_folder_path, &folder.name)?;
 
     {
-        let mut cache = PARSED_CACHE.write().ok()?;
+        let mut cache = PARSED_CACHE.write().unwrap();
         let path_cache = cache
             .entry(base_path.to_string())
             .or_insert_with(ParsedBeatmapCache::new);
@@ -282,9 +276,6 @@ pub fn scan_songs_step(
             .collect();
 
         let total = matching_folders.len();
-        if start_index >= total {
-            return Ok((vec![], total, false));
-        }
         let end_index = (start_index + step_size).min(total);
 
         let results: Vec<Beatmapset> = matching_folders[start_index..end_index]
@@ -338,9 +329,6 @@ pub fn search_beatmaps_full(
     }
 
     let total = matched.len();
-    if start_index >= total {
-        return Ok((vec![], total, false));
-    }
     let end_index = (start_index + step_size).min(total);
     let results = matched[start_index..end_index].to_vec();
     let has_more = scanned < folders.len() || end_index < total;
@@ -349,40 +337,67 @@ pub fn search_beatmaps_full(
 }
 
 #[tauri::command]
-pub fn clear_beatmap_cache() -> Result<(), String> {
+pub fn clear_beatmap_cache() {
     {
-        let mut cache = FOLDER_CACHE.write().map_err(|e| format!("Lock error: {}", e))?;
+        let mut cache = FOLDER_CACHE.write().unwrap();
         cache.folders.clear();
         cache.last_updated.clear();
     }
     {
-        let mut cache = PARSED_CACHE.write().map_err(|e| format!("Lock error: {}", e))?;
+        let mut cache = PARSED_CACHE.write().unwrap();
         cache.clear();
     }
-    Ok(())
 }
 
 #[tauri::command]
-pub fn invalidate_cache_for_path(base_path: String) -> Result<(), String> {
+pub fn invalidate_cache_for_path(base_path: String) {
     let base_path = normalize_base_path(&base_path);
     {
-        let mut cache = FOLDER_CACHE.write().map_err(|e| format!("Lock error: {}", e))?;
+        let mut cache = FOLDER_CACHE.write().unwrap();
         cache.folders.remove(&base_path);
         cache.last_updated.remove(&base_path);
     }
     {
-        let mut cache = PARSED_CACHE.write().map_err(|e| format!("Lock error: {}", e))?;
+        let mut cache = PARSED_CACHE.write().unwrap();
         cache.remove(&base_path);
     }
-    Ok(())
 }
 
 #[tauri::command]
 pub fn reload_beatmaps(base_path: String) -> Result<usize, String> {
     let base_path = normalize_base_path(&base_path);
-    invalidate_cache_for_path(base_path.clone())?;
+    invalidate_cache_for_path(base_path.clone());
     let folders = get_folder_list(&base_path)?;
     Ok(folders.len())
+}
+
+#[tauri::command]
+pub fn list_osu_files(beatmap_folder: String) -> Result<Vec<String>, String> {
+    let path = Path::new(&beatmap_folder);
+
+    if !path.exists() {
+        return Err(format!("Folder not found: {}", beatmap_folder));
+    }
+
+    let osu_files: Vec<String> = fs::read_dir(path)
+        .map_err(|e| format!("Failed to read directory: {}", e))?
+        .filter_map(|e| e.ok())
+        .filter(|e| {
+            e.path()
+                .extension()
+                .and_then(|ext| ext.to_str())
+                .map(|ext| ext == "osu")
+                .unwrap_or(false)
+        })
+        .filter_map(|e| e.file_name().to_str().map(|s| s.to_string()))
+        .collect();
+
+    Ok(osu_files)
+}
+
+#[tauri::command]
+pub fn read_osu_file(file_path: String) -> Result<String, String> {
+    fs::read_to_string(&file_path).map_err(|e| format!("Failed to read file: {}", e))
 }
 
 #[tauri::command]
@@ -390,29 +405,89 @@ pub fn read_audio_file(file_path: String) -> Result<Vec<u8>, String> {
     fs::read(&file_path).map_err(|e| format!("Failed to read audio file: {}", e))
 }
 
-#[derive(Serialize)]
-pub struct FileEntry {
-    pub name: String,
-    pub size: u64,
+#[tauri::command]
+pub fn write_osu_file(file_path: String, content: String) -> Result<(), String> {
+    let mut file =
+        fs::File::create(&file_path).map_err(|e| format!("Failed to create file: {}", e))?;
+
+    file.write_all(content.as_bytes())
+        .map_err(|e| format!("Failed to write file: {}", e))?;
+
+    Ok(())
+}
+
+#[derive(Deserialize)]
+pub struct RenameOp {
+    pub from: String,
+    pub to: String,
 }
 
 #[tauri::command]
-pub fn list_folder_files(folder_path: String) -> Result<Vec<FileEntry>, String> {
-    let path = Path::new(&folder_path);
-    if !path.exists() {
-        return Err(format!("Folder not found: {}", folder_path));
+pub fn rename_osu_files(beatmap_folder: String, renames: Vec<RenameOp>) -> Result<(), String> {
+    let base = Path::new(&beatmap_folder);
+    if !base.exists() {
+        return Err(format!("Folder not found: {}", beatmap_folder));
     }
 
-    let entries: Vec<FileEntry> = fs::read_dir(path)
-        .map_err(|e| format!("Failed to read directory: {}", e))?
-        .filter_map(|e| e.ok())
-        .filter(|e| e.file_type().map(|ft| ft.is_file()).unwrap_or(false))
-        .filter_map(|e| {
-            let name = e.file_name().to_string_lossy().to_string();
-            let size = e.metadata().map(|m| m.len()).unwrap_or(0);
-            Some(FileEntry { name, size })
-        })
-        .collect();
+    let ops: Vec<RenameOp> = renames.into_iter().filter(|op| op.from != op.to).collect();
 
-    Ok(entries)
+    if ops.is_empty() {
+        return Ok(());
+    }
+
+    for op in &ops {
+        if op.from.trim().is_empty() || op.to.trim().is_empty() {
+            return Err("Invalid rename op".to_string());
+        }
+        let from_path = base.join(&op.from);
+        if !from_path.exists() {
+            return Err(format!("File not found: {}", from_path.display()));
+        }
+    }
+
+    let pid = std::process::id();
+    let mut temp_paths: Vec<(std::path::PathBuf, std::path::PathBuf)> =
+        Vec::with_capacity(ops.len());
+
+    for (i, op) in ops.iter().enumerate() {
+        let from_path = base.join(&op.from);
+
+        let mut tmp_name = format!(".__omu_tmp__{}_{}__.osu", pid, i);
+        let mut tmp_path = base.join(&tmp_name);
+        let mut j = 0;
+        while tmp_path.exists() {
+            j += 1;
+            tmp_name = format!(".__omu_tmp__{}_{}_{}__.osu", pid, i, j);
+            tmp_path = base.join(&tmp_name);
+        }
+
+        fs::rename(&from_path, &tmp_path).map_err(|e| {
+            format!(
+                "Failed to rename {} -> {}: {}",
+                from_path.display(),
+                tmp_path.display(),
+                e
+            )
+        })?;
+        temp_paths.push((tmp_path, base.join(&op.to)));
+    }
+
+    for (_tmp_path, final_path) in &temp_paths {
+        if final_path.exists() {
+            return Err(format!("Target already exists: {}", final_path.display()));
+        }
+    }
+
+    for (tmp_path, final_path) in temp_paths {
+        fs::rename(&tmp_path, &final_path).map_err(|e| {
+            format!(
+                "Failed to rename {} -> {}: {}",
+                tmp_path.display(),
+                final_path.display(),
+                e
+            )
+        })?;
+    }
+
+    Ok(())
 }
