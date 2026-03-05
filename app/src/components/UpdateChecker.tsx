@@ -2,11 +2,11 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { check } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { FiDownload } from "react-icons/fi";
-import { Button } from "../components/common/Button";
-import { Modal } from "../components/common/Modal";
-import { LoadingSpinner } from "../components/common/LoadingSpinner";
-import { ProgressBar } from "../components/common/ProgressBar";
-import { StatusMessage } from "../components/common/StatusMessage";
+import { Button } from "./common/Button";
+import { Modal } from "./common/Modal";
+import { LoadingSpinner } from "./common/LoadingSpinner";
+import { ProgressBar } from "./common/ProgressBar";
+import { StatusMessage } from "./common/StatusMessage";
 
 import { useI18n } from "../hooks/i18nContext";
 

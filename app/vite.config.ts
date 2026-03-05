@@ -1,30 +1,22 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
-import { visualizer } from "rollup-plugin-visualizer";
+import { resolve } from "path";
 
-// @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
 
 // https://vitejs.dev/config/
-export default defineConfig(async ({ mode }) => {
-  const isAnalyze = mode === "analyze";
-
+export default defineConfig(async () => {
   return {
     plugins: [
       react(),
       tailwindcss(),
-      ...(isAnalyze
-        ? [
-            visualizer({
-              filename: "dist/stats.html",
-              open: false,
-              gzipSize: true,
-              brotliSize: true,
-            }),
-          ]
-        : []),
     ],
+    resolve: {
+      alias: {
+        "@": resolve(__dirname, "./src"),
+      },
+    },
     build: {
       target: "chrome120",
       reportCompressedSize: true,
@@ -44,7 +36,6 @@ export default defineConfig(async ({ mode }) => {
         },
       },
     },
-
     clearScreen: false,
     server: {
       port: 1420,
