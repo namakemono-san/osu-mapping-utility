@@ -7,8 +7,12 @@
     "app"
   ],
   "scripts": {
-    "dev": "pnpm --filter app tauri dev",
+    "dev": "concurrently \"dotnet watch run --project MappingUtility.Server\" \"pnpm --filter app tauri dev\"",
     "build": "pnpm --filter app tauri dev",
-    "install:app": "pnpm --filter app install"
+    "add:app": "pnpm --filter app add",
+    "remove:app": "pnpm --filter app remove"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
   }
 }

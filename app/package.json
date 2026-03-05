@@ -1,7 +1,8 @@
 {
   "name": "app",
   "private": true,
-  "version": "0.8.0",
+  "version": "1.0.0",
+  "author": "namakemono-san <me@nmkmn.moe>",
   "packageManager": "pnpm@10.28.2",
   "type": "module",
   "scripts": {
@@ -11,6 +12,7 @@
     "tauri": "tauri"
   },
   "dependencies": {
+    "@microsoft/signalr": "^10.0.0",
     "@tailwindcss/vite": "^4.1.11",
     "@tauri-apps/api": "2.8.0",
     "@tauri-apps/plugin-dialog": "2.3.2",

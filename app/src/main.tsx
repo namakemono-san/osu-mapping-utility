@@ -3,7 +3,10 @@ import ReactDOM from "react-dom/client";
 import App from "./App";
 
 import { I18nProvider } from "./hooks/i18nContext";
+import { startConnection } from "@/services/signalr";
 import { AppStateProvider } from "./context/appState";
+
+startConnection();
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <I18nProvider>

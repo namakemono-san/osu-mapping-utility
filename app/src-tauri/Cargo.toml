@@ -1,8 +1,8 @@
 [package]
 name = "osu-mapping-utility"
-version = "0.8.0"
-description = "A Tauri App"
-authors = ["you"]
+version = "1.0.0"
+description = "A tool featuring convenient functions for osu! mapping"
+authors = ["namakemono-san <me@nmkmn.moe>"]
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
