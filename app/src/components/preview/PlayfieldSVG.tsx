@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import type { TaikoDifficulty, TaikoHitObjectWithStart } from "../../domain/osu/taikoMapper";
-import type { OsuTimingPoint } from "../../domain/osu/types";
+import type { TimingLine } from "../../types/osu";
 import type { Tick } from "../../domain/osu/tickGenerator";
 
 interface HitAnimation { id: number; x: number; y: number; color: string; timestamp: number; }
@@ -21,7 +21,7 @@ export interface PlayfieldSVGProps {
     isGameplayMode: boolean;
     isViewSVLine: boolean;
     hitAnimations: HitAnimation[];
-    calculateGameplayStart: (objectTime: number, timingPoints: OsuTimingPoint[]) => number;
+    calculateGameplayStart: (objectTime: number, timingLines: TimingLine[]) => number;
 }
 
 export function PlayfieldSVG({
@@ -53,7 +53,7 @@ export function PlayfieldSVG({
         const RIGHT_LIMIT = PLAYFIELD_WIDTH + 100;
 
         if (obj.type === "drumroll" && obj.endTime) {
-            const endGameplayStart = calculateGameplayStart(obj.endTime, difficulty.timingPoints);
+            const endGameplayStart = calculateGameplayStart(obj.endTime, difficulty.timingLines);
             const tailX = getObjectX(obj.endTime, endGameplayStart);
 
             const leftX = Math.min(headX, tailX);
@@ -82,7 +82,7 @@ export function PlayfieldSVG({
                 />
             );
         } else if (obj.type === "spinner" && obj.endTime) {
-            const endGameplayStart = calculateGameplayStart(obj.endTime, difficulty.timingPoints);
+            const endGameplayStart = calculateGameplayStart(obj.endTime, difficulty.timingLines);
             const tailX = getObjectX(obj.endTime, endGameplayStart);
 
             const leftX = Math.min(headX, tailX);
@@ -137,11 +137,11 @@ export function PlayfieldSVG({
         const centerY = yOffset + 50;
         const height = 70;
 
-        const svPoints = difficulty.timingPoints.filter(tp => !tp.uninherited && tp.svMultiplier !== undefined);
+        const svPoints = difficulty.timingLines.filter(tp => !tp.uninherited);
 
         svPoints.forEach((svPoint, index) => {
-            const gameplayStart = calculateGameplayStart(svPoint.time, difficulty.timingPoints);
-            const x = getObjectX(svPoint.time, gameplayStart);
+            const gameplayStart = calculateGameplayStart(svPoint.offset, difficulty.timingLines);
+            const x = getObjectX(svPoint.offset, gameplayStart);
 
             if (x < -50 || x > PLAYFIELD_WIDTH + 50) return;
 
@@ -165,7 +165,7 @@ export function PlayfieldSVG({
                         fontSize="10"
                         fontWeight="semibold"
                     >
-                        {svPoint.svMultiplier?.toFixed(2)}x
+                        {svPoint.svMult?.toFixed(2)}x
                     </text>
                 </g>
             );

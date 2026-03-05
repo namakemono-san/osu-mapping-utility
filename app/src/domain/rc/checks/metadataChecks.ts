@@ -1,5 +1,5 @@
 import type { CheckDefinition, CheckResult } from "../types";
-import type { OsuBeatmapset } from "../../osu/types";
+import type { Beatmap } from "../../../types/osu";
 
 function isAsciiOnly(str: string): boolean {
     return /^[\x20-\x7E]*$/.test(str);
@@ -9,9 +9,9 @@ const romanisedAscii: CheckDefinition = {
     id: "metadata.romanised_ascii",
     severity: "rule",
     category: "metadata",
-    run: (data: OsuBeatmapset): CheckResult[] => {
+    run: (data: Beatmap[]): CheckResult[] => {
         const results: CheckResult[] = [];
-        for (const d of data.difficulties) {
+        for (const d of data) {
             const titleOk = isAsciiOnly(d.metadata.title);
             const artistOk = isAsciiOnly(d.metadata.artist);
             const passed = titleOk && artistOk;
@@ -38,9 +38,9 @@ const unicodeFilled: CheckDefinition = {
     id: "metadata.unicode_filled",
     severity: "guideline",
     category: "metadata",
-    run: (data: OsuBeatmapset): CheckResult[] => {
+    run: (data: Beatmap[]): CheckResult[] => {
         const results: CheckResult[] = [];
-        for (const d of data.difficulties) {
+        for (const d of data) {
             const passed = d.metadata.titleUnicode !== "" && d.metadata.artistUnicode !== "";
             results.push({
                 checkId: "metadata.unicode_filled",
@@ -59,8 +59,8 @@ const consistency: CheckDefinition = {
     id: "metadata.consistency",
     severity: "rule",
     category: "metadata",
-    run: (data: OsuBeatmapset): CheckResult[] => {
-        if (data.difficulties.length <= 1) {
+    run: (data: Beatmap[]): CheckResult[] => {
+        if (data.length <= 1) {
             return [{
                 checkId: "metadata.consistency",
                 messageKey: "rc.metadata.consistency.pass",
@@ -70,14 +70,14 @@ const consistency: CheckDefinition = {
             }];
         }
 
-        const ref = data.difficulties[0].metadata;
+        const ref = data[0].metadata;
         const fields = ["title", "artist", "creator", "source", "titleUnicode", "artistUnicode", "tags"] as const;
         const mismatched: string[] = [];
 
         for (const field of fields) {
             const refVal = ref[field];
-            for (let i = 1; i < data.difficulties.length; i++) {
-                if (data.difficulties[i].metadata[field] !== refVal) {
+            for (let i = 1; i < data.length; i++) {
+                if (data[i].metadata[field] !== refVal) {
                     mismatched.push(field);
                     break;
                 }
@@ -100,8 +100,8 @@ const creatorFilled: CheckDefinition = {
     id: "metadata.creator_filled",
     severity: "rule",
     category: "metadata",
-    run: (data: OsuBeatmapset): CheckResult[] => {
-        return data.difficulties.map(d => ({
+    run: (data: Beatmap[]): CheckResult[] => {
+        return data.map(d => ({
             checkId: "metadata.creator_filled",
             messageKey: d.metadata.creator !== "" ? "rc.metadata.creatorFilled.pass" : "rc.metadata.creatorFilled.fail",
             severity: "rule" as const,
@@ -127,8 +127,8 @@ const languageTag: CheckDefinition = {
     id: "metadata.language_tag",
     severity: "rule",
     category: "metadata",
-    run: (data: OsuBeatmapset): CheckResult[] => {
-        const ref = data.difficulties[0];
+    run: (data: Beatmap[]): CheckResult[] => {
+        const ref = data[0];
         if (!ref) return [];
         const tags = ref.metadata.tags.toLowerCase();
         const hasLanguage = LANGUAGE_TAGS.some(lang => {
@@ -149,8 +149,8 @@ const genreTag: CheckDefinition = {
     id: "metadata.genre_tag",
     severity: "rule",
     category: "metadata",
-    run: (data: OsuBeatmapset): CheckResult[] => {
-        const ref = data.difficulties[0];
+    run: (data: Beatmap[]): CheckResult[] => {
+        const ref = data[0];
         if (!ref) return [];
         const tags = ref.metadata.tags.toLowerCase();
         const hasGenre = GENRE_TAGS.some(genre => {
@@ -171,14 +171,14 @@ const gdTag: CheckDefinition = {
     id: "metadata.gd_tag",
     severity: "rule",
     category: "metadata",
-    run: (data: OsuBeatmapset): CheckResult[] => {
-        const ref = data.difficulties[0];
+    run: (data: Beatmap[]): CheckResult[] => {
+        const ref = data[0];
         if (!ref) return [];
         const creator = ref.metadata.creator.toLowerCase();
         const tags = ref.metadata.tags.toLowerCase();
 
         const gdMappers = new Set<string>();
-        for (const d of data.difficulties) {
+        for (const d of data) {
             const match = d.metadata.version.match(/^(.+)'s\s+/i);
             if (match) {
                 const namesPart = match[1];

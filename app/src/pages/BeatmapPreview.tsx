@@ -21,8 +21,8 @@ import {
     type TaikoDifficulty,
     type TaikoBeatmapData,
 } from "../domain/osu/taikoMapper";
-import type { OsuTimingPoint, OsuBeatmap } from "../domain/osu/types";
-import { osuApi } from "../domain/osu";
+import type { TimingLine } from "../types/osu";
+import { requestParseBatch } from "../services/signalr";
 import {
     getCurrentBPM as getBPM,
     getCurrentSV as getSV,
@@ -161,28 +161,28 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
         return () => cancelAnimationFrame(id);
     }, [hitAnimations]);
 
-    const getCurrentBPM = useCallback((time: number, timingPoints: OsuTimingPoint[]): number => {
-        return getBPM(time, timingPoints);
+    const getCurrentBPM = useCallback((time: number, timingLines: TimingLine[]): number => {
+        return getBPM(time, timingLines);
     }, []);
 
-    const getCurrentSV = useCallback((time: number, timingPoints: OsuTimingPoint[]): number => {
+    const getCurrentSV = useCallback((time: number, timingLines: TimingLine[]): number => {
         const { svMultiplier: hrMultiplier } = getModMultipliers();
-        return getSV(time, timingPoints, hrMultiplier);
+        return getSV(time, timingLines, hrMultiplier);
     }, [getModMultipliers]);
 
-    const calculateGameplayStart = useCallback((objectTime: number, timingPoints: OsuTimingPoint[]): number => {
+    const calculateGameplayStart = useCallback((objectTime: number, timingLines: TimingLine[]): number => {
         const { arMultiplier, svMultiplier: hrSVMultiplier } = getModMultipliers();
-        return calcGameplayStart(objectTime, timingPoints, isGameplayMode, APPROACH_TIME, arMultiplier, hrSVMultiplier);
+        return calcGameplayStart(objectTime, timingLines, isGameplayMode, APPROACH_TIME, arMultiplier, hrSVMultiplier);
     }, [isGameplayMode, getModMultipliers]);
 
-    const generateTicks = useCallback((timingPoint: OsuTimingPoint, nextTime: number, timingPoints: OsuTimingPoint[]): Tick[] => {
-        return genTicks(timingPoint, nextTime, timingPoints, isGameplayMode, calculateGameplayStart);
+    const generateTicks = useCallback((timingPoint: TimingLine, nextTime: number, timingLines: TimingLine[]): Tick[] => {
+        return genTicks(timingPoint, nextTime, timingLines, isGameplayMode, calculateGameplayStart);
     }, [calculateGameplayStart, isGameplayMode]);
 
     const processDifficulty = useCallback((difficulty: TaikoDifficulty) => {
         const hitObjectsWithStart: TaikoHitObjectWithStart[] = difficulty.hitObjects.map(obj => ({
             ...obj,
-            gameplayStart: calculateGameplayStart(obj.time, difficulty.timingPoints)
+            gameplayStart: calculateGameplayStart(obj.time, difficulty.timingLines)
         }));
 
         const allTicks: Tick[] = [];
@@ -194,7 +194,7 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
             };
         }
 
-        const uninheritedPoints = difficulty.timingPoints.filter(tp => tp.uninherited);
+        const uninheritedPoints = difficulty.timingLines.filter(tp => tp.uninherited);
 
         if (uninheritedPoints.length === 0) {
             return {
@@ -206,13 +206,13 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
         for (let i = 0; i < uninheritedPoints.length; i++) {
             const tp = uninheritedPoints[i];
 
-            if (tp.time >= duration) continue;
+            if (tp.offset >= duration) continue;
 
             const nextTime = i < uninheritedPoints.length - 1
-                ? Math.min(uninheritedPoints[i + 1].time, duration)
+                ? Math.min(uninheritedPoints[i + 1].offset, duration)
                 : duration;
 
-            const sectionTicks = generateTicks(tp, nextTime, difficulty.timingPoints);
+            const sectionTicks = generateTicks(tp, nextTime, difficulty.timingLines);
             allTicks.push(...sectionTicks);
         }
 
@@ -269,39 +269,19 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
 
                 const beatmapPath = `${songsFolder}\\${selectedBeatmap.folder_name}`;
 
-                setLoadingStep("Finding .osu files...");
-                const osuFiles = await osuApi.listOsuFiles(beatmapPath);
+                setLoadingStep("Parsing beatmap difficulties...");
+                const rawBeatmaps = await requestParseBatch(beatmapPath, []);
 
-                if (osuFiles.length === 0) {
+                if (rawBeatmaps.length === 0) {
                     throw new Error("No .osu files found");
                 }
 
-                setLoadingStep(`Parsing ${osuFiles.length} difficulties...`);
-                const rawBeatmaps: OsuBeatmap[] = [];
-                let audioFilename = "";
-                let title = "";
-                let artist = "";
-                let creator = "";
-                let leadIn = 0;
-
-                for (const file of osuFiles) {
-                    const filePath = `${beatmapPath}\\${file}`;
-                    const beatmap = await osuApi.parseOsuFile(filePath);
-                    rawBeatmaps.push(beatmap);
-                    setLoadingStep(`Parsed ${rawBeatmaps.length}/${osuFiles.length} difficulties...`);
-
-                    if (!audioFilename) {
-                        audioFilename = beatmap.general.audioFilename;
-                        title = beatmap.metadata.title;
-                        artist = beatmap.metadata.artist;
-                        creator = beatmap.metadata.creator;
-                        leadIn = beatmap.general.audioLeadIn;
-                    }
-                }
-
-                if (rawBeatmaps.length === 0) {
-                    throw new Error("No taiko difficulties found");
-                }
+                const firstBeatmap = rawBeatmaps[0];
+                const audioFilename = firstBeatmap.general.audioFilename;
+                const title = firstBeatmap.metadata.title;
+                const artist = firstBeatmap.metadata.artist;
+                const creator = firstBeatmap.metadata.creator;
+                const leadIn = firstBeatmap.general.audioLeadIn;
 
                 setLoadingStep("Sorting difficulties...");
                 const { sorted: sortedBeatmaps } = sortDifficulties(rawBeatmaps);
@@ -392,13 +372,13 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
                         const yOffset = diffIndex * 100 + 50;
 
                         if ((obj.type === "drumroll" || obj.type === "spinner") && obj.endTime) {
-                            let currentTP = diff.timingPoints.find(tp => tp.uninherited);
+                            let currentTP = diff.timingLines.find(tp => tp.uninherited);
                             if (!currentTP) return;
 
-                            for (const tp of diff.timingPoints) {
-                                if (tp.time <= obj.time && tp.uninherited) {
+                            for (const tp of diff.timingLines) {
+                                if (tp.offset <= obj.time && tp.uninherited) {
                                     currentTP = tp;
-                                } else if (tp.time > obj.time) {
+                                } else if (tp.offset > obj.time) {
                                     break;
                                 }
                             }
@@ -504,8 +484,8 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
         const map = new Map<string, { sv: number; bpm: number }>();
         for (const diff of filteredDifficulties) {
             map.set(diff.version, {
-                sv: getCurrentSV(currentTime, diff.timingPoints),
-                bpm: getCurrentBPM(currentTime, diff.timingPoints),
+                sv: getCurrentSV(currentTime, diff.timingLines),
+                bpm: getCurrentBPM(currentTime, diff.timingLines),
             });
         }
         return map;

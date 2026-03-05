@@ -1,4 +1,4 @@
-import type { OsuBeatmap, OsuHitObject, OsuTimingPoint } from "./types";
+import type { Beatmap, HitObject, TimingLine } from "../../types/osu";
 
 export type TaikoHitType = "don" | "kat" | "don-big" | "kat-big" | "drumroll" | "spinner";
 
@@ -16,7 +16,7 @@ export interface TaikoDifficulty {
     fileName: string;
     version: string;
     hitObjects: TaikoHitObject[];
-    timingPoints: OsuTimingPoint[];
+    timingLines: TimingLine[];
     bpm: number;
     hpDrainRate: number;
     overallDifficulty: number;
@@ -31,16 +31,16 @@ export interface TaikoBeatmapData {
     difficulties: TaikoDifficulty[];
 }
 
-export function mapToTaikoHitObject(ho: OsuHitObject): TaikoHitObject | null {
+export function mapToTaikoHitObject(ho: HitObject): TaikoHitObject | null {
     const isCircle = (ho.typeFlags & 1) !== 0;
     const isSlider = (ho.typeFlags & 2) !== 0;
     const isSpinner = (ho.typeFlags & 8) !== 0;
 
     if (!isCircle && !isSlider && !isSpinner) return null;
 
-    const hasWhistle = (ho.hitSound & 2) !== 0;
-    const hasFinish = (ho.hitSound & 4) !== 0;
-    const hasClap = (ho.hitSound & 8) !== 0;
+    const hasWhistle = (ho.hitSoundFlags & 2) !== 0;
+    const hasFinish = (ho.hitSoundFlags & 4) !== 0;
+    const hasClap = (ho.hitSoundFlags & 8) !== 0;
 
     if (isCircle) {
         const isKat = hasWhistle || hasClap;
@@ -58,7 +58,7 @@ export function mapToTaikoHitObject(ho: OsuHitObject): TaikoHitObject | null {
     }
 }
 
-export function adaptOsuBeatmapToTaiko(beatmap: OsuBeatmap): TaikoDifficulty {
+export function adaptOsuBeatmapToTaiko(beatmap: Beatmap): TaikoDifficulty {
     const hitObjects: TaikoHitObject[] = beatmap.hitObjects
         .map(mapToTaikoHitObject)
         .filter((h): h is TaikoHitObject => h !== null);
@@ -67,7 +67,7 @@ export function adaptOsuBeatmapToTaiko(beatmap: OsuBeatmap): TaikoDifficulty {
         fileName: beatmap.fileName,
         version: beatmap.metadata.version,
         hitObjects,
-        timingPoints: beatmap.timingPoints,
+        timingLines: beatmap.timingLines,
         bpm: beatmap.bpm,
         hpDrainRate: beatmap.difficulty.hpDrainRate,
         overallDifficulty: beatmap.difficulty.overallDifficulty,

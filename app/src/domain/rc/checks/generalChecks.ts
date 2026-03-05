@@ -1,5 +1,5 @@
 import type { CheckDefinition, CheckResult } from "../types";
-import type { OsuBeatmapset } from "../../osu/types";
+import type { Beatmap } from "../../../types/osu";
 
 function formatDuration(seconds: number): string {
     const m = Math.floor(seconds / 60);
@@ -11,8 +11,8 @@ const previewPoint: CheckDefinition = {
     id: "general.preview_point",
     severity: "rule",
     category: "general",
-    run: (data: OsuBeatmapset): CheckResult[] => {
-        return data.difficulties.map(d => ({
+    run: (data: Beatmap[]): CheckResult[] => {
+        return data.map(d => ({
             checkId: "general.preview_point",
             messageKey: d.general.previewTime > 0 ? "rc.general.previewPoint.pass" : "rc.general.previewPoint.fail",
             severity: "rule" as const,
@@ -27,13 +27,14 @@ const background: CheckDefinition = {
     id: "general.background",
     severity: "rule",
     category: "general",
-    run: (data: OsuBeatmapset): CheckResult[] => {
+    run: (data: Beatmap[]): CheckResult[] => {
+        const hasBackground = data.some(d => d.background != null);
         return [{
             checkId: "general.background",
-            messageKey: data.hasBackground ? "rc.general.background.pass" : "rc.general.background.fail",
+            messageKey: hasBackground ? "rc.general.background.pass" : "rc.general.background.fail",
             severity: "rule",
             category: "general",
-            passed: data.hasBackground,
+            passed: hasBackground,
         }];
     },
 };
@@ -42,8 +43,8 @@ const drainTime: CheckDefinition = {
     id: "general.drain_time",
     severity: "rule",
     category: "general",
-    run: (data: OsuBeatmapset): CheckResult[] => {
-        return data.difficulties.map(d => {
+    run: (data: Beatmap[]): CheckResult[] => {
+        return data.map(d => {
             const drainSec = d.drainTimeMs / 1000;
             const passed = drainSec >= 30;
             return {
@@ -63,13 +64,13 @@ const concurrentUninherited: CheckDefinition = {
     id: "general.concurrent_uninherited",
     severity: "rule",
     category: "general",
-    run: (data: OsuBeatmapset): CheckResult[] => {
-        return data.difficulties.map(d => {
-            const uninheritedTimes = d.timingPoints
+    run: (data: Beatmap[]): CheckResult[] => {
+        return data.map(d => {
+            const uninheritedOffsets = d.timingLines
                 .filter(tp => tp.uninherited)
-                .map(tp => tp.time);
-            const uniqueTimes = new Set(uninheritedTimes);
-            const passed = uninheritedTimes.length === uniqueTimes.size;
+                .map(tp => tp.offset);
+            const uniqueOffsets = new Set(uninheritedOffsets);
+            const passed = uninheritedOffsets.length === uniqueOffsets.size;
             return {
                 checkId: "general.concurrent_uninherited",
                 messageKey: passed ? "rc.general.concurrentUninherited.pass" : "rc.general.concurrentUninherited.fail",
@@ -86,9 +87,9 @@ const timingPointExists: CheckDefinition = {
     id: "general.timing_point_exists",
     severity: "rule",
     category: "general",
-    run: (data: OsuBeatmapset): CheckResult[] => {
-        return data.difficulties.map(d => {
-            const hasUninherited = d.timingPoints.some(tp => tp.uninherited);
+    run: (data: Beatmap[]): CheckResult[] => {
+        return data.map(d => {
+            const hasUninherited = d.timingLines.some(tp => tp.uninherited);
             return {
                 checkId: "general.timing_point_exists",
                 messageKey: hasUninherited ? "rc.general.timingPointExists.pass" : "rc.general.timingPointExists.fail",

@@ -8,10 +8,11 @@ import { CheckCategorySection } from "../components/rc/CheckCategorySection";
 import { Beatmapset } from "../types/beatmap";
 import { useSongsFolder } from "../hooks/useStorage";
 import { useI18n } from "../hooks/i18nContext";
-import { getModeName, osuApi } from "../domain/osu";
+import { getModeName } from "../domain/osu/rcDifficultyNames";
 import { runAllChecks } from "../domain/rc/checker";
+import { requestParseBatch } from "../services/signalr";
 import type { CheckResult, CheckCategory } from "../domain/rc/types";
-import type { GameMode, OsuBeatmapset } from "../domain/osu/types";
+import type { GameMode, Beatmap } from "../types/osu";
 import type { LocaleKey } from "../locale";
 
 interface RankingCriteriaCheckerProps {
@@ -35,11 +36,6 @@ interface AudioCheckInfo {
     frequency_cutoff_hz: number;
     sample_rate: number;
     duration_seconds: number;
-}
-
-interface FileEntry {
-    name: string;
-    size: number;
 }
 
 function formatHz(hz: number): string {
@@ -114,63 +110,6 @@ function buildAudioCheckResults(info: AudioCheckInfo): CheckResult[] {
     }];
 }
 
-function buildFileCheckResults(
-    files: FileEntry[],
-    referencedFiles: Set<string>,
-): CheckResult[] {
-    const results: CheckResult[] = [];
-    const SYSTEM_FILES = new Set(["thumbs.db", "desktop.ini", ".ds_store"]);
-
-    for (const file of files) {
-        const lower = file.name.toLowerCase();
-        if (lower.endsWith(".osu") || SYSTEM_FILES.has(lower)) continue;
-
-        if (!referencedFiles.has(lower)) {
-            results.push({
-                checkId: "files.unused",
-                messageKey: "rc.files.unused.fail",
-                messageParams: { filename: file.name },
-                severity: "rule",
-                category: "files",
-                passed: false,
-            });
-        }
-
-        if (file.size === 0) {
-            results.push({
-                checkId: "files.zero_byte",
-                messageKey: "rc.files.zeroByte.fail",
-                messageParams: { filename: file.name },
-                severity: "rule",
-                category: "files",
-                passed: false,
-            });
-        }
-    }
-
-    if (results.length === 0) {
-        results.push({
-            checkId: "files.unused",
-            messageKey: "rc.files.unused.pass",
-            severity: "rule",
-            category: "files",
-            passed: true,
-        });
-    }
-
-    return results;
-}
-
-function collectReferencedFiles(data: OsuBeatmapset): Set<string> {
-    const files = new Set<string>();
-    for (const d of data.difficulties) {
-        if (d.general.audioFilename) files.add(d.general.audioFilename.toLowerCase());
-        if (d.background?.filename) files.add(d.background.filename.toLowerCase());
-        if (d.videoFilename) files.add(d.videoFilename.toLowerCase());
-    }
-    return files;
-}
-
 function aggregateResults(results: CheckResult[], allDiffNames: string[]): CheckResult[] {
     const groups = new Map<string, CheckResult[]>();
 
@@ -207,7 +146,7 @@ export function RankingCriteriaChecker({ selectedBeatmap }: RankingCriteriaCheck
 
     const [loading, setLoading] = useState(false);
     const [asyncChecking, setAsyncChecking] = useState(false);
-    const [beatmapsetData, setBeatmapsetData] = useState<OsuBeatmapset | null>(null);
+    const [beatmapsetData, setBeatmapsetData] = useState<Beatmap[] | null>(null);
     const [results, setResults] = useState<CheckResult[]>([]);
 
     const [showPassed, setShowPassed] = useState(false);
@@ -227,9 +166,7 @@ export function RankingCriteriaChecker({ selectedBeatmap }: RankingCriteriaCheck
 
         try {
             const beatmapFolder = `${songsFolder}\\${selectedBeatmap.folder_name}`;
-            const osuFiles = await osuApi.listOsuFiles(beatmapFolder);
-
-            const data = await osuApi.parseOsuFilesBatch(beatmapFolder, osuFiles);
+            const data = await requestParseBatch(beatmapFolder, []);
             setBeatmapsetData(data);
 
             const checkResults = runAllChecks(data);
@@ -237,7 +174,7 @@ export function RankingCriteriaChecker({ selectedBeatmap }: RankingCriteriaCheck
             setLoading(false);
             setAsyncChecking(true);
 
-            const audioFilename = data.difficulties[0]?.general.audioFilename;
+            const audioFilename = data[0]?.general.audioFilename;
 
             const audioPromise = audioFilename
                 ? invoke<AudioCheckInfo>("check_audio_info", {
@@ -250,21 +187,11 @@ export function RankingCriteriaChecker({ selectedBeatmap }: RankingCriteriaCheck
                       })
                 : Promise.resolve([] as CheckResult[]);
 
-            const filesPromise = invoke<FileEntry[]>("list_folder_files", { folderPath: beatmapFolder })
-                .then(folderFiles => {
-                    const referenced = collectReferencedFiles(data);
-                    return buildFileCheckResults(folderFiles, referenced);
-                })
-                .catch(err => {
-                    console.warn("[RC Checker] Files check failed:", err);
-                    return [] as CheckResult[];
-                });
-
-            const [audioResults, fileResults] = await Promise.all([audioPromise, filesPromise]);
+            const audioResults = await audioPromise;
 
             if (!cancelRef.current) {
-                if (audioResults.length > 0 || fileResults.length > 0) {
-                    setResults(prev => [...prev, ...audioResults, ...fileResults]);
+                if (audioResults.length > 0) {
+                    setResults(prev => [...prev, ...audioResults]);
                 }
                 setAsyncChecking(false);
             }
@@ -280,10 +207,10 @@ export function RankingCriteriaChecker({ selectedBeatmap }: RankingCriteriaCheck
         return () => { cancelRef.current = true; };
     }, [loadAndCheck]);
 
-    const mode: GameMode = beatmapsetData?.difficulties[0]?.general.mode ?? 0;
+    const mode: GameMode = beatmapsetData?.[0]?.general.mode ?? 0;
     const diffNames = useMemo(() => {
         if (!beatmapsetData) return [];
-        return [...new Set(beatmapsetData.difficulties.map(d => d.metadata.version))];
+        return [...new Set(beatmapsetData.map(d => d.metadata.version))];
     }, [beatmapsetData]);
 
     const aggregatedResults = useMemo(() => {
@@ -353,8 +280,8 @@ export function RankingCriteriaChecker({ selectedBeatmap }: RankingCriteriaCheck
                     <span>{selectedBeatmap.title || selectedBeatmap.folder_name}</span>
                     <span>{t("rc.header.mode", { mode: getModeName(mode) })}</span>
                     <span>{t("rc.header.files", {
-                        count: beatmapsetData.difficulties.length,
-                        plural: beatmapsetData.difficulties.length === 1 ? "" : "s",
+                        count: beatmapsetData.length,
+                        plural: beatmapsetData.length === 1 ? "" : "s",
                     })}</span>
                 </div>
             </Card>

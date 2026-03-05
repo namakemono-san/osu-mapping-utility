@@ -12,7 +12,7 @@ import { StatusMessage } from "../components/common/StatusMessage";
 import { Beatmapset } from "../types/beatmap";
 import { useSongsFolder } from "../hooks/useStorage";
 import { useI18n } from "../hooks/i18nContext";
-import { osuApi } from "../domain/osu";
+import { requestParseBatch } from "../services/signalr";
 
 interface BeatmapCloneProps {
     selectedBeatmap?: Beatmapset | null;
@@ -37,7 +37,6 @@ export function BeatmapClone({ selectedBeatmap }: BeatmapCloneProps) {
 
     const [gameMode, setGameMode] = useState<GameMode>("taiko");
 
-    const [osuFiles, setOsuFiles] = useState<string[]>([]);
     const [templateOsuFile, setTemplateOsuFile] = useState<string>("");
 
     const [title, setTitle] = useState("");
@@ -65,10 +64,6 @@ export function BeatmapClone({ selectedBeatmap }: BeatmapCloneProps) {
 
     const handleGameModeChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
         setGameMode(e.target.value as GameMode);
-    }, []);
-
-    const handleTemplateChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-        setTemplateOsuFile(e.target.value);
     }, []);
 
     const onClone = useCallback(async () => {
@@ -155,18 +150,25 @@ export function BeatmapClone({ selectedBeatmap }: BeatmapCloneProps) {
 
         (async () => {
             setLoading(true);
-            setOsuFiles([]);
             setTemplateOsuFile("");
 
             try {
-                const files = await osuApi.listOsuFiles(beatmapPath);
+                const maps = await requestParseBatch(beatmapPath, []);
 
                 if (!mounted) return;
 
-                setOsuFiles(files);
-                setTemplateOsuFile(files[0] ?? "");
+                const firstMap = maps[0];
+                if (!firstMap) return;
+
+                setTemplateOsuFile(firstMap.fileName);
+                setTitle(firstMap.metadata.title);
+                setTitleUnicode(firstMap.metadata.titleUnicode);
+                setArtist(firstMap.metadata.artist);
+                setArtistUnicode(firstMap.metadata.artistUnicode);
+                setSource(firstMap.metadata.source);
+                setTags(firstMap.metadata.tags);
             } catch (err) {
-                console.error("[Clone] Failed to list .osu files:", err);
+                console.error("[Clone] Failed to load beatmap data:", err);
             } finally {
                 if (mounted) setLoading(false);
             }
@@ -176,36 +178,6 @@ export function BeatmapClone({ selectedBeatmap }: BeatmapCloneProps) {
             mounted = false;
         };
     }, [selectedBeatmap, beatmapPath]);
-
-    useEffect(() => {
-        if (!beatmapPath || !templateOsuFile) return;
-
-        let mounted = true;
-
-        (async () => {
-            setLoading(true);
-
-            try {
-                const filePath = `${beatmapPath}\\${templateOsuFile}`;
-                const beatmap = await osuApi.parseOsuFile(filePath);
-                if (!mounted) return;
-                setTitle(beatmap.metadata.title);
-                setTitleUnicode(beatmap.metadata.titleUnicode);
-                setArtist(beatmap.metadata.artist);
-                setArtistUnicode(beatmap.metadata.artistUnicode);
-                setSource(beatmap.metadata.source);
-                setTags(beatmap.metadata.tags);
-            } catch (err) {
-                console.error("[Clone] Failed to load metadata:", err);
-            } finally {
-                if (mounted) setLoading(false);
-            }
-        })();
-
-        return () => {
-            mounted = false;
-        };
-    }, [beatmapPath, templateOsuFile]);
 
     if (!selectedBeatmap) {
         return (
@@ -251,20 +223,6 @@ export function BeatmapClone({ selectedBeatmap }: BeatmapCloneProps) {
                                     <option value="taiko">osu!taiko</option>
                                     <option value="catch">osu!catch</option>
                                     <option value="mania">osu!mania</option>
-                                </Select>
-                            </div>
-
-                            <div>
-                                <label className="block text-xs text-text-muted mb-1">
-                                    {t("clone.sourceOsu.label")}
-                                </label>
-                                <Select value={templateOsuFile} onChange={handleTemplateChange}>
-                                    <option value="">{t("clone.sourceOsu.placeholder")}</option>
-                                    {osuFiles.map((f) => (
-                                        <option key={f} value={f}>
-                                            {f}
-                                        </option>
-                                    ))}
                                 </Select>
                             </div>
                         </div>

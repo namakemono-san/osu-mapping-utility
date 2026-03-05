@@ -1,10 +1,10 @@
-import type { OsuTimingPoint } from "./types";
+import type { TimingLine } from "../../types/osu";
 
-export function getCurrentBPM(time: number, timingPoints: OsuTimingPoint[]): number {
+export function getCurrentBPM(time: number, timingPoints: TimingLine[]): number {
     let currentBeatLength = 500;
 
     for (const tp of timingPoints) {
-        if (tp.time > time) break;
+        if (tp.offset > time) break;
 
         if (tp.uninherited) {
             currentBeatLength = tp.beatLength;
@@ -16,18 +16,18 @@ export function getCurrentBPM(time: number, timingPoints: OsuTimingPoint[]): num
 
 export function getCurrentSV(
     time: number,
-    timingPoints: OsuTimingPoint[],
+    timingPoints: TimingLine[],
     hrMultiplier: number,
 ): number {
     let svMultiplier = 1.0;
 
     for (const tp of timingPoints) {
-        if (tp.time > time) break;
+        if (tp.offset > time) break;
 
         if (tp.uninherited) {
             svMultiplier = 1.0;
-        } else if (tp.svMultiplier != null) {
-            svMultiplier = tp.svMultiplier;
+        } else {
+            svMultiplier = tp.svMult;
         }
     }
 
@@ -36,7 +36,7 @@ export function getCurrentSV(
 
 export function calculateGameplayStart(
     objectTime: number,
-    timingPoints: OsuTimingPoint[],
+    timingPoints: TimingLine[],
     isGameplayMode: boolean,
     fixedApproachTime: number,
     arMultiplier: number,
@@ -47,13 +47,13 @@ export function calculateGameplayStart(
         let baseSvMultiplier = 1.0;
 
         for (const tp of timingPoints) {
-            if (tp.time > objectTime) break;
+            if (tp.offset > objectTime) break;
 
             if (tp.uninherited) {
                 currentBeatLength = tp.beatLength;
                 baseSvMultiplier = 1.0;
-            } else if (tp.svMultiplier != null) {
-                baseSvMultiplier = tp.svMultiplier;
+            } else {
+                baseSvMultiplier = tp.svMult;
             }
         }
 

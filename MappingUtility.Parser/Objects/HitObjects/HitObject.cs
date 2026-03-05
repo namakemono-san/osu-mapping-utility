@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace MappingUtility.Parser.Objects.HitObjects;
 
 [Flags]
@@ -20,6 +22,11 @@ public enum HitSound
     Clap = 8,
 }
 
+[JsonPolymorphic]
+[JsonDerivedType(typeof(Circle))]
+[JsonDerivedType(typeof(Slider))]
+[JsonDerivedType(typeof(Spinner))]
+[JsonDerivedType(typeof(HoldNote))]
 public abstract class HitObject
 {
     public int Time { get; set; }

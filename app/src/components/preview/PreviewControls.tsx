@@ -20,7 +20,7 @@ import { TooltipButton } from "../common/TooltipButton";
 import { DebugPanel } from "./DebugPanel";
 
 import type { TaikoDifficulty, TaikoBeatmapData } from "../../domain/osu/taikoMapper";
-import type { OsuTimingPoint } from "../../domain/osu/types";
+import type { TimingLine } from "../../types/osu";
 
 interface ModState { isDT: boolean; isHR: boolean; }
 import type { LocaleKey } from "../../locale";
@@ -77,8 +77,8 @@ export interface PreviewControlsProps {
     audioLeadIn: number;
     hitWindow: number;
     filteredDifficulties: TaikoDifficulty[];
-    getCurrentBPM: (time: number, timingPoints: OsuTimingPoint[]) => number;
-    getCurrentSV: (time: number, timingPoints: OsuTimingPoint[]) => number;
+    getCurrentBPM: (time: number, timingLines: TimingLine[]) => number;
+    getCurrentSV: (time: number, timingLines: TimingLine[]) => number;
     debugInfo: string[];
     beatmapData: TaikoBeatmapData | null;
 }

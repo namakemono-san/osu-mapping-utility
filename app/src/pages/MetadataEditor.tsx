@@ -11,12 +11,8 @@ import { Beatmapset } from "../types/beatmap";
 import { useSongsFolder } from "../hooks/useStorage";
 import { useI18n } from "../hooks/i18nContext";
 import type { LocaleKey } from "../locale";
-import {
-    buildOsuFilename,
-    makeUniqueOsuFilename,
-    osuApi,
-} from "../domain/osu";
-import type { OsuBackground, OsuMetadata, MetadataWriteInput } from "../domain/osu/types";
+import { requestParseBatch, requestApplyMetadata } from "../services/signalr";
+import type { Background, MetadataSettings, MetadataWriteInput } from "../types/osu";
 
 interface MetadataEditorProps {
     selectedBeatmap?: Beatmapset | null;
@@ -24,11 +20,11 @@ interface MetadataEditorProps {
 
 interface FileMetadata {
     filename: string;
-    metadata: OsuMetadata;
-    background: OsuBackground;
+    metadata: MetadataSettings;
+    background: Background;
 }
 
-type ConflictField = keyof Omit<OsuMetadata, "version" | "beatmapId" | "beatmapSetId">;
+type ConflictField = keyof Omit<MetadataSettings, "version" | "beatmapId" | "beatmapSetId">;
 
 interface Conflict {
     field: ConflictField;
@@ -53,7 +49,7 @@ export function MetadataEditor({ selectedBeatmap }: MetadataEditorProps) {
     const [saving, setSaving] = useState(false);
     const [files, setFiles] = useState<FileMetadata[]>([]);
     const [conflicts, setConflicts] = useState<Conflict[]>([]);
-    const [mergedData, setMergedData] = useState<Omit<OsuMetadata, "version" | "beatmapId" | "beatmapSetId">>({
+    const [mergedData, setMergedData] = useState<Omit<MetadataSettings, "version" | "beatmapId" | "beatmapSetId">>({
         title: "",
         titleUnicode: "",
         artist: "",
@@ -66,7 +62,7 @@ export function MetadataEditor({ selectedBeatmap }: MetadataEditorProps) {
 
     const [bgModalOpen, setBgModalOpen] = useState(false);
     const [editingBgIndex, setEditingBgIndex] = useState<number | null>(null);
-    const [tempBgData, setTempBgData] = useState<OsuBackground>({
+    const [tempBgData, setTempBgData] = useState<Background>({
         filename: "",
         xOffset: 0,
         yOffset: 0,
@@ -147,30 +143,6 @@ export function MetadataEditor({ selectedBeatmap }: MetadataEditorProps) {
         return a.length > 0 && isAsciiPrintable(a) && a === mergedData.artist;
     }, [mergedData.artistUnicode, mergedData.artist, isAsciiPrintable]);
 
-    const filenamePlan = useMemo(() => {
-        const used = new Set<string>();
-        const planned = new Map<string, string>();
-
-        for (const file of files) {
-            const desired = buildOsuFilename({
-                artist: mergedData.artist,
-                title: mergedData.title,
-                creator: mergedData.creator,
-                difficulty: file.metadata.version,
-            });
-            const unique = makeUniqueOsuFilename(desired, used);
-            planned.set(file.filename, unique);
-        }
-
-        const renames = files
-            .map((f) => ({ from: f.filename, to: planned.get(f.filename) ?? f.filename }))
-            .filter((op) => op.from !== op.to);
-
-        return { planned, renames };
-    }, [files, mergedData.artist, mergedData.title, mergedData.creator]);
-
-    const showFilenamePreview = filenamePlan.renames.length > 0;
-
     const handleSave = useCallback(async () => {
         if (!selectedBeatmap || files.length === 0) return;
 
@@ -195,17 +167,7 @@ export function MetadataEditor({ selectedBeatmap }: MetadataEditorProps) {
                     source: mergedData.source,
                     tags: mergedData.tags,
                 };
-                await osuApi.writeOsuMetadata(filePath, metadata, file.background);
-            }
-
-            if (filenamePlan.renames.length > 0) {
-                await osuApi.renameOsuFiles(beatmapPath, filenamePlan.renames);
-                setFiles((prev) =>
-                    prev.map((f) => ({
-                        ...f,
-                        filename: filenamePlan.planned.get(f.filename) ?? f.filename,
-                    }))
-                );
+                await requestApplyMetadata(filePath, metadata, file.background);
             }
 
             setResult({
@@ -224,7 +186,7 @@ export function MetadataEditor({ selectedBeatmap }: MetadataEditorProps) {
         } finally {
             setSaving(false);
         }
-    }, [selectedBeatmap, files, mergedData, songsFolder, filenamePlan, t]);
+    }, [selectedBeatmap, files, mergedData, songsFolder, t]);
 
     const saveButtonText = useMemo(() => {
         if (saving) return t("metadata.save.saving");
@@ -248,19 +210,17 @@ export function MetadataEditor({ selectedBeatmap }: MetadataEditorProps) {
                 }
 
                 const beatmapPath = `${songsFolder}\\${selectedBeatmap.folder_name}`;
-                const osuFiles = await osuApi.listOsuFiles(beatmapPath);
+                const beatmaps = await requestParseBatch(beatmapPath, []);
 
-                if (osuFiles.length === 0) {
+                if (beatmaps.length === 0) {
                     throw new Error(t("metadata.error.noOsu"));
                 }
 
                 const filesData: FileMetadata[] = [];
 
-                for (const filename of osuFiles) {
-                    const filePath = `${beatmapPath}\\${filename}`;
-                    const beatmap = await osuApi.parseOsuFile(filePath);
-                    const background: OsuBackground = beatmap.background ?? { filename: "", xOffset: 0, yOffset: 0 };
-                    filesData.push({ filename, metadata: beatmap.metadata, background });
+                for (const beatmap of beatmaps) {
+                    const background: Background = beatmap.background ?? { filename: "", xOffset: 0, yOffset: 0 };
+                    filesData.push({ filename: beatmap.fileName, metadata: beatmap.metadata, background });
                 }
 
                 if (!mounted) return;
@@ -503,36 +463,6 @@ export function MetadataEditor({ selectedBeatmap }: MetadataEditorProps) {
                             </div>
                         )}
                     </Card>
-
-                    {showFilenamePreview && (
-                        <Card className="p-3">
-                            <h3 className="font-semibold text-sm mb-3">{t("metadata.filenamePreview.title")}</h3>
-                            <div className="space-y-2">
-                                {files.map((file) => {
-                                    const next = filenamePlan.planned.get(file.filename) ?? file.filename;
-                                    const changed = next !== file.filename;
-                                    if (!changed) return null;
-
-                                    return (
-                                        <div
-                                            key={file.filename}
-                                            className="rounded-lg border px-3 py-2.5 bg-accent-primary/10 border-accent-primary/40"
-                                        >
-                                            <div className="text-xs font-semibold text-white mb-1 truncate">
-                                                {file.metadata.version}
-                                            </div>
-                                            <div className="text-11 text-text-muted font-mono break-all">
-                                                {t("metadata.filenamePreview.old")} {file.filename}
-                                            </div>
-                                            <div className="text-11 text-text-secondary font-mono break-all mt-1">
-                                                {t("metadata.filenamePreview.new")} {next}
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </Card>
-                    )}
 
                     <Card className="p-3">
                         <div className="flex items-center gap-2 mb-3">

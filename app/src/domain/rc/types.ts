@@ -1,4 +1,4 @@
-import type { OsuBeatmapset } from "../osu/types";
+import type { Beatmap } from "../../types/osu";
 
 export type CheckSeverity = "rule" | "guideline" | "warning";
 export type CheckCategory = "general" | "metadata" | "timing" | "difficulty_settings" | "spread" | "audio" | "files";
@@ -18,5 +18,5 @@ export interface CheckDefinition {
     id: string;
     severity: CheckSeverity;
     category: CheckCategory;
-    run: (data: OsuBeatmapset) => CheckResult[];
+    run: (data: Beatmap[]) => CheckResult[];
 }

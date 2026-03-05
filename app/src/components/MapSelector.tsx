@@ -210,7 +210,7 @@ export function MapSelector({
         });
 
         if (selected && typeof selected === "string") {
-            await invoke("invalidate_cache_for_path", { basePath: selected });
+            await invoke("invalidate_songs_cache", { basePath: selected });
 
             setSongsFolder(selected);
             setDetectStatus({ key: "mapSelector.detect.selected", params: { path: selected } });
@@ -246,7 +246,7 @@ export function MapSelector({
 
                 if (useFullSearch && searchQuery.length >= 2) {
                     result = await invoke<[Beatmapset[], number, boolean]>(
-                        "search_beatmaps_full",
+                        "search_beatmapsets",
                         {
                             basePath: folder,
                             searchQuery,
@@ -256,7 +256,7 @@ export function MapSelector({
                     );
                 } else {
                     result = await invoke<[Beatmapset[], number, boolean]>(
-                        "scan_songs_step",
+                        "scan_beatmapsets",
                         {
                             basePath: folder,
                             startIndex,
@@ -341,7 +341,7 @@ export function MapSelector({
         setDetectStatus({ key: "mapSelector.detect.reloading" });
 
         try {
-            const count = await invoke<number>("reload_beatmaps", {
+            const count = await invoke<number>("reload_songs", {
                 basePath: songsFolder,
             });
             setDetectStatus({ key: "mapSelector.detect.foundBeatmaps", params: { count } });

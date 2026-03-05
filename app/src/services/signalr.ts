@@ -1,4 +1,5 @@
 import * as signalR from "@microsoft/signalr";
+import type { Beatmap, MetadataWriteInput, Background } from "../types/osu";
 
 const connection = new signalR.HubConnectionBuilder()
     .withUrl("http://localhost:5000/hub")
@@ -22,16 +23,62 @@ export async function startConnection() {
     await retry();
 }
 
-export function onUpdateBeatmap(callback: (json: string) => void) {
-    connection.on("UpdateBeatmap", callback);
+export async function requestParse(filePath: string): Promise<Beatmap> {
+    return new Promise((resolve, reject) => {
+        const onResult = (json: string) => {
+            connection.off("UpdateBeatmap", onResult);
+            connection.off("ParseError", onError);
+            resolve(JSON.parse(json) as Beatmap);
+        };
+        const onError = (message: string) => {
+            connection.off("UpdateBeatmap", onResult);
+            connection.off("ParseError", onError);
+            reject(new Error(message));
+        };
+        connection.on("UpdateBeatmap", onResult);
+        connection.on("ParseError", onError);
+        connection.invoke("RequestParse", filePath).catch(reject);
+    });
 }
 
-export function onParseError(callback: (message: string) => void) {
-    connection.on("ParseError", callback);
+export async function requestParseBatch(folderPath: string, fileNames: string[]): Promise<Beatmap[]> {
+    return new Promise((resolve, reject) => {
+        const onResult = (json: string) => {
+            connection.off("UpdateBeatmapset", onResult);
+            connection.off("ParseError", onError);
+            resolve(JSON.parse(json) as Beatmap[]);
+        };
+        const onError = (message: string) => {
+            connection.off("UpdateBeatmapset", onResult);
+            connection.off("ParseError", onError);
+            reject(new Error(message));
+        };
+        connection.on("UpdateBeatmapset", onResult);
+        connection.on("ParseError", onError);
+        connection.invoke("RequestParseBatch", folderPath, fileNames).catch(reject);
+    });
 }
 
-export async function requestParse(filePath: string) {
-    await connection.invoke("RequestParse", filePath);
+export async function requestApplyMetadata(
+    filePath: string,
+    metadata: MetadataWriteInput,
+    background: Background | null,
+): Promise<void> {
+    return new Promise((resolve, reject) => {
+        const onResult = (_filePath: string) => {
+            connection.off("ApplyMetadataComplete", onResult);
+            connection.off("ParseError", onError);
+            resolve();
+        };
+        const onError = (message: string) => {
+            connection.off("ApplyMetadataComplete", onResult);
+            connection.off("ParseError", onError);
+            reject(new Error(message));
+        };
+        connection.on("ApplyMetadataComplete", onResult);
+        connection.on("ParseError", onError);
+        connection.invoke("RequestApplyMetadata", filePath, metadata, background).catch(reject);
+    });
 }
 
 export default connection;

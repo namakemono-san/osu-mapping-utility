@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import { FiCheckCircle, FiAlertCircle, FiRefreshCw, FiChevronDown, FiChevronUp } from "react-icons/fi";
 import { readTextFile, writeTextFile, copyFile, mkdir, BaseDirectory } from "@tauri-apps/plugin-fs";
 
@@ -11,7 +10,8 @@ import { useI18n } from "../hooks/i18nContext";
 import { useSongsFolder } from "../hooks/useStorage";
 
 import { Beatmapset } from "../types/beatmap";
-import { removeEditorBookmarks, removeNewComboExceptFirst, rewriteCenter, whistleToClap_2to8 } from "../domain/osu";
+import { removeEditorBookmarks, removeNewComboExceptFirst, rewriteCenter, whistleToClap_2to8 } from "../domain/osu/textTransform";
+import { requestParseBatch } from "../services/signalr";
 
 interface BeatmapCustomizerProps {
     selectedBeatmap?: Beatmapset | null;
@@ -80,9 +80,8 @@ export function BeatmapCustomizer({ selectedBeatmap }: BeatmapCustomizerProps) {
 
                 const beatmapPath = `${songsFolder}\\${selectedBeatmap.folder_name}`;
 
-                const osuFileList = await invoke<string[]>("list_osu_files", {
-                    beatmapFolder: beatmapPath
-                });
+                const maps = await requestParseBatch(beatmapPath, []);
+                const osuFileList = maps.map(m => m.fileName);
 
                 setOsuFiles(osuFileList);
                 setSelectedFiles(new Set(osuFileList));

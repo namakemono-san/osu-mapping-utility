@@ -253,7 +253,7 @@ fn get_or_parse_beatmap(base_path: &str, folder: &FolderEntry) -> Option<Beatmap
 }
 
 #[tauri::command]
-pub fn scan_songs_step(
+pub fn scan_beatmapsets(
     base_path: String,
     start_index: usize,
     step_size: usize,
@@ -298,7 +298,7 @@ pub fn scan_songs_step(
 }
 
 #[tauri::command]
-pub fn search_beatmaps_full(
+pub fn search_beatmapsets(
     base_path: String,
     search_query: String,
     start_index: usize,
@@ -363,7 +363,7 @@ pub fn clear_beatmap_cache() -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn invalidate_cache_for_path(base_path: String) -> Result<(), String> {
+pub fn invalidate_songs_cache(base_path: String) -> Result<(), String> {
     let base_path = normalize_base_path(&base_path);
     {
         let mut cache = FOLDER_CACHE.write().map_err(|e| format!("Lock error: {}", e))?;
@@ -378,9 +378,9 @@ pub fn invalidate_cache_for_path(base_path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn reload_beatmaps(base_path: String) -> Result<usize, String> {
+pub fn reload_songs(base_path: String) -> Result<usize, String> {
     let base_path = normalize_base_path(&base_path);
-    invalidate_cache_for_path(base_path.clone())?;
+    invalidate_songs_cache(base_path.clone())?;
     let folders = get_folder_list(&base_path)?;
     Ok(folders.len())
 }

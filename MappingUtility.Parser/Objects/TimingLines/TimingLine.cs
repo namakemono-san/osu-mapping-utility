@@ -1,5 +1,10 @@
+using System.Text.Json.Serialization;
+
 namespace MappingUtility.Parser.Objects.TimingLines;
 
+[JsonPolymorphic]
+[JsonDerivedType(typeof(UninheritedLine))]
+[JsonDerivedType(typeof(InheritedLine))]
 public abstract class TimingLine
 {
     public double Offset { get; set; }

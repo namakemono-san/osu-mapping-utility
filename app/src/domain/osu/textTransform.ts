@@ -1,4 +1,6 @@
-import { detectEol } from "./eol";
+function detectEol(content: string): string {
+    return content.includes('\r\n') ? '\r\n' : '\n';
+}
 
 function isSectionHeader(s: string): boolean {
   return /^\s*\[[A-Za-z]+\]\s*$/i.test(s);

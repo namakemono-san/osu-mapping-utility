@@ -1,5 +1,5 @@
 import type { CheckDefinition, CheckResult } from "../types";
-import type { OsuBeatmapset, OsuBeatmap, GameMode } from "../../osu/types";
+import type { Beatmap, GameMode } from "../../../types/osu";
 import { classifyDifficulty } from "../../osu/rcDifficultyNames";
 
 interface Range {
@@ -68,7 +68,7 @@ function formatRange(range: Range): string {
 }
 
 function checkDiffGuidelines(
-    d: OsuBeatmap,
+    d: Beatmap,
     category: string,
     guidelines: DiffSettingsGuideline,
 ): CheckResult[] {
@@ -114,10 +114,10 @@ const difficultySettingsCheck: CheckDefinition = {
     id: "difficulty_settings",
     severity: "guideline",
     category: "difficulty_settings",
-    run: (data: OsuBeatmapset): CheckResult[] => {
+    run: (data: Beatmap[]): CheckResult[] => {
         const results: CheckResult[] = [];
 
-        for (const d of data.difficulties) {
+        for (const d of data) {
             const mode = d.general.mode;
             const category = classifyDifficulty(d.metadata.version, mode);
 

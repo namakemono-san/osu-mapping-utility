@@ -1,5 +1,5 @@
 import type { CheckDefinition, CheckResult } from "../types";
-import type { OsuBeatmapset, GameMode } from "../../osu/types";
+import type { Beatmap, GameMode } from "../../../types/osu";
 import { classifyDifficulty, getDifficultyOrder } from "../../osu/rcDifficultyNames";
 
 interface SpreadRule {
@@ -52,14 +52,14 @@ const requiredLevels: CheckDefinition = {
     id: "spread.required_levels",
     severity: "rule",
     category: "spread",
-    run: (data: OsuBeatmapset): CheckResult[] => {
-        if (data.difficulties.length === 0) return [];
+    run: (data: Beatmap[]): CheckResult[] => {
+        if (data.length === 0) return [];
 
-        const mode = data.difficulties[0].general.mode;
+        const mode = data[0].general.mode;
         const order = getDifficultyOrder(mode);
         const spreadRules = getSpreadRules(mode);
 
-        const maxDrainSec = Math.max(...data.difficulties.map(d => d.drainTimeMs / 1000));
+        const maxDrainSec = Math.max(...data.map(d => d.drainTimeMs / 1000));
 
         const rule = spreadRules.find(r => maxDrainSec >= r.minDrainSec && maxDrainSec < r.maxDrainSec);
         if (!rule) {
@@ -81,14 +81,14 @@ const requiredLevels: CheckDefinition = {
 };
 
 function checkSpreadRule(
-    data: OsuBeatmapset,
+    data: Beatmap[],
     rule: SpreadRule,
     order: readonly string[],
     mode: GameMode,
     drainSec: number,
 ): CheckResult[] {
-    const classifications = data.difficulties.map(d => classifyDifficulty(d.metadata.version, mode));
-    const diffCount = data.difficulties.length;
+    const classifications = data.map(d => classifyDifficulty(d.metadata.version, mode));
+    const diffCount = data.length;
 
     if (rule.altMinDiffCount !== undefined && diffCount >= rule.altMinDiffCount) {
         return [{

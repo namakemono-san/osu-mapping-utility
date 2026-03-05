@@ -1,8 +1,8 @@
 import type { CheckResult } from "./types";
-import type { OsuBeatmapset } from "../osu/types";
+import type { Beatmap } from "../../types/osu";
 import { allChecks } from "./checks";
 
-export function runAllChecks(data: OsuBeatmapset): CheckResult[] {
+export function runAllChecks(data: Beatmap[]): CheckResult[] {
     const results: CheckResult[] = [];
 
     for (const check of allChecks) {

@@ -4,7 +4,6 @@ import { relaunch } from "@tauri-apps/plugin-process";
 import { FiDownload } from "react-icons/fi";
 import { Button } from "./common/Button";
 import { Modal } from "./common/Modal";
-import { LoadingSpinner } from "./common/LoadingSpinner";
 import { ProgressBar } from "./common/ProgressBar";
 import { StatusMessage } from "./common/StatusMessage";
 
@@ -148,11 +147,7 @@ export function UpdateChecker() {
     }, []);
 
     if (checking) {
-        return (
-            <Modal isOpen={true} onClose={() => { }} title="" hideCloseButton>
-                <LoadingSpinner label={t("update.checking")} />
-            </Modal>
-        );
+        return (<></>);
     }
 
     if (downloading) {

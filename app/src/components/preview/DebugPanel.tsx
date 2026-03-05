@@ -1,5 +1,5 @@
 import type { TaikoDifficulty } from "../../domain/osu/taikoMapper";
-import type { OsuTimingPoint } from "../../domain/osu/types";
+import type { TimingLine } from "../../types/osu";
 import type { LocaleKey } from "../../locale";
 
 interface ModState { isDT: boolean; isHR: boolean; }
@@ -13,8 +13,8 @@ export interface DebugPanelProps {
     audioLeadIn: number;
     hitWindow: number;
     filteredDifficulties: TaikoDifficulty[];
-    getCurrentBPM: (time: number, timingPoints: OsuTimingPoint[]) => number;
-    getCurrentSV: (time: number, timingPoints: OsuTimingPoint[]) => number;
+    getCurrentBPM: (time: number, timingLines: TimingLine[]) => number;
+    getCurrentSV: (time: number, timingLines: TimingLine[]) => number;
     debugInfo: string[];
     beatmapData: { difficulties: TaikoDifficulty[] } | null;
 }
@@ -50,8 +50,8 @@ export function DebugPanel({
                 <div>{t("preview.debug.hitWindow", { ms: hitWindow })}</div>
                 {isGameplayMode && beatmapData && filteredDifficulties.length > 0 && (
                     <>
-                        <div>{t("preview.debug.currentBpm", { bpm: getCurrentBPM(currentTime, filteredDifficulties[0].timingPoints) })}</div>
-                        <div>{t("preview.debug.currentSv", { sv: getCurrentSV(currentTime, filteredDifficulties[0].timingPoints).toFixed(2) })}</div>
+                        <div>{t("preview.debug.currentBpm", { bpm: getCurrentBPM(currentTime, filteredDifficulties[0].timingLines) })}</div>
+                        <div>{t("preview.debug.currentSv", { sv: getCurrentSV(currentTime, filteredDifficulties[0].timingLines).toFixed(2) })}</div>
                     </>
                 )}
                 <div className="border-t border-border-muted pt-2 mt-2">

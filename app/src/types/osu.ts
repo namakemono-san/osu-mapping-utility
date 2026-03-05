@@ -1,7 +1,7 @@
 export type GameMode = 0 | 1 | 2 | 3;
 
-export interface OsuTimingPoint {
-    time: number;
+export interface TimingLine {
+    offset: number;
     beatLength: number;
     meter: number;
     sampleSet: number;
@@ -9,31 +9,41 @@ export interface OsuTimingPoint {
     volume: number;
     uninherited: boolean;
     kiai: boolean;
-    svMultiplier?: number | null;
+    omitsBarLine: boolean;
+    svMult: number;
+    // UninheritedLine extra properties (present when uninherited === true)
+    msPerBeat?: number;
+    bpm?: number;
 }
 
-export interface OsuHitObject {
+export interface HitObject {
     time: number;
     typeFlags: number;
-    hitSound: number;
+    hitSoundFlags: number;
     endTime: number;
+    // Slider extra properties
     sliderType?: string | null;
     slides?: number | null;
     length?: number | null;
 }
 
-export interface OsuBackground {
+export interface Background {
     filename: string;
     xOffset: number;
     yOffset: number;
 }
 
-export interface OsuBreak {
+export interface Video {
+    filename: string;
+    offset: number;
+}
+
+export interface Break {
     startTime: number;
     endTime: number;
 }
 
-export interface OsuGeneral {
+export interface GeneralSettings {
     audioFilename: string;
     audioLeadIn: number;
     previewTime: number;
@@ -43,7 +53,7 @@ export interface OsuGeneral {
     sampleSet: string;
 }
 
-export interface OsuMetadata {
+export interface MetadataSettings {
     title: string;
     titleUnicode: string;
     artist: string;
@@ -56,7 +66,7 @@ export interface OsuMetadata {
     beatmapSetId: number;
 }
 
-export interface OsuDifficultySettings {
+export interface DifficultySettings {
     hpDrainRate: number;
     circleSize: number;
     overallDifficulty: number;
@@ -65,27 +75,20 @@ export interface OsuDifficultySettings {
     sliderTickRate: number;
 }
 
-export interface OsuBeatmap {
+export interface Beatmap {
     fileName: string;
     formatVersion: number;
-    general: OsuGeneral;
-    metadata: OsuMetadata;
-    difficulty: OsuDifficultySettings;
-    background: OsuBackground | null;
-    videoFilename: string | null;
-    timingPoints: OsuTimingPoint[];
-    hitObjects: OsuHitObject[];
-    breaks: OsuBreak[];
+    general: GeneralSettings;
+    metadata: MetadataSettings;
+    difficulty: DifficultySettings;
+    background: Background | null;
+    video: Video | null;
+    breaks: Break[];
+    timingLines: TimingLine[];
+    hitObjects: HitObject[];
     bpm: number;
     drainTimeMs: number;
     totalLengthMs: number;
-}
-
-export interface OsuBeatmapset {
-    folderPath: string;
-    difficulties: OsuBeatmap[];
-    hasBackground: boolean;
-    backgroundFilename: string;
 }
 
 export interface MetadataWriteInput {

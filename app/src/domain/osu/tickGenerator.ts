@@ -1,4 +1,4 @@
-import type { OsuTimingPoint } from "./types";
+import type { TimingLine } from "../../types/osu";
 
 export interface Tick {
     time: number;
@@ -8,13 +8,13 @@ export interface Tick {
 
 export type CalculateGameplayStartFn = (
     objectTime: number,
-    timingPoints: OsuTimingPoint[],
+    timingPoints: TimingLine[],
 ) => number;
 
 export function generateTicks(
-    timingPoint: OsuTimingPoint,
+    timingPoint: TimingLine,
     nextTime: number,
-    timingPoints: OsuTimingPoint[],
+    timingPoints: TimingLine[],
     isGameplayMode: boolean,
     calculateGameplayStartFn: CalculateGameplayStartFn,
 ): Tick[] {
@@ -22,7 +22,7 @@ export function generateTicks(
     const beatLength = timingPoint.beatLength;
     const meter = timingPoint.meter;
 
-    let time = timingPoint.time;
+    let time = timingPoint.offset;
     let beatIndex = 0;
 
     while (time < nextTime) {
