@@ -38,10 +38,16 @@ export const ja: Record<LocaleKey, string> = {
     "imageResizer.meta.preset": "プリセット: x2 / ノイズ2 / cunet",
 
     "mapSelector.context.openFolder": "フォルダを開く",
+    "mapSelector.context.openWebPage": "ビートマップページを開く",
+    "mapSelector.context.openDiscussion": "ディスカッションを開く",
+    "mapSelector.context.openDirect": "osu!direct でダウンロード",
     "mapSelector.mappedBy": "Mapper: {creator}",
     "mapSelector.status.scrollForMore": "さらに読み込むにはスクロール",
     "mapSelector.status.results": "{count} 件{more}",
     "mapSelector.status.loaded": "{count} 件読み込み{more}",
+    "mapSelector.error.loadFailed": "ビートマップの取得に失敗しました",
+    "mapSelector.empty.noSongsFolder": "osu!/Songs フォルダを選択してください",
+    "mapSelector.empty.hintSongsFolder": "osu!/Songs フォルダを選択しているか確認してください",
     "mapSelector.detect.detecting": "osu! のインストール先を検出中...",
     "mapSelector.detect.found": "見つかりました: {path}",
     "mapSelector.detect.failed": "自動検出に失敗しました。フォルダを手動で選択してください。",
@@ -295,7 +301,7 @@ export const ja: Record<LocaleKey, string> = {
     "preview.volume.music": "音量(曲)",
     "preview.volume.hitsound": "音量(ヒットサウンド)",
 
-    "tool.rc_checks": "RC Checker",
+    "tool.metadata_checker": "Metadata Checker",
 
     "rc.loading": "ビートマップファイルを読み込み中...",
     "rc.empty.selectBeatmap": "Ranking Criteriaをチェックするビートマップを選択してください",

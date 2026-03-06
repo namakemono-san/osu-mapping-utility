@@ -7,7 +7,9 @@ pub struct Beatmapset {
     pub artist: String,
     pub creator: String,
     pub background_path: Option<String>,
+    #[serde(rename = "beatmapID")]
     pub beatmap_id: String,
+    #[serde(rename = "beatmapSetID")]
     pub beatmap_set_id: String,
 }
 

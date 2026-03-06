@@ -116,7 +116,9 @@ fn try_common_locations() -> Option<String> {
 fn get_folder_list(base_path: &str) -> Result<Arc<Vec<FolderEntry>>, String> {
     let base_path = normalize_base_path(base_path);
     {
-        let cache = FOLDER_CACHE.read().map_err(|e| format!("Lock error: {}", e))?;
+        let cache = FOLDER_CACHE
+            .read()
+            .map_err(|e| format!("Lock error: {}", e))?;
         if let Some(folders) = cache.folders.get(&base_path) {
             return Ok(folders.clone());
         }
@@ -149,7 +151,9 @@ fn get_folder_list(base_path: &str) -> Result<Arc<Vec<FolderEntry>>, String> {
     let arc_folders = Arc::new(folders);
 
     {
-        let mut cache = FOLDER_CACHE.write().map_err(|e| format!("Lock error: {}", e))?;
+        let mut cache = FOLDER_CACHE
+            .write()
+            .map_err(|e| format!("Lock error: {}", e))?;
         cache
             .folders
             .insert(base_path.to_string(), arc_folders.clone());
@@ -163,6 +167,8 @@ fn get_folder_list(base_path: &str) -> Result<Arc<Vec<FolderEntry>>, String> {
 
 fn parse_beatmap_folder(folder_path: &Path, folder_name: &str) -> Option<Beatmapset> {
     let files = fs::read_dir(folder_path).ok()?;
+
+    let mut best: Option<Beatmapset> = None;
 
     for file in files.filter_map(|f| f.ok()) {
         let path = file.path();
@@ -186,8 +192,8 @@ fn parse_beatmap_folder(folder_path: &Path, folder_name: &str) -> Option<Beatmap
         let title = header.title;
         let artist = header.artist;
         let creator = header.creator;
-        let beatmap_id = header.beatmap_id;
-        let beatmapset_id = header.beatmap_set_id;
+        let beatmap_id = header.beatmap_id.clone();
+        let beatmapset_id = header.beatmap_set_id.clone();
         let bg_file = header.background_filename.unwrap_or_default();
 
         let display_title = if !title.is_empty() && !artist.is_empty() {
@@ -205,7 +211,7 @@ fn parse_beatmap_folder(folder_path: &Path, folder_name: &str) -> Option<Beatmap
             None
         };
 
-        return Some(Beatmapset {
+        let candidate = Beatmapset {
             folder_name: folder_name.to_string(),
             title: display_title,
             artist: if artist.is_empty() {
@@ -220,11 +226,24 @@ fn parse_beatmap_folder(folder_path: &Path, folder_name: &str) -> Option<Beatmap
             },
             background_path,
             beatmap_id,
-            beatmap_set_id: beatmapset_id,
-        });
+            beatmap_set_id: beatmapset_id.clone(),
+        };
+
+        let has_set_id = !beatmapset_id.is_empty() && beatmapset_id != "-1" && beatmapset_id != "0";
+
+        match &best {
+            None => {
+                best = Some(candidate);
+            }
+            Some(_) if has_set_id => {
+                best = Some(candidate);
+                break;
+            }
+            _ => {}
+        }
     }
 
-    None
+    best
 }
 
 fn get_or_parse_beatmap(base_path: &str, folder: &FolderEntry) -> Option<Beatmapset> {
@@ -351,12 +370,16 @@ pub fn search_beatmapsets(
 #[tauri::command]
 pub fn clear_beatmap_cache() -> Result<(), String> {
     {
-        let mut cache = FOLDER_CACHE.write().map_err(|e| format!("Lock error: {}", e))?;
+        let mut cache = FOLDER_CACHE
+            .write()
+            .map_err(|e| format!("Lock error: {}", e))?;
         cache.folders.clear();
         cache.last_updated.clear();
     }
     {
-        let mut cache = PARSED_CACHE.write().map_err(|e| format!("Lock error: {}", e))?;
+        let mut cache = PARSED_CACHE
+            .write()
+            .map_err(|e| format!("Lock error: {}", e))?;
         cache.clear();
     }
     Ok(())
@@ -366,12 +389,16 @@ pub fn clear_beatmap_cache() -> Result<(), String> {
 pub fn invalidate_songs_cache(base_path: String) -> Result<(), String> {
     let base_path = normalize_base_path(&base_path);
     {
-        let mut cache = FOLDER_CACHE.write().map_err(|e| format!("Lock error: {}", e))?;
+        let mut cache = FOLDER_CACHE
+            .write()
+            .map_err(|e| format!("Lock error: {}", e))?;
         cache.folders.remove(&base_path);
         cache.last_updated.remove(&base_path);
     }
     {
-        let mut cache = PARSED_CACHE.write().map_err(|e| format!("Lock error: {}", e))?;
+        let mut cache = PARSED_CACHE
+            .write()
+            .map_err(|e| format!("Lock error: {}", e))?;
         cache.remove(&base_path);
     }
     Ok(())

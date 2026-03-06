@@ -28,7 +28,7 @@ export type SidebarKey =
     | "metadata_editor"
     | "video_downloader"
     | "image_downloader"
-    | "rc_checks"
+    | "metadata_checker"
 
 type SidebarProps = {
     active?: SidebarKey;
@@ -56,7 +56,7 @@ const CATEGORIES: SidebarCategory[] = [
             { key: "beatmap_preview", label: "tool.beatmap_preview", Icon: MdRemoveRedEye },
             { key: "beatmap_customizer", label: "tool.beatmap_customizer", Icon: MdContentCut },
             { key: "metadata_editor", label: "tool.metadata_editor", Icon: MdEdit },
-            { key: "rc_checks", label: "tool.rc_checks", Icon: MdCheckCircle },
+            { key: "metadata_checker", label: "tool.metadata_checker", Icon: MdCheckCircle },
         ],
     },
     {
@@ -90,7 +90,7 @@ export function Sidebar({
 
     return (
         <aside
-            className={`h-full shrink-0 border-r border-border-muted bg-surface-sidebar text-text-primary flex flex-col transition-all duration-300 ease-in-out ${isExpanded ? "w-56" : "w-16"
+            className={`h-full shrink-0 border-r border-border-muted bg-surface-sidebar text-text-primary flex flex-col transition-[width] duration-300 ease-in-out overflow-hidden ${isExpanded ? "w-56" : "w-16"
                 } ${className}`}
         >
             <div className="border-b border-border-muted px-2 py-2">
@@ -107,18 +107,16 @@ export function Sidebar({
                 </button>
             </div>
 
-            <nav className="flex-1 px-2 py-2 space-y-4 overflow-y-auto">
+            <nav className="flex-1 px-2 py-2 space-y-4 overflow-y-auto overflow-x-hidden">
                 {CATEGORIES.map((category, categoryIndex) => (
                     <div key={category.title}>
-                                {isExpanded && (
-                                    <div className="mb-2 px-3 text-xs font-bold uppercase tracking-wider text-text-muted">
+                        {isExpanded ? (
+                            <div className="mb-2 px-3 text-xs font-bold uppercase tracking-wider text-text-muted whitespace-nowrap">
                                 {t(category.title)}
-                                    </div>
-                                )}
-
-                        {!isExpanded && categoryIndex > 0 && (
+                            </div>
+                        ) : categoryIndex > 0 ? (
                             <div className="my-2 mx-auto h-px w-8 bg-border-muted" />
-                        )}
+                        ) : null}
 
                         <div className="space-y-1">
                             {category.items.map(({ key, label, Icon }) => {
@@ -145,7 +143,7 @@ export function Sidebar({
                                         />
                                         {isExpanded && (
                                             <span
-                                                className={`font-semibold text-sm truncate transition-colors duration-200 ${isActive
+                                                className={`font-semibold text-sm truncate whitespace-nowrap ${isActive
                                                     ? "text-text-primary"
                                                     : "text-text-secondary group-hover:text-text-primary"
                                                     }`}
@@ -170,7 +168,7 @@ export function Sidebar({
                 >
                     <MdFolderOpen className="text-xl text-text-muted group-hover:text-text-primary transition-colors duration-200 shrink-0" />
                     {isExpanded && (
-                        <span className="font-semibold text-sm text-text-secondary group-hover:text-text-primary transition-colors duration-200">
+                        <span className="font-semibold text-sm text-text-secondary group-hover:text-text-primary whitespace-nowrap">
                             {t("sidebar.action.openAppFolder")}
                         </span>
                     )}

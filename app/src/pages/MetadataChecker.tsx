@@ -15,7 +15,7 @@ import type { CheckResult, CheckCategory } from "../domain/rc/types";
 import type { GameMode, Beatmap } from "../types/osu";
 import type { LocaleKey } from "../locale";
 
-interface RankingCriteriaCheckerProps {
+interface MetadataCheckerProps {
     selectedBeatmap?: Beatmapset | null;
 }
 
@@ -140,7 +140,7 @@ function aggregateResults(results: CheckResult[], allDiffNames: string[]): Check
     return aggregated;
 }
 
-export function RankingCriteriaChecker({ selectedBeatmap }: RankingCriteriaCheckerProps) {
+export function MetadataChecker({ selectedBeatmap }: MetadataCheckerProps) {
     const { t } = useI18n();
     const [songsFolder] = useSongsFolder();
 

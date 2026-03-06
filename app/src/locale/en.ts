@@ -36,10 +36,16 @@ export const en = {
     "imageResizer.meta.preset": "Preset: x2 / noise2 / cunet",
 
     "mapSelector.context.openFolder": "Open Folder",
+    "mapSelector.context.openWebPage": "Open Beatmap Page",
+    "mapSelector.context.openDiscussion": "Open Discussion",
+    "mapSelector.context.openDirect": "Download via osu!direct",
     "mapSelector.mappedBy": "Mapped by {creator}",
     "mapSelector.status.scrollForMore": "scroll for more",
     "mapSelector.status.results": "{count} results{more}",
     "mapSelector.status.loaded": "{count} loaded{more}",
+    "mapSelector.error.loadFailed": "Failed to load beatmaps",
+    "mapSelector.empty.noSongsFolder": "Select osu!/Songs folder",
+    "mapSelector.empty.hintSongsFolder": "Make sure you've selected osu!/Songs.",
     "mapSelector.detect.detecting": "Detecting osu! installation...",
     "mapSelector.detect.found": "Found: {path}",
     "mapSelector.detect.failed": "Auto-detection failed. Please select folder manually.",
@@ -293,7 +299,7 @@ export const en = {
     "preview.volume.music": "Music Volume",
     "preview.volume.hitsound": "Hitsound Volume",
 
-    "tool.rc_checks": "RC Checker",
+    "tool.metadata_checker": "Metadata Checker",
 
     "rc.loading": "Loading beatmap files...",
     "rc.empty.selectBeatmap": "Select a beatmap to check ranking criteria",

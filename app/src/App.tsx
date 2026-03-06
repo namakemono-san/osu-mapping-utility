@@ -19,7 +19,7 @@ const MAP_TOOLS: SidebarKey[] = [
   "beatmap_preview",
   "beatmap_customizer",
   "metadata_editor",
-  "rc_checks",
+  "metadata_checker",
 ];
 
 const BeatmapClone = lazy(async () => ({
@@ -43,8 +43,8 @@ const ImageDownloader = lazy(async () => ({
 const AudioAnalyzer = lazy(async () => ({
   default: (await import("./pages/AudioAnalyzer")).AudioAnalyzer,
 }));
-const RankingCriteriaChecker = lazy(async () => ({
-  default: (await import("./pages/RankingCriteriaChecker")).RankingCriteriaChecker,
+const MetadataChecker = lazy(async () => ({
+  default: (await import("./pages/MetadataChecker")).MetadataChecker,
 }));
 
 function ToolLoading() {
@@ -101,8 +101,8 @@ function App() {
         return <BeatmapCustomizer selectedBeatmap={selectedBeatmap} />;
       case "metadata_editor":
         return <MetadataEditor selectedBeatmap={selectedBeatmap} />;
-      case "rc_checks":
-        return <RankingCriteriaChecker selectedBeatmap={selectedBeatmap} />;
+      case "metadata_checker":
+        return <MetadataChecker selectedBeatmap={selectedBeatmap} />;
       case "offset_calibrator":
         return <OffsetCalibrator />;
       case "video_downloader":

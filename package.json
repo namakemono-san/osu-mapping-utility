@@ -8,7 +8,7 @@
   ],
   "scripts": {
     "dev": "concurrently \"dotnet watch run --project MappingUtility.Server\" \"pnpm --filter app tauri dev\"",
-    "build": "pnpm --filter app tauri dev",
+    "build": "pnpm --filter app tauri build",
     "add:app": "pnpm --filter app add",
     "remove:app": "pnpm --filter app remove"
   },

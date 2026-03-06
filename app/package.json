@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "author": "namakemono-san <me@nmkmn.moe>",
-  "packageManager": "pnpm@10.28.2",
+  "packageManager": "pnpm@10.30.3",
   "type": "module",
   "scripts": {
     "dev": "vite",

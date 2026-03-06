@@ -1,18 +1,18 @@
 import { useState, useEffect, useRef, useCallback, useMemo, memo } from "react";
-import { MdRefresh, MdFolder, MdSearch, MdFolderOpen } from "react-icons/md";
+import { MdRefresh, MdFolder, MdSearch, MdFolderOpen, MdOpenInBrowser, MdComment, MdDownload } from "react-icons/md";
 import { createPortal } from "react-dom";
 
 import { open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { convertFileSrc } from "@tauri-apps/api/core";
-import { openPath } from "@tauri-apps/plugin-opener";
+import { openPath, openUrl } from "@tauri-apps/plugin-opener";
 
 import { Button } from "./common/Button";
+import { StatusMessage } from "./common/StatusMessage";
 
 import { Beatmapset } from "../types/beatmap";
 import { useSongsFolder } from "../hooks/useStorage";
 import { useI18n } from "../hooks/i18nContext";
-import type { LocaleKey } from "../locale";
 
 type MapSelectorProps = {
     onSelect?: (beatmap: Beatmapset) => void;
@@ -35,11 +35,17 @@ const ContextMenu = memo(function ContextMenu({
     x,
     y,
     onOpenFolder,
+    onOpenWebPage,
+    onOpenDiscussion,
+    onOpenDirect,
     onClose,
 }: {
     x: number;
     y: number;
     onOpenFolder: () => void;
+    onOpenWebPage: () => void;
+    onOpenDiscussion: () => void;
+    onOpenDirect: () => void;
     onClose: () => void;
 }) {
     const { t } = useI18n();
@@ -67,19 +73,29 @@ const ContextMenu = memo(function ContextMenu({
         };
     }, [onClose]);
 
+    const items = [
+        { onClick: onOpenFolder, Icon: MdFolderOpen, label: t("mapSelector.context.openFolder") },
+        { onClick: onOpenWebPage, Icon: MdOpenInBrowser, label: t("mapSelector.context.openWebPage") },
+        { onClick: onOpenDiscussion, Icon: MdComment, label: t("mapSelector.context.openDiscussion") },
+        { onClick: onOpenDirect, Icon: MdDownload, label: t("mapSelector.context.openDirect") },
+    ];
+
     return createPortal(
         <div
             ref={menuRef}
             className="fixed z-9999 min-w-160 py-1 bg-surface-hover border border-border-strong rounded-lg shadow-xl"
             style={{ left: x, top: y }}
         >
-            <button
-                onClick={onOpenFolder}
-                className="w-full px-3 py-2 flex items-center gap-2 text-sm text-text-primary hover:bg-surface-hover-strong transition-colors text-left"
-            >
-                <MdFolderOpen className="text-base" />
-                {t("mapSelector.context.openFolder")}
-            </button>
+            {items.map(({ onClick, Icon, label }) => (
+                <button
+                    key={label}
+                    onClick={onClick}
+                    className="w-full px-3 py-2 flex items-center gap-2 text-sm text-text-primary hover:bg-surface-hover-strong transition-colors text-left"
+                >
+                    <Icon className="text-base shrink-0" />
+                    {label}
+                </button>
+            ))}
         </div>,
         document.body
     );
@@ -155,10 +171,7 @@ export function MapSelector({
     const [debouncedSearch, setDebouncedSearch] = useState("");
     const [isScanning, setIsScanning] = useState(false);
     const [songsFolder, setSongsFolder] = useSongsFolder();
-    const [detectStatus, setDetectStatus] = useState<
-        | { key: LocaleKey; params?: Record<string, string | number> }
-        | null
-    >(null);
+    const [loadError, setLoadError] = useState<string | null>(null);
     const [currentIndex, setCurrentIndex] = useState(0);
     const [hasMore, setHasMore] = useState(true);
     const [contextMenu, setContextMenu] = useState<ContextMenuState>({
@@ -187,16 +200,15 @@ export function MapSelector({
     }, []);
 
     const autoDetectOsuFolder = useCallback(async (): Promise<string | null> => {
-        setDetectStatus({ key: "mapSelector.detect.detecting" });
+        setLoadError(null);
 
         try {
             const path = await invoke<string>("detect_osu_path");
-            setDetectStatus({ key: "mapSelector.detect.found", params: { path } });
+            setLoadError(null);
             setSongsFolder(path);
             return path;
         } catch (err) {
             console.error("[detect] Auto-detection failed:", err);
-            setDetectStatus({ key: "mapSelector.detect.failed" });
             return null;
         }
     }, [setSongsFolder]);
@@ -213,7 +225,7 @@ export function MapSelector({
             await invoke("invalidate_songs_cache", { basePath: selected });
 
             setSongsFolder(selected);
-            setDetectStatus({ key: "mapSelector.detect.selected", params: { path: selected } });
+            setLoadError(null);
             setSearch("");
             setDebouncedSearch("");
             setBeatmaps([]);
@@ -238,6 +250,7 @@ export function MapSelector({
             if (isLoadingRef.current) return;
             isLoadingRef.current = true;
             setIsScanning(true);
+            setLoadError(null);
 
             try {
                 const useFullSearch = searchQuery.length > 0 && !searchQuery.match(/^\d+\s/);
@@ -277,10 +290,11 @@ export function MapSelector({
                 );
                 setCurrentIndex(nextIndex);
                 setHasMore(more);
+                setLoadError(null);
             } catch (err) {
                 if (requestId === currentRequestRef.current) {
                     console.error("[loadStep] Error:", err);
-                    setDetectStatus({ key: "mapSelector.detect.error", params: { error: String(err) } });
+                    setLoadError(String(err));
                 }
             } finally {
                 isLoadingRef.current = false;
@@ -311,6 +325,8 @@ export function MapSelector({
         async (searchQuery: string = "") => {
             if (!songsFolder) return;
 
+            setLoadError(null);
+
             if (isLoadingRef.current) {
                 currentRequestRef.current += 1;
                 pendingReloadRef.current = { folder: songsFolder, searchQuery };
@@ -338,17 +354,16 @@ export function MapSelector({
         if (!songsFolder) return;
 
         setIsScanning(true);
-        setDetectStatus({ key: "mapSelector.detect.reloading" });
+        setLoadError(null);
 
         try {
-            const count = await invoke<number>("reload_songs", {
+            await invoke<number>("reload_songs", {
                 basePath: songsFolder,
             });
-            setDetectStatus({ key: "mapSelector.detect.foundBeatmaps", params: { count } });
             await reloadSearch(debouncedSearch);
         } catch (err) {
             console.error("[forceReload] Error:", err);
-            setDetectStatus({ key: "mapSelector.detect.reloadError", params: { error: String(err) } });
+            setLoadError(String(err));
             setIsScanning(false);
         }
     }, [songsFolder, debouncedSearch, reloadSearch]);
@@ -412,17 +427,33 @@ export function MapSelector({
 
     const handleOpenFolder = useCallback(async () => {
         if (!contextMenu.beatmap || !songsFolder) return;
-
         const folderPath = `${songsFolder}\\${contextMenu.beatmap.folder_name}`;
-
         try {
             await openPath(folderPath);
         } catch (err) {
             console.error("[openFolder] Error:", err);
         }
-
         closeContextMenu();
     }, [contextMenu.beatmap, songsFolder, closeContextMenu]);
+
+    const handleOpenWebPage = useCallback(async () => {
+        if (!contextMenu.beatmap) return;
+        await openUrl(`https://osu.ppy.sh/beatmapsets/${contextMenu.beatmap.beatmapSetID}`);
+        closeContextMenu();
+    }, [contextMenu.beatmap, closeContextMenu]);
+
+    const handleOpenDiscussion = useCallback(async () => {
+        if (!contextMenu.beatmap) return;
+        const { beatmapSetID, beatmapID } = contextMenu.beatmap;
+        await openUrl(`https://osu.ppy.sh/beatmapsets/${beatmapSetID}/discussion/${beatmapID}`);
+        closeContextMenu();
+    }, [contextMenu.beatmap, closeContextMenu]);
+
+    const handleOpenDirect = useCallback(async () => {
+        if (!contextMenu.beatmap) return;
+        await openUrl(`osu://dl/${contextMenu.beatmap.beatmapSetID}`);
+        closeContextMenu();
+    }, [contextMenu.beatmap, closeContextMenu]);
 
     useEffect(() => {
         if (isInitialMount.current) {
@@ -475,17 +506,6 @@ export function MapSelector({
         [onSelect]
     );
 
-    const statusText = useMemo(() => {
-        const loaded = beatmaps.length;
-        const moreText = hasMore ? ` · ${t("mapSelector.status.scrollForMore")}` : "";
-
-        if (debouncedSearch) {
-            return t("mapSelector.status.results", { count: loaded, more: moreText });
-        }
-
-        return t("mapSelector.status.loaded", { count: loaded, more: moreText });
-    }, [beatmaps.length, hasMore, debouncedSearch, t]);
-
     return (
         <aside
             className={`h-full w-64 shrink-0 bg-surface-sidebar text-text-primary border-r border-border-muted flex flex-col ${className}`}
@@ -529,24 +549,13 @@ export function MapSelector({
                             className="w-full h-8 pl-9 pr-3 rounded-lg bg-surface-hover border border-border-strong text-sm placeholder-text-muted focus:outline-none focus:border-border-focus transition-colors"
                         />
                     </div>
-
-                    {detectStatus && (
-                        <div
-                            className="text-xs text-text-muted truncate"
-                            title={t(detectStatus.key, detectStatus.params)}
-                        >
-                            {t(detectStatus.key, detectStatus.params)}
-                        </div>
-                    )}
-
-                    <div className="text-xs text-text-muted">{statusText}</div>
                 </div>
             </div>
 
             <div
                 ref={scrollContainerRef}
                 onScroll={handleScroll}
-                className="flex-1 overflow-y-auto px-2 py-2 space-y-2 scrollbar-custom"
+                className="flex-1 overflow-y-auto px-2 py-2 space-y-2 scrollbar-hide"
             >
                 {beatmaps.map((b) => (
                     <BeatmapCard
@@ -557,16 +566,31 @@ export function MapSelector({
                         isSelected={selectedBeatmap?.folder_name === b.folder_name}
                     />
                 ))}
-                {isScanning && (
+                {isScanning && beatmaps.length > 0 && (
                     <div className="text-center py-4 text-sm text-yellow-400 animate-pulse">
                         {t("mapSelector.loading")}
                     </div>
                 )}
-                {!isScanning && beatmaps.length === 0 && (
+                {beatmaps.length === 0 && (
                     <div className="text-center py-8 text-text-muted">
-                        <p className="text-sm">{t("mapSelector.empty.noBeatmaps")}</p>
-                        {search && (
-                            <p className="text-xs mt-2">{t("mapSelector.empty.tryDifferent")}</p>
+                        {isScanning ? (
+                            <p className="text-sm animate-pulse">{t("mapSelector.loading")}</p>
+                        ) : loadError ? (
+                            <div className="space-y-2">
+                                <StatusMessage type="error" message={t("mapSelector.error.loadFailed")} />
+                                <p className="text-xs opacity-70 break-words">{loadError}</p>
+                            </div>
+                        ) : !songsFolder ? (
+                            <p className="text-sm">{t("mapSelector.empty.noSongsFolder")}</p>
+                        ) : (
+                            <>
+                                <p className="text-sm">{t("mapSelector.empty.noBeatmaps")}</p>
+                                {search ? (
+                                    <p className="text-xs mt-2">{t("mapSelector.empty.tryDifferent")}</p>
+                                ) : (
+                                    <p className="text-xs mt-2">{t("mapSelector.empty.hintSongsFolder")}</p>
+                                )}
+                            </>
                         )}
                     </div>
                 )}
@@ -577,34 +601,14 @@ export function MapSelector({
                     x={contextMenu.x}
                     y={contextMenu.y}
                     onOpenFolder={handleOpenFolder}
+                    onOpenWebPage={handleOpenWebPage}
+                    onOpenDiscussion={handleOpenDiscussion}
+                    onOpenDirect={handleOpenDirect}
                     onClose={closeContextMenu}
                 />
             )}
 
-            <style>{`
-                .scrollbar-custom::-webkit-scrollbar {
-                    width: 8px;
-                }
-                .scrollbar-custom::-webkit-scrollbar-track {
-                    background: #1a1a1a;
-                    border-radius: 4px;
-                }
-                .scrollbar-custom::-webkit-scrollbar-thumb {
-                    background: #3a3a3a;
-                    border-radius: 4px;
-                    transition: background 0.2s;
-                }
-                .scrollbar-custom::-webkit-scrollbar-thumb:hover {
-                    background: #4a4a4a;
-                }
-                .scrollbar-custom::-webkit-scrollbar-thumb:active {
-                    background: #5a5a5a;
-                }
-                .scrollbar-custom {
-                    scrollbar-width: thin;
-                    scrollbar-color: #3a3a3a #1a1a1a;
-                }
-            `}</style>
+
         </aside>
     );
 }
