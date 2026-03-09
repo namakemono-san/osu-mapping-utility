@@ -38,7 +38,6 @@ export function useSongsFolder(): [string | null, (value: string) => void] {
     const { songsFolder, setSongsFolder } = useAppState();
     const setFolderAndSave = useCallback((value: string) => {
         setSongsFolder(value);
-        setStorageString(STORAGE_KEYS.SONGS_FOLDER, value);
     }, [setSongsFolder]);
     return [songsFolder, setFolderAndSave];
 }

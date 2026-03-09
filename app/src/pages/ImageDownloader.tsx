@@ -1,8 +1,8 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { openPath } from "@tauri-apps/plugin-opener";
-import { FiLink, FiImage, FiAlertCircle, FiFolder, FiFile, FiX } from "react-icons/fi";
+import { FiLink, FiImage, FiAlertCircle, FiFolder, FiFile, FiX, FiTrash2 } from "react-icons/fi";
 
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
@@ -21,6 +21,18 @@ export function ImageDownloader() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [imageSrc, setImageSrc] = useState<string | null>(null);
+  const [logLines, setLogLines] = useState<string[]>([]);
+  const logRef = useRef<HTMLPreElement | null>(null);
+
+  const appendLog = useCallback((msg: string) => {
+    setLogLines((prev) => {
+      const next = [...prev, msg];
+      if (next.length > 500) return next.slice(next.length - 500);
+      return next;
+    });
+  }, []);
+
+  const clearLog = useCallback(() => setLogLines([]), []);
 
   const extractVideoId = (url: string): string | null => {
     try {
@@ -93,6 +105,7 @@ export function ImageDownloader() {
       let path: string;
 
       if (kind === "file") {
+        appendLog(`[info] ${pickedFile}`);
         path = await invoke<string>("process_thumbnail_from_image", {
           srcPath: pickedFile,
           outDir,
@@ -103,8 +116,10 @@ export function ImageDownloader() {
         if (!vid) {
           throw new Error(t("image.invalidUrl"));
         }
+        appendLog(`[info] video_id=${vid}`);
         path = await invoke<string>("process_thumbnail_from_video_id", { videoId: vid });
       } else if (kind === "url") {
+        appendLog(`[info] ${input}`);
         path = await invoke<string>("process_thumbnail_from_url", {
           imageUrl: input,
           outDir,
@@ -114,14 +129,21 @@ export function ImageDownloader() {
         throw new Error(t("image.error.noInput"));
       }
 
+      appendLog(`[done] ${path}`);
       setImageSrc(convertFileSrc(path));
       void openPath(outDir);
     } catch (e: unknown) {
-      setError(String(e));
+      appendLog(`[error] ${String(e)}`);
     } finally {
       setBusy(false);
     }
-  }, [kind, input, pickedFile, outDir, t]);
+  }, [kind, input, pickedFile, outDir, t, appendLog]);
+
+  useEffect(() => {
+    if (logRef.current) {
+      logRef.current.scrollTop = logRef.current.scrollHeight;
+    }
+  }, [logLines]);
 
   return (
     <div className="flex flex-col gap-2 text-zinc-200">
@@ -168,6 +190,18 @@ export function ImageDownloader() {
         <Chip icon={<FiFolder />} className="min-w-0 max-w-min-48-820" title={outDir || t("image.noFolder")}>
           {outDir || t("image.noFolder")}
         </Chip>
+
+        <div className="flex-1" />
+
+        <Button
+          variant="danger"
+          icon={<FiTrash2 />}
+          onClick={clearLog}
+          disabled={busy || logLines.length === 0}
+          title={t("image.button.clearLogTitle")}
+        >
+          {t("image.button.clearLog")}
+        </Button>
       </Card>
 
       {error && (
@@ -176,6 +210,18 @@ export function ImageDownloader() {
           <span className="text-red-400 text-sm">{error}</span>
         </Card>
       )}
+
+      <Card className="flex flex-col">
+        <div className="flex items-center px-3 py-2 border-b border-border-muted">
+          <span className="text-sm opacity-80">{t("image.log.title")}</span>
+        </div>
+        <pre
+          ref={logRef}
+          className="font-mono text-sm whitespace-pre-wrap wrap-break-word px-3 py-2 h-40 overflow-auto"
+        >
+          {logLines.length > 0 ? logLines.join("\n") : t("image.log.ready")}
+        </pre>
+      </Card>
 
       {imageSrc && (
         <Card className="flex flex-col">

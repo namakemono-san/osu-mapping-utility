@@ -260,15 +260,7 @@ public static class OsuSerializer
             var isSpinner  = (typeFlags & (int)HitObjectType.Spinner) != 0;
             var isHoldNote = (typeFlags & (int)HitObjectType.ManiaHoldNote) != 0;
 
-            if (fields.Length > 5 && isSpinner &&
-                int.TryParse(fields[5], out var spinnerEnd) &&
-                endTimesToFix.Contains(spinnerEnd))
-            {
-                fields[5] = UnsnapChecker.GetCorrectedTime(spinnerEnd, beatmap).ToString();
-                fixedCount++;
-                modified = true;
-            }
-            else if (fields.Length > 5 && isHoldNote)
+            if (fields.Length > 5 && isHoldNote)
             {
                 var colonIdx = fields[5].IndexOf(':');
                 if (colonIdx > 0 &&

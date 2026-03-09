@@ -81,6 +81,10 @@ export const en = {
     "image.noFolder": "No folder selected",
     "image.error.noOutDir": "Select an output folder",
     "image.error.noInput": "Enter a URL or select an image file",
+    "image.log.title": "Log",
+    "image.log.ready": "Ready.",
+    "image.button.clearLog": "Clear",
+    "image.button.clearLogTitle": "Clear log",
 
     "video.dialog.selectOutFolder": "Select output folder",
     "video.alert.enterUrl": "Enter a URL",

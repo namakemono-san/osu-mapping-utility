@@ -83,6 +83,10 @@ export const ja: Record<LocaleKey, string> = {
     "image.noFolder": "フォルダ未選択",
     "image.error.noOutDir": "出力先フォルダを選択してください",
     "image.error.noInput": "URLを入力するか、画像ファイルを選択してください",
+    "image.log.title": "ログ",
+    "image.log.ready": "待機中",
+    "image.button.clearLog": "クリア",
+    "image.button.clearLogTitle": "ログをクリア",
 
     "video.dialog.selectOutFolder": "出力先フォルダを選択",
     "video.alert.enterUrl": "URL を入力してください",

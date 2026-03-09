@@ -125,7 +125,7 @@ async fn render_jpeg(
 ) -> Result<(), String> {
     let shell = app.shell();
 
-    let vf = format!("scale={}:{}", width, height);
+    let vf = format!("scale={}:{}:force_original_aspect_ratio=decrease", width, height);
     let q_str = q.to_string();
 
     let args: Vec<String> = vec![

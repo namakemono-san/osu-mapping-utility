@@ -99,27 +99,6 @@ export async function requestFixUnsnaps(filePath: string): Promise<number> {
     });
 }
 
-export async function requestRenameOsuFiles(
-    beatmapFolder: string,
-    renames: { from: string; to: string }[],
-): Promise<void> {
-    return new Promise((resolve, reject) => {
-        const onDone = () => {
-            connection.off("RenameComplete", onDone);
-            connection.off("ParseError", onError);
-            resolve();
-        };
-        const onError = (message: string) => {
-            connection.off("RenameComplete", onDone);
-            connection.off("ParseError", onError);
-            reject(new Error(message));
-        };
-        connection.on("RenameComplete", onDone);
-        connection.on("ParseError", onError);
-        connection.invoke("RequestRenameOsuFiles", beatmapFolder, renames).catch(reject);
-    });
-}
-
 export function onUpdateBeatmap(callback: (beatmap: Beatmap) => void) {
     connection.on("UpdateBeatmap", (json: string) => {
         callback(JSON.parse(json) as Beatmap);

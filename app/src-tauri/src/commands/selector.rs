@@ -233,6 +233,7 @@ fn parse_beatmap_folder(folder_path: &Path, folder_name: &str) -> Option<Beatmap
         match &best {
             None => {
                 best = Some(candidate);
+                if has_set_id { break; }
             }
             Some(_) if has_set_id => {
                 best = Some(candidate);
