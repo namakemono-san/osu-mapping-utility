@@ -4,9 +4,9 @@
   "version": "1.0.0",
   "identifier": "osu-mapping-utility",
   "build": {
-    "beforeDevCommand": "pnpm dev",
+    "beforeDevCommand": "pnpm build:server && pnpm dev",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "pnpm build",
+    "beforeBuildCommand": "pnpm build:server && pnpm build",
     "frontendDist": "../dist"
   },
   "app": {
@@ -26,7 +26,7 @@
     "security": {
       "csp": {
         "default-src": "'self' ipc: http://ipc.localhost",
-        "connect-src": "'self' ipc: http://ipc.localhost https://ipc.localhost",
+        "connect-src": "'self' ipc: http://ipc.localhost https://ipc.localhost http://localhost:5001",
         "img-src": "'self' asset: http://asset.localhost https://asset.localhost data: blob:",
         "style-src": "'self' 'unsafe-inline'",
         "font-src": "'self'",
@@ -45,7 +45,8 @@
         "default",
         "opener",
         "desktop-capability",
-        "downloader"
+        "downloader",
+        "server"
       ]
     }
   },
@@ -72,7 +73,8 @@
       "binaries/ffmpeg",
       "binaries/ffprobe",
       "binaries/deno",
-      "binaries/waifu2x-ncnn-vulkan"
+      "binaries/waifu2x-ncnn-vulkan",
+      "binaries/MappingUtility.Server"
     ],
     "icon": [
       "icons/32x32.png",

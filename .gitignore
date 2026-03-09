@@ -588,6 +588,9 @@ app/src-tauri/binaries/deno-*.exe
 app/src-tauri/binaries/ffmpeg-*.exe
 app/src-tauri/binaries/ffprobe-*.exe
 
+# Build artifacts
+app/src-tauri/binaries/MappingUtility.Server-x86_64-pc-windows-msvc.exe
+
 # Claude
 .claude/
 CLAUDE.md

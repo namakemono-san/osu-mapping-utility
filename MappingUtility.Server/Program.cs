@@ -7,7 +7,7 @@ builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
-        policy.WithOrigins("http://localhost:1420")
+        policy.WithOrigins("http://localhost:1420", "tauri://localhost")
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();

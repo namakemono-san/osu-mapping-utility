@@ -6,21 +6,18 @@ const connection = new signalR.HubConnectionBuilder()
     .withAutomaticReconnect()
     .build();
 
-export async function startConnection() {
-    const retry = async (attempt: number = 0) => {
+export async function startConnection(): Promise<boolean> {
+    for (let attempt = 0; attempt < 10; attempt++) {
         try {
             await connection.start();
-            console.log("SignalR connected");
-        } catch (e) {
-            if (attempt < 10) {
-                setTimeout(() => retry(attempt + 1), 2000);
-            } else {
-                console.error("SignalR connection failed:", e);
+            return true;
+        } catch {
+            if (attempt < 9) {
+                await new Promise(r => setTimeout(r, 2000));
             }
         }
-    };
-
-    await retry();
+    }
+    return false;
 }
 
 export async function requestParse(filePath: string): Promise<Beatmap> {

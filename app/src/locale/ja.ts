@@ -19,7 +19,7 @@ export const ja: Record<LocaleKey, string> = {
     "tool.metadata_editor": "Metadata Editor",
     "tool.offset_calibrator": "Offset Calibrator",
     "tool.audio_analyzer": "Audio Analyzer",
-    "tool.video_downloader": "Video Downloader",
+    "tool.video_downloader": "Audio Downloader",
     "tool.image_downloader": "Image Downloader",
 
     "mapSelector.context.openFolder": "フォルダを開く",

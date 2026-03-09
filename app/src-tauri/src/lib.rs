@@ -4,6 +4,23 @@ mod models;
 mod osu;
 mod utils;
 
+use std::sync::Mutex;
+
+struct ServerProcess(Option<tauri_plugin_shell::process::CommandChild>);
+
+impl Drop for ServerProcess {
+    fn drop(&mut self) {
+        if let Some(child) = self.0.take() {
+            let _ = child.kill();
+        }
+    }
+}
+
+struct AppState {
+    #[allow(dead_code)]
+    server: Mutex<Option<ServerProcess>>,
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -13,6 +30,28 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
+        .setup(|app| {
+            use tauri::Manager;
+            use tauri_plugin_shell::ShellExt;
+
+            let server_state = match app
+                .shell()
+                .sidecar("MappingUtility.Server")
+                .and_then(|cmd| cmd.spawn())
+            {
+                Ok((_, child)) => Some(ServerProcess(Some(child))),
+                Err(e) => {
+                    eprintln!("[ERROR] Failed to start MappingUtility.Server: {e}");
+                    None
+                }
+            };
+
+            app.manage(AppState {
+                server: Mutex::new(server_state),
+            });
+
+            Ok(())
+        })
         .register_uri_scheme_protocol("asset", move |_app, request| {
             use percent_encoding::percent_decode_str;
             use std::{fs, path::PathBuf};
@@ -82,6 +121,16 @@ pub fn run() {
             audio::commands::export_spectrogram,
             audio::commands::check_audio_info,
         ])
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::Destroyed = event {
+                use tauri::Manager;
+                if let Some(state) = window.app_handle().try_state::<AppState>() {
+                    if let Ok(mut guard) = state.server.lock() {
+                        guard.take();
+                    }
+                }
+            }
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
