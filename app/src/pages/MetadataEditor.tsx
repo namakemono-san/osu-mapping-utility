@@ -1,17 +1,17 @@
 import { useCallback, useEffect, useState, useMemo } from "react";
 import { FiRefreshCw, FiSave, FiFileText, FiImage } from "react-icons/fi";
 
-import { Card } from "../components/common/Card";
-import { Input } from "../components/common/Input";
-import { Modal } from "../components/common/Modal";
-import { Button } from "../components/common/Button";
-import { StatusMessage } from "../components/common/StatusMessage";
+import { Card } from "../components/Card";
+import { Input } from "../components/Input";
+import { Modal } from "../components/Modal";
+import { Button } from "../components/Button";
+import { StatusMessage } from "../components/StatusMessage";
 
 import { Beatmapset } from "../types/beatmap";
 import { useSongsFolder } from "../hooks/useStorage";
 import { useI18n } from "../hooks/i18nContext";
 import type { LocaleKey } from "../locale";
-import { requestParseBatch, requestApplyMetadata } from "../services/signalr";
+import { requestParseBatch, requestApplyMetadata } from "../utils/signalr";
 import type { Background, MetadataSettings, MetadataWriteInput } from "../types/osu";
 
 interface MetadataEditorProps {

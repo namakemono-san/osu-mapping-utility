@@ -3,8 +3,8 @@ import ReactDOM from "react-dom/client";
 import App from "./App";
 
 import { I18nProvider } from "./hooks/i18nContext";
-import { startConnection } from "@/services/signalr";
-import { AppStateProvider } from "./context/appState";
+import { startConnection } from "@/utils/signalr";
+import { AppStateProvider } from "./hooks/appState";
 
 startConnection();
 

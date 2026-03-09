@@ -3,16 +3,16 @@ import { invoke } from "@tauri-apps/api/core";
 import { FiCopy, FiRefreshCw } from "react-icons/fi";
 import { openPath } from "@tauri-apps/plugin-opener";
 
-import { Button } from "../components/common/Button";
-import { Card } from "../components/common/Card";
-import { Input } from "../components/common/Input";
-import { Select } from "../components/common/Select";
-import { StatusMessage } from "../components/common/StatusMessage";
+import { Button } from "../components/Button";
+import { Card } from "../components/Card";
+import { Input } from "../components/Input";
+import { Select } from "../components/Select";
+import { StatusMessage } from "../components/StatusMessage";
 
 import { Beatmapset } from "../types/beatmap";
 import { useSongsFolder } from "../hooks/useStorage";
 import { useI18n } from "../hooks/i18nContext";
-import { requestParseBatch } from "../services/signalr";
+import { requestParseBatch } from "../utils/signalr";
 
 interface BeatmapCloneProps {
     selectedBeatmap?: Beatmapset | null;

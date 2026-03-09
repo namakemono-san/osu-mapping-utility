@@ -11,7 +11,6 @@ export interface TimingLine {
     kiai: boolean;
     omitsBarLine: boolean;
     svMult: number;
-    // UninheritedLine extra properties (present when uninherited === true)
     msPerBeat?: number;
     bpm?: number;
 }
@@ -21,7 +20,6 @@ export interface HitObject {
     typeFlags: number;
     hitSoundFlags: number;
     endTime: number;
-    // Slider extra properties
     sliderType?: string | null;
     slides?: number | null;
     length?: number | null;

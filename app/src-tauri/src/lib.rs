@@ -66,31 +66,21 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
-            commands::run_download,
-            commands::convert_taiko_video,
             commands::detect_osu_path,
             commands::scan_beatmapsets,
             commands::search_beatmapsets,
-            commands::clear_beatmap_cache,
-            commands::invalidate_songs_cache,
-            commands::reload_songs,
-            commands::list_osu_files,
-            commands::write_osu_file,
-            commands::read_osu_file,
-            commands::read_audio_file,
-            commands::rename_osu_files,
+            commands::reload_beatmapsets,
             commands::clone_beatmap,
-            commands::parse_osu_file,
-            commands::parse_osu_files_batch,
-            commands::write_osu_metadata,
-            commands::process_thumbnail,
+            commands::read_audio_file,
+            commands::download_video,
+            commands::convert_video,
+            commands::process_thumbnail_from_video_id,
+            commands::process_thumbnail_from_image,
+            commands::process_thumbnail_from_url,
             commands::save_thumbnail,
-            commands::process_image_to_thumbnail,
-            commands::process_url_to_thumbnail,
             audio::commands::analyze_audio,
             audio::commands::export_spectrogram,
             audio::commands::check_audio_info,
-            commands::list_folder_files,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

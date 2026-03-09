@@ -2,16 +2,16 @@ import { useCallback, useEffect, useState } from "react";
 import { FiCheckCircle, FiAlertCircle, FiRefreshCw, FiChevronDown, FiChevronUp } from "react-icons/fi";
 import { readTextFile, writeTextFile, copyFile, mkdir, BaseDirectory } from "@tauri-apps/plugin-fs";
 
-import { Button } from "../components/common/Button";
-import { Card } from "../components/common/Card";
-import { Switch } from "../components/common/Switch";
+import { Button } from "../components/Button";
+import { Card } from "../components/Card";
+import { Switch } from "../components/Switch";
 
 import { useI18n } from "../hooks/i18nContext";
 import { useSongsFolder } from "../hooks/useStorage";
 
 import { Beatmapset } from "../types/beatmap";
 import { removeEditorBookmarks, removeNewComboExceptFirst, rewriteCenter, whistleToClap_2to8 } from "../domain/osu/textTransform";
-import { requestParseBatch } from "../services/signalr";
+import { requestParseBatch, requestFixUnsnaps } from "../utils/signalr";
 
 interface BeatmapCustomizerProps {
     selectedBeatmap?: Beatmapset | null;
@@ -65,6 +65,7 @@ export function BeatmapCustomizer({ selectedBeatmap }: BeatmapCustomizerProps) {
     const [rmBookmarks, setRmBookmarks] = useState(false);
     const [rmNewCombo, setRmNewCombo] = useState(false);
     const [w2cOn, setW2cOn] = useState(false);
+    const [fixUnsnaps, setFixUnsnaps] = useState(false);
     const [createBackup, setCreateBackup] = useState(true);
 
     useEffect(() => {
@@ -168,7 +169,12 @@ export function BeatmapCustomizer({ selectedBeatmap }: BeatmapCustomizerProps) {
                 if (rmNewCombo) text = removeNewComboExceptFirst(text);
                 if (w2cOn) text = whistleToClap_2to8(text);
 
-                await writeTextFile(filePath, text);
+                if (centerOn || rmBookmarks || rmNewCombo || w2cOn) {
+                    await writeTextFile(filePath, text);
+                }
+                if (fixUnsnaps) {
+                    await requestFixUnsnaps(filePath);
+                }
                 successCount++;
             }
 
@@ -185,7 +191,7 @@ export function BeatmapCustomizer({ selectedBeatmap }: BeatmapCustomizerProps) {
         } finally {
             setProcessing(false);
         }
-    }, [selectedBeatmap, selectedFiles, centerOn, rmBookmarks, rmNewCombo, w2cOn, createBackup, songsFolder]);
+    }, [selectedBeatmap, selectedFiles, centerOn, rmBookmarks, rmNewCombo, w2cOn, fixUnsnaps, createBackup, songsFolder]);
 
     if (!selectedBeatmap) {
         return (
@@ -198,7 +204,7 @@ export function BeatmapCustomizer({ selectedBeatmap }: BeatmapCustomizerProps) {
         );
     }
 
-    const hasChanges = centerOn || rmBookmarks || rmNewCombo || w2cOn;
+    const hasChanges = centerOn || rmBookmarks || rmNewCombo || w2cOn || fixUnsnaps;
 
     return (
         <div className="relative h-full flex flex-col">
@@ -297,6 +303,12 @@ export function BeatmapCustomizer({ selectedBeatmap }: BeatmapCustomizerProps) {
                                 desc: t("customizer.option.whistle.desc"),
                                 checked: w2cOn,
                                 set: setW2cOn,
+                            },
+                            {
+                                label: t("customizer.option.fixUnsnaps.label"),
+                                desc: t("customizer.option.fixUnsnaps.desc"),
+                                checked: fixUnsnaps,
+                                set: setFixUnsnaps,
                             },
                         ].map((opt) => (
                             <button

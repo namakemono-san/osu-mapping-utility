@@ -3,16 +3,16 @@ import { convertFileSrc } from "@tauri-apps/api/core";
 
 import "./App.css";
 
-import { Titlebar } from "./components/Titlebar";
-import { Sidebar, SidebarKey } from "./components/Sidebar";
-import { MapSelector } from "./components/MapSelector";
-import { UpdateChecker } from "./components/UpdateChecker";
+import { Titlebar } from "./components/layout/Titlebar";
+import { Sidebar, SidebarKey } from "./components/layout/Sidebar";
+import { MapSelector } from "./components/layout/MapSelector";
+import { UpdateChecker } from "./components/layout/UpdateChecker";
 import { BeatmapCustomizer } from "./pages/BeatmapCustomizer";
 
 import { Beatmapset } from "./types/beatmap";
 
 import { useI18n } from "./hooks/i18nContext";
-import { useAppState } from "./context/appState";
+import { useAppState } from "./hooks/appState";
 
 const MAP_TOOLS: SidebarKey[] = [
   "beatmap_clone",

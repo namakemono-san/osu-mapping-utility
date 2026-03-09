@@ -4,10 +4,10 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { FiLink, FiImage, FiAlertCircle, FiFolder, FiFile, FiX } from "react-icons/fi";
 
-import { Button } from "../components/common/Button";
-import { Card } from "../components/common/Card";
-import { Input } from "../components/common/Input";
-import { Chip } from "../components/common/Chip";
+import { Button } from "../components/Button";
+import { Card } from "../components/Card";
+import { Input } from "../components/Input";
+import { Chip } from "../components/Chip";
 
 import { useI18n } from "../hooks/i18nContext";
 
@@ -93,7 +93,7 @@ export function ImageDownloader() {
       let path: string;
 
       if (kind === "file") {
-        path = await invoke<string>("process_image_to_thumbnail", {
+        path = await invoke<string>("process_thumbnail_from_image", {
           srcPath: pickedFile,
           outDir,
           useWaifu2x: false,
@@ -103,9 +103,9 @@ export function ImageDownloader() {
         if (!vid) {
           throw new Error(t("image.invalidUrl"));
         }
-        path = await invoke<string>("process_thumbnail", { videoId: vid });
+        path = await invoke<string>("process_thumbnail_from_video_id", { videoId: vid });
       } else if (kind === "url") {
-        path = await invoke<string>("process_url_to_thumbnail", {
+        path = await invoke<string>("process_thumbnail_from_url", {
           imageUrl: input,
           outDir,
           useWaifu2x: false,

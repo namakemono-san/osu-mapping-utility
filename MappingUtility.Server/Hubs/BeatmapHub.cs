@@ -58,6 +58,23 @@ public class BeatmapHub : Hub
         }
     }
 
+    public async Task RequestFixUnsnaps(string filePath)
+    {
+        try
+        {
+            var content = await File.ReadAllTextAsync(filePath);
+            var fileName = Path.GetFileName(filePath);
+            var beatmap = OsuParser.Parse(content, fileName);
+            var (newContent, fixedCount) = OsuSerializer.FixUnsnaps(content, beatmap);
+            await File.WriteAllTextAsync(filePath, newContent);
+            await Clients.Caller.SendAsync("FixUnsnapsComplete", fixedCount);
+        }
+        catch (Exception ex)
+        {
+            await Clients.Caller.SendAsync("ParseError", ex.Message);
+        }
+    }
+
     public async Task RequestApplyMetadata(string filePath, MetadataSettings metadata, Background? background)
     {
         try

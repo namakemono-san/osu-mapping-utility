@@ -16,5 +16,5 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 app.UseCors();
-app.MapHub<BeatmapHub>("/hub");
-app.Run("http://localhost:5000");
+app.MapHub<BeatmapHub>("/beatmap");
+app.Run("http://localhost:5001");

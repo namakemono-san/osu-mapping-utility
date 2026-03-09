@@ -6,12 +6,12 @@ import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 import { openPath } from "@tauri-apps/plugin-opener";
 
-import { Button } from "../components/common/Button";
-import { Card } from "../components/common/Card";
-import { Input } from "../components/common/Input";
-import { Select } from "../components/common/Select";
-import { Switch } from "../components/common/Switch";
-import { Chip } from "../components/common/Chip";
+import { Button } from "../components/Button";
+import { Card } from "../components/Card";
+import { Input } from "../components/Input";
+import { Select } from "../components/Select";
+import { Switch } from "../components/Switch";
+import { Chip } from "../components/Chip";
 
 import { useDownloaderSettings } from "../hooks/useStorage";
 import { useState } from "react";
@@ -89,7 +89,7 @@ export function VideoDownloader() {
         taikoDoneRef.current = false;
         openedRef.current = false;
         try {
-            const res = await invoke<string>("run_download", {
+            const res = await invoke<string>("download_video", {
                 url,
                 outDir,
                 audioFormat,
@@ -116,7 +116,7 @@ export function VideoDownloader() {
 
         setBusy(true);
         try {
-            const outPath = await invoke<string>("convert_taiko_video", {
+            const outPath = await invoke<string>("convert_video", {
                 srcPath: lastVideoPath,
                 outDir,
             });

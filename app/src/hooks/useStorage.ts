@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 import { getStorage, setStorage, getStorageString, setStorageString, STORAGE_KEYS } from "../utils/storage";
-import { useAppState } from "../context/appState";
+import { useAppState } from "./appState";
 
 type StorageKey = (typeof STORAGE_KEYS)[keyof typeof STORAGE_KEYS];
 

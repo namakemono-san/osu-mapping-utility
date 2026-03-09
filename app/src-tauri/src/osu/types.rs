@@ -109,31 +109,3 @@ pub struct OsuBeatmapHeader {
     pub background_filename: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct OsuBeatmapset {
-    pub folder_path: String,
-    pub difficulties: Vec<OsuBeatmap>,
-    pub has_background: bool,
-    pub background_filename: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct MetadataWriteInput {
-    pub title: String,
-    pub title_unicode: String,
-    pub artist: String,
-    pub artist_unicode: String,
-    pub creator: String,
-    pub source: String,
-    pub tags: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct BackgroundWriteInput {
-    pub filename: String,
-    pub x_offset: i32,
-    pub y_offset: i32,
-}

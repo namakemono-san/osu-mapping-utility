@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using MappingUtility.Parser.Checks;
 using MappingUtility.Parser.Objects;
 using MappingUtility.Parser.Objects.Events;
 using MappingUtility.Parser.Objects.HitObjects;
@@ -183,5 +184,106 @@ public static class OsuSerializer
         }
 
         return string.Join(eol, output);
+    }
+
+    public static (string Content, int FixedCount) FixUnsnaps(string content, Beatmap beatmap)
+    {
+        var results = UnsnapChecker.Check(beatmap).ToList();
+        if (results.Count == 0) return (content, 0);
+
+        var headTimesToFix = new HashSet<int>();
+        var endTimesToFix = new HashSet<int>();
+
+        foreach (var r in results)
+        {
+            switch (r.ObjectType)
+            {
+                case "Circle":
+                case "Slider head":
+                case "Hold note head":
+                    headTimesToFix.Add((int)r.Time);
+                    break;
+                case "Hold note tail":
+                    endTimesToFix.Add((int)r.Time);
+                    break;
+            }
+        }
+
+        var eol = content.Contains("\r\n") ? "\r\n" : "\n";
+        var lines = content.Split(eol);
+        var output = new List<string>(lines.Length);
+        var inHitObjects = false;
+        var fixedCount = 0;
+
+        foreach (var line in lines)
+        {
+            var trimmed = line.Trim();
+
+            if (trimmed.Equals("[HitObjects]", StringComparison.OrdinalIgnoreCase))
+            {
+                inHitObjects = true;
+                output.Add(line);
+                continue;
+            }
+
+            if (trimmed.StartsWith('[') && trimmed.EndsWith(']'))
+            {
+                inHitObjects = false;
+                output.Add(line);
+                continue;
+            }
+
+            if (!inHitObjects || trimmed.Length == 0 || trimmed.StartsWith("//"))
+            {
+                output.Add(line);
+                continue;
+            }
+
+            var fields = trimmed.Split(',');
+            if (fields.Length < 5 ||
+                !int.TryParse(fields[2], out var time) ||
+                !int.TryParse(fields[3], out var typeFlags))
+            {
+                output.Add(line);
+                continue;
+            }
+
+            var modified = false;
+
+            if (headTimesToFix.Contains(time))
+            {
+                fields[2] = UnsnapChecker.GetCorrectedTime(time, beatmap).ToString();
+                fixedCount++;
+                modified = true;
+            }
+
+            var isSpinner  = (typeFlags & (int)HitObjectType.Spinner) != 0;
+            var isHoldNote = (typeFlags & (int)HitObjectType.ManiaHoldNote) != 0;
+
+            if (fields.Length > 5 && isSpinner &&
+                int.TryParse(fields[5], out var spinnerEnd) &&
+                endTimesToFix.Contains(spinnerEnd))
+            {
+                fields[5] = UnsnapChecker.GetCorrectedTime(spinnerEnd, beatmap).ToString();
+                fixedCount++;
+                modified = true;
+            }
+            else if (fields.Length > 5 && isHoldNote)
+            {
+                var colonIdx = fields[5].IndexOf(':');
+                if (colonIdx > 0 &&
+                    int.TryParse(fields[5][..colonIdx], out var holdEnd) &&
+                    endTimesToFix.Contains(holdEnd))
+                {
+                    fields[5] = UnsnapChecker.GetCorrectedTime(holdEnd, beatmap) + fields[5][colonIdx..];
+                    fixedCount++;
+                    modified = true;
+                }
+            }
+
+            output.Add(modified ? string.Join(",", fields) : line);
+        }
+
+        return (string.Join(eol, output), fixedCount);
     }
 }
