@@ -90,6 +90,15 @@ export function useAudioPlayer(options: UseAudioPlayerOptions): UseAudioPlayerRe
         gainNode.connect(audioContextRef.current.destination);
         gainNode.gain.value = musicVolume;
 
+        source.onended = () => {
+            if (audioSourceRef.current === source) {
+                audioSourceRef.current = null;
+                audioGainNodeRef.current = null;
+                audioOffsetRef.current = 0;
+                setIsPlaying(false);
+            }
+        };
+
         if (startOffsetSec < audioBufferRef.current.duration) {
             source.start(0, startOffsetSec);
         }
