@@ -273,7 +273,7 @@ export function PreviewControls({
                         style={{ width: `${(currentTime / duration) * 100}%` }}
                     />
                     <div
-                        className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-lg cursor-grab active:cursor-grabbing"
+                        className="absolute top-1/2 w-3 h-3 bg-white rounded-full shadow-lg cursor-grab active:cursor-grabbing"
                         style={{ left: `${(currentTime / duration) * 100}%`, transform: 'translate(-50%, -50%)' }}
                         onMouseDown={(e) => {
                             e.stopPropagation();
