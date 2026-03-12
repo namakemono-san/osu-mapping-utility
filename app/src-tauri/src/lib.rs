@@ -109,6 +109,7 @@ pub fn run() {
             commands::scan_beatmapsets,
             commands::search_beatmapsets,
             commands::warmup_search_cache,
+            commands::warmup_search_cache_chunked,
             commands::reload_beatmapsets,
             commands::clone_beatmap,
             commands::read_audio_file,

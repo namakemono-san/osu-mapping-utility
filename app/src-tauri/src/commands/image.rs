@@ -201,18 +201,24 @@ async fn resize_to_thumbnail_pipeline(
 }
 
 #[tauri::command]
-pub async fn process_thumbnail_from_video_id(app: tauri::AppHandle, video_id: String) -> Result<String, String> {
-    let base_dir = app
+pub async fn process_thumbnail_from_video_id(app: tauri::AppHandle, video_id: String, out_dir: String) -> Result<String, String> {
+    if out_dir.trim().is_empty() {
+        return Err("out_dir is empty".into());
+    }
+
+    let out_dir_buf = PathBuf::from(&out_dir);
+    std::fs::create_dir_all(&out_dir_buf).map_err(|e| e.to_string())?;
+
+    let work_dir = app
         .path()
         .app_data_dir()
         .map_err(|e| e.to_string())?
         .join("thumbnails");
+    std::fs::create_dir_all(&work_dir).map_err(|e| e.to_string())?;
 
-    std::fs::create_dir_all(&base_dir).map_err(|e| e.to_string())?;
-
-    let raw = base_dir.join(format!("{}_raw.jpg", video_id));
-    let upscaled = base_dir.join(format!("{}_upscaled.png", video_id));
-    let fhd = base_dir.join(format!("{}_fhd.jpg", video_id));
+    let raw = work_dir.join(format!("{}_raw.jpg", video_id));
+    let upscaled = work_dir.join(format!("{}_upscaled.png", video_id));
+    let fhd = out_dir_buf.join(format!("{}-thumbnail.jpg", video_id));
 
     if fhd.exists() {
         let size = std::fs::metadata(&fhd).map_err(|e| e.to_string())?.len();

@@ -365,7 +365,6 @@ pub fn warmup_search_cache(base_path: String) -> Result<usize, String> {
     let base_path = normalize_base_path(&base_path);
     let folders = get_folder_list(&base_path)?;
 
-    // Collect names of uncached folders
     let uncached_names: Vec<String> = {
         let cache = PARSED_CACHE
             .read()
@@ -385,17 +384,78 @@ pub fn warmup_search_cache(base_path: String) -> Result<usize, String> {
         return Ok(folders.len());
     }
 
-    // Parse all uncached folders in parallel without holding any lock
-    let parsed: Vec<(String, Beatmapset)> = uncached_names
-        .par_iter()
-        .filter_map(|name| {
-            let path = Path::new(&base_path).join(name);
-            let beatmap = parse_beatmap_folder(&path, name)?;
-            Some((name.clone(), beatmap))
+    let chunk_size = 50;
+    for chunk in uncached_names.chunks(chunk_size) {
+        let parsed: Vec<(String, Beatmapset)> = chunk
+            .par_iter()
+            .filter_map(|name| {
+                let path = Path::new(&base_path).join(name);
+                let beatmap = parse_beatmap_folder(&path, name)?;
+                Some((name.clone(), beatmap))
+            })
+            .collect();
+
+        {
+            let mut cache = PARSED_CACHE
+                .write()
+                .map_err(|e| format!("Lock error: {}", e))?;
+            let path_cache = cache
+                .entry(base_path.clone())
+                .or_insert_with(ParsedBeatmapCache::new);
+            for (name, beatmap) in parsed {
+                path_cache.data.insert(name, beatmap);
+            }
+        }
+
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+
+    Ok(folders.len())
+}
+
+#[tauri::command]
+pub fn warmup_search_cache_chunked(
+    base_path: String,
+    chunk_size: usize,
+    max_chunks_per_call: usize,
+) -> Result<(usize, usize, bool), String> {
+    let base_path = normalize_base_path(&base_path);
+    let folders = get_folder_list(&base_path)?;
+
+    let uncached_names: Vec<String> = {
+        let cache = PARSED_CACHE
+            .read()
+            .map_err(|e| format!("Lock error: {}", e))?;
+        if let Some(path_cache) = cache.get(&base_path) {
+            folders
+                .iter()
+                .filter(|f| !path_cache.data.contains_key(&f.name))
+                .map(|f| f.name.clone())
+                .collect()
+        } else {
+            folders.iter().map(|f| f.name.clone()).collect()
+        }
+    };
+
+    let total_uncached = uncached_names.len();
+    if total_uncached == 0 {
+        return Ok((folders.len(), 0, true));
+    }
+
+    let items_to_process = (chunk_size * max_chunks_per_call).min(total_uncached);
+    let chunks_to_process = &uncached_names[0..items_to_process];
+
+    let parsed: Vec<(String, Beatmapset)> = chunks_to_process
+        .par_chunks(chunk_size)
+        .flat_map(|chunk| {
+            chunk.par_iter().filter_map(|name| {
+                let path = Path::new(&base_path).join(name);
+                let beatmap = parse_beatmap_folder(&path, name)?;
+                Some((name.clone(), beatmap))
+            })
         })
         .collect();
 
-    // Single write lock for bulk insert
     {
         let mut cache = PARSED_CACHE
             .write()
@@ -408,7 +468,10 @@ pub fn warmup_search_cache(base_path: String) -> Result<usize, String> {
         }
     }
 
-    Ok(folders.len())
+    let remaining = total_uncached - items_to_process;
+    let is_complete = remaining == 0;
+
+    Ok((folders.len(), items_to_process, is_complete))
 }
 
 #[tauri::command]

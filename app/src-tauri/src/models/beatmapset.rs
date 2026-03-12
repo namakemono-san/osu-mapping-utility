@@ -11,7 +11,6 @@ pub struct Beatmapset {
     pub beatmap_id: String,
     #[serde(rename = "beatmapSetID")]
     pub beatmap_set_id: String,
-    /// Pre-computed lowercase search string. Not serialized to frontend.
     #[serde(skip)]
     pub search_text: String,
 }

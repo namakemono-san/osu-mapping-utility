@@ -113,7 +113,7 @@ pub fn decode_audio(file_path: &str) -> Result<AudioData, String> {
             continue;
         }
 
-        audio_stream_bytes += packet.data().len() as u64;
+        audio_stream_bytes += packet.data.len() as u64;
 
         let decoded = match decoder.decode(&packet) {
             Ok(decoded) => decoded,
