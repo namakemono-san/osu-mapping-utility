@@ -31,6 +31,11 @@ jobs:
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
       - name: Ensure manifests are synced
         run: node .github/scripts/sync-version.mjs --check
 

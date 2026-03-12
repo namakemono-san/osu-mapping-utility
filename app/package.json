@@ -1,0 +1,46 @@
+{
+  "name": "app",
+  "private": true,
+  "version": "1.0.0",
+  "author": "namakemono-san <me@nmkmn.moe>",
+  "packageManager": "pnpm@10.30.3",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "build:server": "node scripts/build-server.mjs"
+  },
+  "dependencies": {
+    "@microsoft/signalr": "^10.0.0",
+    "@tailwindcss/vite": "^4.1.11",
+    "@tauri-apps/api": "2.8.0",
+    "@tauri-apps/plugin-dialog": "2.3.2",
+    "@tauri-apps/plugin-fs": "2.4.5",
+    "@tauri-apps/plugin-opener": "2.5.3",
+    "@tauri-apps/plugin-process": "2.3.1",
+    "@tauri-apps/plugin-updater": "2.9.0",
+    "clsx": "^2.1.1",
+    "path": "^0.12.7",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-icons": "^5.5.0",
+    "tailwind-merge": "^3.3.1",
+    "tailwindcss": "^4.1.11"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2",
+    "@types/node": "^25.3.3",
+    "@types/react": "^18.3.1",
+    "@types/react-dom": "^18.3.1",
+    "@typescript-eslint/eslint-plugin": "^8.56.1",
+    "@typescript-eslint/parser": "^8.56.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "add": "^2.0.6",
+    "eslint": "^10.0.2",
+    "eslint-plugin-import": "^2.32.0",
+    "typescript": "~5.6.2",
+    "vite": "^6.0.3"
+  }
+}
