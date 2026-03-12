@@ -93,11 +93,6 @@ export function AudioAnalyzer({ className = "" }: AudioAnalyzerProps) {
         >
           {t("audio.button.export")}
         </Button>
-
-        <div className="ml-auto text-xs text-text-faint inline-flex items-center gap-2">
-          <FiImage />
-          <span>{result ? `${result.image_width} x ${result.image_height}` : "800 x 450"}</span>
-        </div>
       </Card>
 
       {loading && <StatusMessage type="success" message={t("audio.status.loading")} />}
