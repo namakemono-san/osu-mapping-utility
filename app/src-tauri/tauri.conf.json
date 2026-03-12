@@ -1,0 +1,97 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "osu! mapping utility",
+  "version": "1.0.0",
+  "identifier": "osu-mapping-utility",
+  "build": {
+    "beforeDevCommand": "pnpm build:server && pnpm dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "pnpm build:server && pnpm build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "title": "osu! mapping utility",
+        "decorations": false,
+        "transparent": false,
+        "fullscreen": false,
+        "resizable": false,
+        "dragDropEnabled": true,
+        "width": 1280,
+        "height": 720
+      }
+    ],
+    "security": {
+      "csp": {
+        "default-src": "'self' ipc: http://ipc.localhost",
+        "connect-src": "'self' ipc: http://ipc.localhost https://ipc.localhost http://localhost:5001 ws://localhost:5001",
+        "img-src": "'self' asset: http://asset.localhost https://asset.localhost data: blob:",
+        "style-src": "'self' 'unsafe-inline'",
+        "font-src": "'self'",
+        "script-src": "'self' 'unsafe-inline'"
+      },
+      "assetProtocol": {
+        "enable": true,
+        "scope": {
+          "allow": [
+            "**"
+          ],
+          "deny": []
+        }
+      },
+      "capabilities": [
+        "default",
+        "opener",
+        "desktop-capability",
+        "downloader",
+        "server"
+      ]
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "nsis"
+    ],
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "installerIcon": "icons/icon.ico",
+        "headerImage": "icons/icon.ico"
+      }
+    },
+    "resources": [
+      "binaries/models-cunet/*",
+      "binaries/models-upconv_7_anime_style_art_rgb/*",
+      "binaries/models-upconv_7_photo/*",
+      "binaries/vcomp140.dll"
+    ],
+    "externalBin": [
+      "binaries/yt-dlp",
+      "binaries/ffmpeg",
+      "binaries/ffprobe",
+      "binaries/deno",
+      "binaries/waifu2x-ncnn-vulkan",
+      "binaries/MappingUtility.Server"
+    ],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "dialog": true,
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IERERTQ2MzI4REExMTUyRQpSV1F1RmFHTk1rYmVEWUh2RkhEcUp2SXEybFgrZ0xLVktpaW1nMVNhUU5ZTFFnclFUVGVKZjRkbgo=",
+      "endpoints": [
+        "https://github.com/namakemono-san/osu-mapping-utility/releases/latest/download/latest.json"
+      ]
+    }
+  }
+}

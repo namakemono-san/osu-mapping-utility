@@ -1,0 +1,19 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "server",
+  "description": "Permissions for MappingUtility.Server sidecar",
+  "windows": ["main"],
+  "permissions": [
+    "shell:default",
+    {
+      "identifier": "shell:allow-execute",
+      "allow": [
+        {
+          "name": "MappingUtility.Server",
+          "sidecar": true,
+          "args": []
+        }
+      ]
+    }
+  ]
+}

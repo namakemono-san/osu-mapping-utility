@@ -28,39 +28,39 @@ cd osu-mapping-utility
 
 pnpm install
 
-# Development build (desktop)
-pnpm tauri dev
+# Development build
+pnpm dev
 
 # Production build
-pnpm tauri build
+pnpm build
 ```
 
 ## Features
 
 ### Map Tools
 
-| Category                      | Description                                                                                                                                                       |
-| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Beatmap Clone**             | Generates a working copy of an existing beatmapset. Copies timing points, resets difficulty settings, and strips unnecessary skin files.                          |
-| **Beatmap Preview**           | Plays back taiko beatmaps with a visual playfield and audio synchronization. Supports hit sounds, SV/tick visualization, DT/HR mods, and per-difficulty toggling. |
-| **Beatmap Customizer**        | Applies batch text-level modifications to `.osu` files, such as removing editor bookmarks, rewriting combo colors, and converting hitsound types.                 |
-| **Metadata Editor**           | Edits metadata fields including Unicode/Romanized title, artist, creator, source, and tags across all difficulties. Renames `.osu` files automatically.           |
-| **Ranking Criteria Checker**  | Validates a beatmapset against osu! Ranking Criteria rules and guidelines across categories: metadata, audio quality, file usage, spread, and difficulty settings. |
+| Category                     | Description                                                                                                                                                        |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Beatmap Clone**            | Generates a working copy of an existing beatmapset. Copies timing points, resets difficulty settings, and strips unnecessary skin files.                           |
+| **Beatmap Preview**          | Plays back taiko beatmaps with a visual playfield and audio synchronization. Supports hit sounds, SV/tick visualization, DT/HR mods, and per-difficulty toggling.  |
+| **Beatmap Customizer**       | Applies batch text-level modifications to `.osu` files, such as removing editor bookmarks, rewriting combo colors, and converting hitsound types.                  |
+| **Metadata Editor**          | Edits metadata fields including Unicode/Romanized title, artist, creator, source, and tags across all difficulties. Renames `.osu` files automatically.            |
+| **Metadata Checker** | Validates a beatmapset against osu! Ranking Criteria rules and guidelines across categories: metadata, audio quality, file usage, spread, and difficulty settings. |
 
 ### Utilities
 
-| Category              | Description                                                                                                    |
-| --------------------- | -------------------------------------------------------------------------------------------------------------- |
-| **Offset Calibrator** | Allows offset adjustment by playing audio directly within the application.                                     |
-| **Audio Analyzer**    | Analyzes audio files for BPM, bitrate, and frequency cutoff. Generates and exports a spectrogram image.        |
-| **Video Downloader**  | Downloads video or audio from external sources such as YouTube via yt-dlp for use during beatmap preparation.  |
-| **Image Downloader**  | Downloads thumbnail images from YouTube for use as a beatmap background.                                       |
+| Category              | Description                                                                                                   |
+| --------------------- | ------------------------------------------------------------------------------------------------------------- |
+| **Offset Calibrator** | Allows offset adjustment by playing audio directly within the application.                                    |
+| **Audio Analyzer**    | Analyzes audio files for BPM, bitrate, and frequency cutoff. Generates and exports a spectrogram image.       |
+| **Audio Downloader**  | Downloads audio or video from external sources such as YouTube via yt-dlp for use during beatmap preparation. |
+| **Image Downloader**  | Downloads thumbnail images from YouTube for use as a beatmap background.                                      |
 
 ## Roadmap
 
-| Category                       | Summary                                                       | Status                 |
-| ------------------------------ | ------------------------------------------------------------- | ---------------------- |
-| **Plugin / Extension Support** | Support for external utility extensions                       | 🟡 Concept stage       |
+| Category                       | Summary                                 | Status           |
+| ------------------------------ | --------------------------------------- | ---------------- |
+| **Plugin / Extension Support** | Support for external utility extensions | 🟡 Concept stage |
 
 ## Issue Reporting
 

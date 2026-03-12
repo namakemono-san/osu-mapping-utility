@@ -26,10 +26,11 @@ if (wantPrint && wantCheck) {
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDir, '..', '..');
 
-const tauriConfPath = path.join(repoRoot, 'src-tauri', 'tauri.conf.json');
-const cargoTomlPath = path.join(repoRoot, 'src-tauri', 'Cargo.toml');
-const cargoLockPath = path.join(repoRoot, 'src-tauri', 'Cargo.lock');
-const packageJsonPath = path.join(repoRoot, 'package.json');
+const tauriConfPath = path.join(repoRoot, 'app', 'src-tauri', 'tauri.conf.json');
+const cargoTomlPath = path.join(repoRoot, 'app', 'src-tauri', 'Cargo.toml');
+const cargoLockPath = path.join(repoRoot, 'app', 'src-tauri', 'Cargo.lock');
+const packageJsonPath = path.join(repoRoot, 'app', 'package.json');
+const csProjPath = path.join(repoRoot, 'MappingUtility.Server', 'MappingUtility.Server.csproj');
 
 function readText(filePath) {
   return fs.readFileSync(filePath, 'utf8');
@@ -70,12 +71,12 @@ function syncPackageJson(version, mode) {
   const before = pkg.version;
   const inSync = before === version;
 
-  if (mode === 'check') return { file: 'package.json', inSync };
+  if (mode === 'check') return { file: 'app/package.json', inSync };
   if (!inSync) {
     pkg.version = version;
     writeJson(packageJsonPath, pkg, eol, 2);
   }
-  return { file: 'package.json', changed: !inSync };
+  return { file: 'app/package.json', changed: !inSync };
 }
 
 function syncCargoToml(version, mode) {
@@ -107,12 +108,12 @@ function syncCargoToml(version, mode) {
   }
 
   if (!found) throw new Error('Cargo.toml: [package].version not found');
-  if (mode === 'check') return { file: 'src-tauri/Cargo.toml', inSync };
+  if (mode === 'check') return { file: 'app/src-tauri/Cargo.toml', inSync };
 
   const afterText = lines.join('\n');
   const changed = afterText.replace(/\r?\n/g, eol) !== beforeText;
   if (changed) writeText(cargoTomlPath, afterText, eol);
-  return { file: 'src-tauri/Cargo.toml', changed };
+  return { file: 'app/src-tauri/Cargo.toml', changed };
 }
 
 function syncCargoLock(version, mode) {
@@ -157,11 +158,38 @@ function syncCargoLock(version, mode) {
   }
 
   if (!foundAny) throw new Error('Cargo.lock: package osu-mapping-utility not found');
-  if (mode === 'check') return { file: 'src-tauri/Cargo.lock', inSync };
+  if (mode === 'check') return { file: 'app/src-tauri/Cargo.lock', inSync };
   const afterText = lines.join('\n');
   const changed = touched > 0;
   if (changed) writeText(cargoLockPath, afterText, eol);
-  return { file: 'src-tauri/Cargo.lock', changed };
+  return { file: 'app/src-tauri/Cargo.lock', changed };
+}
+
+function syncCsProj(version, mode) {
+  const label = 'MappingUtility.Server/MappingUtility.Server.csproj';
+  const beforeText = readText(csProjPath);
+  const eol = detectEol(beforeText);
+  const match = beforeText.match(/<Version>([^<]*)<\/Version>/);
+
+  if (!match) {
+    if (mode === 'check') return { file: label, inSync: false };
+    const newText = beforeText.replace(
+      /(<PropertyGroup>)/,
+      `$1\n    <Version>${version}</Version>`,
+    );
+    writeText(csProjPath, newText, eol);
+    return { file: label, changed: true };
+  }
+
+  const current = match[1];
+  const inSync = current === version;
+  if (mode === 'check') return { file: label, inSync };
+
+  if (!inSync) {
+    const newText = beforeText.replace(/<Version>[^<]*<\/Version>/, `<Version>${version}</Version>`);
+    writeText(csProjPath, newText, eol);
+  }
+  return { file: label, changed: !inSync };
 }
 
 function main() {
@@ -179,6 +207,7 @@ function main() {
     syncPackageJson(version, mode),
     syncCargoToml(version, mode),
     syncCargoLock(version, mode),
+    syncCsProj(version, mode),
   ];
 
   if (mode === 'check') {
