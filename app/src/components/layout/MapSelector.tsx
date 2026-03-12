@@ -647,7 +647,7 @@ export function MapSelector({
                         ) : loadError ? (
                             <div className="space-y-2">
                                 <StatusMessage type="error" message={t("mapSelector.error.loadFailed")} />
-                                <p className="text-xs opacity-70 break-words">{loadError}</p>
+                                <p className="text-xs opacity-70 wrap-break-word">{loadError}</p>
                             </div>
                         ) : !songsFolder ? (
                             <p className="text-sm">{t("mapSelector.empty.noSongsFolder")}</p>

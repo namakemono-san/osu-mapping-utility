@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { FiImage, FiSave, FiUpload } from "react-icons/fi";
+import { FiSave, FiUpload } from "react-icons/fi";
 import { invoke } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
 
