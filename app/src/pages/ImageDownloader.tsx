@@ -9,6 +9,7 @@ import { Card } from "../components/Card";
 import { Input } from "../components/Input";
 import { Chip } from "../components/Chip";
 
+import { useDownloaderSettings } from "../hooks/useStorage";
 import { useI18n } from "../hooks/i18nContext";
 
 export function ImageDownloader() {
@@ -16,12 +17,14 @@ export function ImageDownloader() {
 
   const [input, setInput] = useState("");
   const [pickedFile, setPickedFile] = useState<string>("");
-  const [outDir, setOutDir] = useState<string>("");
+
+  const { outDir, setOutDir } = useDownloaderSettings();
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [imageSrc, setImageSrc] = useState<string | null>(null);
   const [logLines, setLogLines] = useState<string[]>([]);
+  const [activeTab, setActiveTab] = useState<"log" | "preview">("log");
   const logRef = useRef<HTMLPreElement | null>(null);
 
   const appendLog = useCallback((msg: string) => {
@@ -94,6 +97,7 @@ export function ImageDownloader() {
   const run = useCallback(async () => {
     setError(null);
     setImageSrc(null);
+    setActiveTab("log");
 
     if (!outDir.trim()) {
       setError(t("image.error.noOutDir"));
@@ -117,7 +121,7 @@ export function ImageDownloader() {
           throw new Error(t("image.invalidUrl"));
         }
         appendLog(`[info] video_id=${vid}`);
-        path = await invoke<string>("process_thumbnail_from_video_id", { videoId: vid });
+        path = await invoke<string>("process_thumbnail_from_video_id", { videoId: vid, outDir });
       } else if (kind === "url") {
         appendLog(`[info] ${input}`);
         path = await invoke<string>("process_thumbnail_from_url", {
@@ -131,6 +135,7 @@ export function ImageDownloader() {
 
       appendLog(`[done] ${path}`);
       setImageSrc(convertFileSrc(path));
+      setActiveTab("preview");
       void openPath(outDir);
     } catch (e: unknown) {
       appendLog(`[error] ${String(e)}`);
@@ -211,29 +216,55 @@ export function ImageDownloader() {
         </Card>
       )}
 
-      <Card className="flex flex-col">
-        <div className="flex items-center px-3 py-2 border-b border-border-muted">
-          <span className="text-sm opacity-80">{t("image.log.title")}</span>
+      <div>
+        <div className="flex">
+          <button
+            type="button"
+            onClick={() => setActiveTab("log")}
+            className={`px-3 py-2 text-sm border-t border-l border-r rounded-t-lg transition-colors ${
+              activeTab === "log"
+                ? "bg-surface-base border-border-muted text-text-primary border-b-surface-base"
+                : "bg-surface-elevated border-border-strong text-text-muted hover:text-text-primary hover:bg-surface-hover border-b-border-muted"
+            }`}
+          >
+            {t("image.log.title")}
+          </button>
+          {imageSrc && (
+            <button
+              type="button"
+              onClick={() => setActiveTab("preview")}
+              className={`px-3 py-2 text-sm border-t border-l border-r rounded-t-lg transition-colors -ml-px ${
+                activeTab === "preview"
+                  ? "bg-surface-base border-border-muted text-text-primary border-b-surface-base"
+                  : "bg-surface-elevated border-border-strong text-text-muted hover:text-text-primary hover:bg-surface-hover border-b-border-muted"
+              }`}
+            >
+              {t("image.preview")}
+            </button>
+          )}
+          <div className="flex-1 border-b border-border-muted"></div>
+          {activeTab === "preview" && imageSrc && (
+            <span className="text-xs opacity-60 self-center mr-3">{t("image.previewSize")}</span>
+          )}
         </div>
-        <pre
-          ref={logRef}
-          className="font-mono text-sm whitespace-pre-wrap wrap-break-word px-3 py-2 h-40 overflow-auto"
-        >
-          {logLines.length > 0 ? logLines.join("\n") : t("image.log.ready")}
-        </pre>
-      </Card>
 
-      {imageSrc && (
-        <Card className="flex flex-col">
-          <div className="flex items-center justify-between px-3 py-2 border-b border-border-muted">
-            <span className="text-sm opacity-80">{t("image.preview")}</span>
-            <span className="text-xs opacity-60">{t("image.previewSize")}</span>
-          </div>
-          <div className="p-3">
-            <img src={imageSrc} alt="image" className="w-full rounded border border-border-muted" />
-          </div>
+        <Card className="border-t-0 rounded-t-none">
+          {activeTab === "log" && (
+            <pre
+              ref={logRef}
+              className="font-mono text-sm whitespace-pre-wrap wrap-break-word px-3 py-2 h-40 overflow-auto"
+            >
+              {logLines.length > 0 ? logLines.join("\n") : t("image.log.ready")}
+            </pre>
+          )}
+
+          {activeTab === "preview" && imageSrc && (
+            <div className="p-3">
+              <img src={imageSrc} alt="image" className="w-full rounded border border-border-muted" />
+            </div>
+          )}
         </Card>
-      )}
+      </div>
     </div>
   );
 }

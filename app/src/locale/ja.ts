@@ -251,7 +251,7 @@ export const ja: Record<LocaleKey, string> = {
     "calibrator.beatWaveforms": "拍の波形",
 
     "audio.button.select": "音声ファイルを選択",
-    "audio.button.export": "PNG保存",
+    "audio.button.export": "画像を保存",
     "audio.status.loading": "解析中...",
     "audio.export.success": "スペクトログラムを保存しました",
 

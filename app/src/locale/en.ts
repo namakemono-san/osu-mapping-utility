@@ -249,7 +249,7 @@ export const en = {
     "calibrator.beatWaveforms": "Beat Waveforms",
 
     "audio.button.select": "Select Audio File",
-    "audio.button.export": "Save PNG",
+    "audio.button.export": "Save Image",
     "audio.status.loading": "Analyzing audio...",
     "audio.export.success": "Spectrogram exported successfully",
 
