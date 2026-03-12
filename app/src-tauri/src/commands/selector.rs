@@ -210,22 +210,25 @@ fn parse_beatmap_folder(folder_path: &Path, folder_name: &str) -> Option<Beatmap
             None
         };
 
+        let artist_str = if artist.is_empty() { "Unknown".to_string() } else { artist };
+        let creator_str = if creator.is_empty() { "Unknown".to_string() } else { creator };
+        let search_text = format!(
+            "{} {} {} {} {}",
+            display_title.to_lowercase(),
+            artist_str.to_lowercase(),
+            creator_str.to_lowercase(),
+            beatmap_id.to_lowercase(),
+            beatmapset_id.to_lowercase(),
+        );
         let candidate = Beatmapset {
             folder_name: folder_name.to_string(),
             title: display_title,
-            artist: if artist.is_empty() {
-                "Unknown".to_string()
-            } else {
-                artist
-            },
-            creator: if creator.is_empty() {
-                "Unknown".to_string()
-            } else {
-                creator
-            },
+            artist: artist_str,
+            creator: creator_str,
             background_path,
             beatmap_id,
             beatmap_set_id: beatmapset_id.clone(),
+            search_text,
         };
 
         let has_set_id = !beatmapset_id.is_empty() && beatmapset_id != "-1" && beatmapset_id != "0";
@@ -335,17 +338,7 @@ pub fn search_beatmapsets(
         let parsed: Vec<Beatmapset> = chunk
             .par_iter()
             .filter_map(|folder| get_or_parse_beatmap(&base_path, folder))
-            .filter(|b| {
-                let searchable = format!(
-                    "{} {} {} {} {}",
-                    b.title.to_lowercase(),
-                    b.artist.to_lowercase(),
-                    b.creator.to_lowercase(),
-                    b.beatmap_id,
-                    b.beatmap_set_id
-                );
-                searchable.contains(&query_lower)
-            })
+            .filter(|b| b.search_text.contains(&query_lower))
             .collect();
 
         matched.extend(parsed);
@@ -365,6 +358,57 @@ pub fn search_beatmapsets(
     let has_more = scanned < folders.len() || end_index < total;
 
     Ok((results, end_index, has_more))
+}
+
+#[tauri::command]
+pub fn warmup_search_cache(base_path: String) -> Result<usize, String> {
+    let base_path = normalize_base_path(&base_path);
+    let folders = get_folder_list(&base_path)?;
+
+    // Collect names of uncached folders
+    let uncached_names: Vec<String> = {
+        let cache = PARSED_CACHE
+            .read()
+            .map_err(|e| format!("Lock error: {}", e))?;
+        if let Some(path_cache) = cache.get(&base_path) {
+            folders
+                .iter()
+                .filter(|f| !path_cache.data.contains_key(&f.name))
+                .map(|f| f.name.clone())
+                .collect()
+        } else {
+            folders.iter().map(|f| f.name.clone()).collect()
+        }
+    };
+
+    if uncached_names.is_empty() {
+        return Ok(folders.len());
+    }
+
+    // Parse all uncached folders in parallel without holding any lock
+    let parsed: Vec<(String, Beatmapset)> = uncached_names
+        .par_iter()
+        .filter_map(|name| {
+            let path = Path::new(&base_path).join(name);
+            let beatmap = parse_beatmap_folder(&path, name)?;
+            Some((name.clone(), beatmap))
+        })
+        .collect();
+
+    // Single write lock for bulk insert
+    {
+        let mut cache = PARSED_CACHE
+            .write()
+            .map_err(|e| format!("Lock error: {}", e))?;
+        let path_cache = cache
+            .entry(base_path)
+            .or_insert_with(ParsedBeatmapCache::new);
+        for (name, beatmap) in parsed {
+            path_cache.data.insert(name, beatmap);
+        }
+    }
+
+    Ok(folders.len())
 }
 
 #[tauri::command]

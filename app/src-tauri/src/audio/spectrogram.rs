@@ -10,7 +10,7 @@ use once_cell::sync::Lazy;
 use crate::audio::analyzer::SpectrogramData;
 
 const MIN_DB: f32 = -120.0;
-const MAX_DB: f32 = -20.0;
+const MAX_DB: f32 = 0.0;
 
 static UI_FONTS: Lazy<Vec<FontArc>> = Lazy::new(|| {
     let mut fonts = Vec::new();
@@ -225,7 +225,7 @@ pub fn generate_image(
     }
     draw_rect(&mut image, bar_x, bar_y, bar_width, bar_h, [185, 185, 185]);
 
-    for db in [-20, -40, -60, -80, -100, -120] {
+    for db in [0, -20, -40, -60, -80, -100, -120] {
         let y = db_to_bar_y(db as f32, plot_top, plot_bottom);
         let label = format!("{db} dB");
         draw_text(

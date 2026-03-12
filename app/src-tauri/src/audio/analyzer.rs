@@ -1,8 +1,8 @@
 use rustfft::num_complex::Complex;
 use rustfft::FftPlanner;
 
-const WINDOW_SIZE: usize = 2048;
-const HOP_SIZE: usize = 512;
+const WINDOW_SIZE: usize = 4096;
+const HOP_SIZE: usize = 1024;
 const MIN_DB: f32 = -120.0;
 
 pub struct SpectrogramData {
@@ -43,8 +43,7 @@ pub fn compute_spectrogram(
 
     let freq_bins = WINDOW_SIZE / 2 + 1;
     let mut rows: Vec<Vec<f32>> = Vec::with_capacity(frame_count);
-    let window_sum: f32 = window.iter().sum();
-    let reference = (window_sum * 0.5).max(1.0e-12);
+    let reference = WINDOW_SIZE as f32 / 2.0;
 
     for frame_idx in 0..frame_count {
         let frame_start = frame_idx * adaptive_hop;
@@ -59,11 +58,8 @@ pub fn compute_spectrogram(
         fft.process(&mut fft_input);
 
         let mut row = Vec::with_capacity(freq_bins);
-        for (bin_index, bin) in fft_input.iter().take(freq_bins).enumerate() {
-            let mut magnitude = bin.norm();
-            if bin_index != 0 && bin_index != freq_bins - 1 {
-                magnitude *= 2.0;
-            }
+        for bin in fft_input.iter().take(freq_bins) {
+            let magnitude = bin.norm();
 
             let normalized = (magnitude / reference).max(1.0e-12);
             let db = 20.0 * normalized.log10();

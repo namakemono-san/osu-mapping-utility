@@ -143,7 +143,7 @@ function App() {
 
         {showMapSelector && (
           <MapSelector
-            onSelect={setSelectedBeatmap}
+            onSelect={(b) => setSelectedBeatmap({ ...b })}
             selectedBeatmap={selectedBeatmap}
             className={hasBackground ? "bg-surface-sidebar/90 backdrop-blur-md" : ""}
           />

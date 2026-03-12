@@ -46,6 +46,7 @@ export const ja: Record<LocaleKey, string> = {
     "mapSelector.button.changeFolderTitle": "フォルダ変更",
     "mapSelector.search.placeholder": "ビートマップ検索...",
     "mapSelector.loading": "読み込み中...",
+    "mapSelector.indexing": "検索インデックスを作成中...",
     "mapSelector.empty.noBeatmaps": "ビートマップが見つかりません",
     "mapSelector.empty.tryDifferent": "別の検索語を試してください",
     "mapSelector.dialog.selectSongsFolder": "osu! Songs フォルダを選択",

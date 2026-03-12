@@ -170,6 +170,7 @@ export function MapSelector({
     const [search, setSearch] = useState("");
     const [debouncedSearch, setDebouncedSearch] = useState("");
     const [isScanning, setIsScanning] = useState(false);
+    const [isIndexing, setIsIndexing] = useState(false);
     const [songsFolder, setSongsFolder] = useSongsFolder();
     const [loadError, setLoadError] = useState<string | null>(null);
     const [currentIndex, setCurrentIndex] = useState(0);
@@ -187,6 +188,16 @@ export function MapSelector({
     const pendingReloadRef = useRef<{ folder: string; searchQuery: string } | null>(null);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const isInitialMount = useRef(true);
+    const warmupFolderRef = useRef<string | null>(null);
+
+    useEffect(() => {
+        if (!songsFolder || warmupFolderRef.current === songsFolder) return;
+        warmupFolderRef.current = songsFolder;
+        setIsIndexing(true);
+        invoke("warmup_search_cache", { basePath: songsFolder })
+            .then(() => setIsIndexing(false))
+            .catch(() => setIsIndexing(false));
+    }, [songsFolder]);
 
     useEffect(() => {
         const handleContextMenu = (e: MouseEvent) => {
@@ -384,11 +395,6 @@ export function MapSelector({
         };
     }, [search]);
 
-    useEffect(() => {
-        if (isInitialMount.current) return;
-        reloadSearch(debouncedSearch);
-    }, [debouncedSearch, reloadSearch]);
-
     const handleScroll = useCallback(
         (e: React.UIEvent<HTMLDivElement>) => {
             if (!songsFolder || isLoadingRef.current || !hasMore) return;
@@ -460,17 +466,9 @@ export function MapSelector({
             isInitialMount.current = false;
             return;
         }
-
         if (!songsFolder) return;
-
-        currentRequestRef.current += 1;
-        const requestId = currentRequestRef.current;
-        setBeatmaps([]);
-        setCurrentIndex(0);
-        setHasMore(true);
-        if (scrollContainerRef.current) scrollContainerRef.current.scrollTop = 0;
-        void loadStep(songsFolder, debouncedSearch, 0, false, requestId);
-    }, [songsFolder, debouncedSearch, loadStep]);
+        void reloadSearch(debouncedSearch);
+    }, [songsFolder, debouncedSearch, reloadSearch]);
 
     useEffect(() => {
         (async () => {
@@ -549,6 +547,9 @@ export function MapSelector({
                             className="w-full h-8 pl-9 pr-3 rounded-lg bg-surface-hover border border-border-strong text-sm placeholder-text-muted focus:outline-none focus:border-border-focus transition-colors"
                         />
                     </div>
+                    {isIndexing && (
+                        <p className="text-xs text-text-muted animate-pulse">{t("mapSelector.indexing")}</p>
+                    )}
                 </div>
             </div>
 

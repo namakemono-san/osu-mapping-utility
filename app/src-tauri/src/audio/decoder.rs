@@ -20,6 +20,7 @@ pub struct AudioData {
     pub bits_per_sample: u16,
     pub duration_seconds: f64,
     pub file_size_bytes: u64,
+    pub audio_stream_bytes: u64,
 }
 
 pub fn decode_audio(file_path: &str) -> Result<AudioData, String> {
@@ -95,6 +96,8 @@ pub fn decode_audio(file_path: &str) -> Result<AudioData, String> {
         mono_samples.reserve(reserve_len);
     }
 
+    let mut audio_stream_bytes: u64 = 0;
+
     loop {
         let packet = match format.next_packet() {
             Ok(packet) => packet,
@@ -109,6 +112,8 @@ pub fn decode_audio(file_path: &str) -> Result<AudioData, String> {
         if packet.track_id() != track_id {
             continue;
         }
+
+        audio_stream_bytes += packet.data().len() as u64;
 
         let decoded = match decoder.decode(&packet) {
             Ok(decoded) => decoded,
@@ -148,6 +153,7 @@ pub fn decode_audio(file_path: &str) -> Result<AudioData, String> {
         bits_per_sample,
         duration_seconds,
         file_size_bytes: metadata.len(),
+        audio_stream_bytes,
     })
 }
 

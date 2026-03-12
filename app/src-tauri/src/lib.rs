@@ -108,6 +108,7 @@ pub fn run() {
             commands::detect_osu_path,
             commands::scan_beatmapsets,
             commands::search_beatmapsets,
+            commands::warmup_search_cache,
             commands::reload_beatmapsets,
             commands::clone_beatmap,
             commands::read_audio_file,

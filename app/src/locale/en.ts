@@ -44,6 +44,7 @@ export const en = {
     "mapSelector.button.changeFolderTitle": "Change folder",
     "mapSelector.search.placeholder": "Search beatmaps...",
     "mapSelector.loading": "Loading...",
+    "mapSelector.indexing": "Indexing beatmaps for search...",
     "mapSelector.empty.noBeatmaps": "No beatmaps found",
     "mapSelector.empty.tryDifferent": "Try a different search term",
     "mapSelector.dialog.selectSongsFolder": "Select osu! Songs folder",

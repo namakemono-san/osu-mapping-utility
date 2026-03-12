@@ -72,7 +72,7 @@ pub async fn analyze_audio(file_path: String) -> Result<AudioAnalysisResult, Str
 
     let image_base64 = STANDARD.encode(&png_bytes);
     let max_frequency_hz = (decoded.sample_rate / 2).min(24_000);
-    let average_bitrate_kbps = average_bitrate_kbps_from_data(decoded.file_size_bytes, decoded.duration_seconds);
+    let average_bitrate_kbps = average_bitrate_kbps_from_data(decoded.audio_stream_bytes, decoded.duration_seconds);
     let original_size_bytes = estimate_original_size_bytes(
         decoded.sample_rate,
         decoded.channels,
@@ -168,7 +168,7 @@ fn estimate_frequency_cutoff_hz(spectrogram: &analyzer::SpectrogramData, sample_
         .clamp(0.0, (bins - 1) as f32) as usize;
 
     let mut occupancy = vec![0.0f32; bins];
-    let threshold_db = -82.0f32;
+    let threshold_db = -94.0f32;
 
     for (bin, occ) in occupancy.iter_mut().enumerate() {
         let hits = spectrogram
@@ -260,7 +260,7 @@ pub async fn check_audio_info(file_path: String) -> Result<AudioCheckInfo, Strin
 
     let frequency_cutoff_hz = estimate_frequency_cutoff_hz(&spectrum, decoded.sample_rate);
     let average_bitrate_kbps =
-        average_bitrate_kbps_from_data(decoded.file_size_bytes, decoded.duration_seconds);
+        average_bitrate_kbps_from_data(decoded.audio_stream_bytes, decoded.duration_seconds);
 
     Ok(AudioCheckInfo {
         format,
