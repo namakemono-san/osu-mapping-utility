@@ -2,7 +2,7 @@ import * as signalR from "@microsoft/signalr";
 import type { Beatmap, MetadataWriteInput, Background } from "../types/osu";
 
 const connection = new signalR.HubConnectionBuilder()
-    .withUrl("http://localhost:5001/beatmap")
+    .withUrl("http://localhost:7001/beatmap")
     .withAutomaticReconnect()
     .build();
 
