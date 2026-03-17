@@ -41,7 +41,7 @@ export default function MetadataPanel(props: MetadataPanelProps) {
     <Card className="p-2">
       <div className="text-xs font-semibold mb-2 border-b border-border-subtle pb-1">Vitals</div>
       <div className="text-xs leading-5 space-y-0.5">
-        <div>Sample Rate: {Math.round(props.sampleRate / 1000)}kHz</div>
+        <div>Sample Rate: {Math.round(props.sampleRate)}Hz</div>
         <div>Channels: {props.channels} {channelText}</div>
         <div>Bits Per Sample: {props.bitsPerSample}</div>
         <div>Size: {formatSize(props.fileSizeBytes)} ({originalPercent}% of original)</div>
