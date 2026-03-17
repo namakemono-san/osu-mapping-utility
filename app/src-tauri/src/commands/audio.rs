@@ -171,7 +171,7 @@ async fn convert_audio(
         .len();
 
     let source_avg_kbps = average_kbps_from_size_and_duration(file_size_bytes, duration_seconds);
-    let target_sample_rate_hz = std::cmp::min(sample_rate_hz, 48_000);
+    let target_sample_rate_hz = std::cmp::min(sample_rate_hz, 44_100);
 
     let max_bitrate_kbps = match audio_format.to_lowercase().as_str() {
         "ogg" => 208,
