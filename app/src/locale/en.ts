@@ -252,6 +252,8 @@ export const en = {
     "audio.button.export": "Save Image",
     "audio.status.loading": "Analyzing audio...",
     "audio.export.success": "Spectrogram exported successfully",
+    "audio.dropHint": "Drop an audio file here (MP3 / OGG), or click \"{select}\".",
+    "audio.dropOverlay": "Drop to analyze",
 
     "preview.debug.title": "Debug Info:",
     "preview.debug.mode": "Mode:",

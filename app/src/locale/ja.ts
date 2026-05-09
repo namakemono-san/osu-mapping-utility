@@ -254,6 +254,8 @@ export const ja: Record<LocaleKey, string> = {
     "audio.button.export": "画像を保存",
     "audio.status.loading": "解析中...",
     "audio.export.success": "スペクトログラムを保存しました",
+    "audio.dropHint": "ここに音声ファイルをドロップするか、\"{select}\" をクリックしてください（MP3 / OGG）。",
+    "audio.dropOverlay": "ドロップして解析",
 
     "preview.debug.title": "Debug Info:",
     "preview.debug.mode": "Mode:",

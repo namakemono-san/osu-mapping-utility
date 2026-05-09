@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { FiSave, FiUpload } from "react-icons/fi";
 import { invoke } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
@@ -25,6 +26,68 @@ export function AudioAnalyzer({ className = "" }: AudioAnalyzerProps) {
   const [error, setError] = useState<string | null>(null);
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
   const [exportSuccess, setExportSuccess] = useState<string | null>(null);
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
+
+  const handleAnalyze = useCallback(async (filePath: string) => {
+    setLoading(true);
+    setError(null);
+    setExportSuccess(null);
+    setSelectedFilePath(filePath);
+
+    try {
+      const analysisResult = await invoke<AudioAnalysisResult>("analyze_audio", {
+        filePath,
+      });
+      setResult(analysisResult);
+    } catch (err) {
+      setError(toErrorMessage(err));
+      setResult(null);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    let unlisten: (() => void) | undefined;
+
+    function register() {
+      getCurrentWebview()
+        .onDragDropEvent((event) => {
+          const payload = event.payload;
+          if (payload.type === "drop") {
+            setIsDraggingOver(false);
+            const audioFile = payload.paths.find((p) => /\.(mp3|ogg)$/i.test(p));
+            if (audioFile) {
+              handleAnalyze(audioFile);
+            }
+            // Re-register after each drop: Windows resets drag state after drop,
+            // causing subsequent drag events to stop firing on the same listener.
+            unlisten?.();
+            unlisten = undefined;
+            if (active) register();
+          } else if (payload.type === "enter" || payload.type === "over") {
+            setIsDraggingOver(true);
+          } else if (payload.type === "leave") {
+            setIsDraggingOver(false);
+          }
+        })
+        .then((fn) => {
+          if (active) {
+            unlisten = fn;
+          } else {
+            fn();
+          }
+        });
+    }
+
+    register();
+
+    return () => {
+      active = false;
+      unlisten?.();
+    };
+  }, [handleAnalyze]);
 
   const handleFileSelect = async () => {
     try {
@@ -35,21 +98,9 @@ export function AudioAnalyzer({ className = "" }: AudioAnalyzerProps) {
 
       if (!selected || Array.isArray(selected)) return;
 
-      setLoading(true);
-      setError(null);
-      setExportSuccess(null);
-      setSelectedFilePath(selected);
-
-      const analysisResult = await invoke<AudioAnalysisResult>("analyze_audio", {
-        filePath: selected,
-      });
-
-      setResult(analysisResult);
+      handleAnalyze(selected);
     } catch (err) {
       setError(toErrorMessage(err));
-      setResult(null);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -80,7 +131,13 @@ export function AudioAnalyzer({ className = "" }: AudioAnalyzerProps) {
   };
 
   return (
-    <div className={`flex flex-col gap-2 text-zinc-200 ${className}`}>
+    <div className={`relative flex flex-col gap-2 text-zinc-200 ${className}`}>
+      {isDraggingOver && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center rounded-lg border-2 border-dashed border-pink-400 bg-zinc-900/80 pointer-events-none">
+          <span className="text-lg font-semibold text-pink-300">{t("audio.dropOverlay")}</span>
+        </div>
+      )}
+
       <Card className="flex flex-wrap items-center gap-2 p-2">
         <Button icon={<FiUpload />} variant="primary" onClick={handleFileSelect} disabled={loading}>
           {t("audio.button.select")}
@@ -99,6 +156,12 @@ export function AudioAnalyzer({ className = "" }: AudioAnalyzerProps) {
       {error && <StatusMessage type="error" message={error} />}
       {exportSuccess && <StatusMessage type="success" message={exportSuccess} />}
 
+      {!result && !loading && (
+        <Card className="flex items-center justify-center p-8 text-sm text-zinc-500">
+          {t("audio.dropHint", { select: t("audio.button.select") })}
+        </Card>
+      )}
+
       {result && (
         <div className="grid grid-cols-1 xl-grid-cols-layout gap-2 min-h-520">
           <MetadataPanel
@@ -114,6 +177,7 @@ export function AudioAnalyzer({ className = "" }: AudioAnalyzerProps) {
             analyzeMs={result.analyze_ms}
             renderMs={result.render_ms}
             totalMs={result.total_ms}
+            format={selectedFilePath?.toLowerCase().endsWith(".ogg") ? "ogg" : "mp3"}
           />
 
           <Card className="p-2 flex items-center justify-center overflow-auto">

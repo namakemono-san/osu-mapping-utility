@@ -13,6 +13,18 @@ interface MetadataPanelProps {
   analyzeMs: number;
   renderMs: number;
   totalMs: number;
+  format: "mp3" | "ogg";
+}
+
+function expectedCutoffHz(format: "mp3" | "ogg", bitrateKbps: number): number {
+  if (format === "ogg") {
+    if (bitrateKbps <= 128) return 15000;
+    if (bitrateKbps <= 192) return 16000;
+    return 18000;
+  }
+  if (bitrateKbps <= 128) return 16000;
+  if (bitrateKbps <= 192) return 18000;
+  return 19500;
 }
 
 function formatSize(bytes: number): string {
@@ -37,6 +49,10 @@ export default function MetadataPanel(props: MetadataPanelProps) {
     ? ((props.fileSizeBytes / props.originalSizeBytes) * 100).toFixed(1)
     : "0.0";
 
+  const hasCutoff = props.frequencyCutoffHz > 0 && props.frequencyCutoffHz < props.sampleRate / 2;
+  const expected = expectedCutoffHz(props.format, props.averageBitrateKbps);
+  const isBloated = hasCutoff && props.frequencyCutoffHz < expected;
+
   return (
     <Card className="p-2">
       <div className="text-xs font-semibold mb-2 border-b border-border-subtle pb-1">Vitals</div>
@@ -50,8 +66,13 @@ export default function MetadataPanel(props: MetadataPanelProps) {
         {props.originalSampleRate !== props.sampleRate && (
           <div>Original Sample Rate: {Math.round(props.originalSampleRate / 1000)}kHz</div>
         )}
-        {props.frequencyCutoffHz > 0 && props.frequencyCutoffHz < props.sampleRate / 2 && (
+        {hasCutoff && (
           <div>Frequency Cutoff: {(props.frequencyCutoffHz / 1000).toFixed(1)}kHz</div>
+        )}
+        {isBloated && (
+          <div className="mt-1 rounded bg-amber-900/40 border border-amber-600/50 px-2 py-1 text-amber-300 leading-4">
+            Possible lossy re-encode — cutoff {(props.frequencyCutoffHz / 1000).toFixed(1)}kHz, expected ≥{(expected / 1000).toFixed(1)}kHz
+          </div>
         )}
       </div>
       <div className="mt-3 text-11 leading-4 border-t border-border-subtle pt-2">{executionText}</div>
