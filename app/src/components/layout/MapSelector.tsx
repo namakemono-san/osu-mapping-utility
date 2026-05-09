@@ -568,21 +568,6 @@ export function MapSelector({
                         >
                             <MdFolder className="text-base" />
                         </Button>
-                        {songsFolder && (
-                            <Button
-                                onClick={isIndexing ? stopIndexing : () => void startProgressiveIndexing(songsFolder)}
-                                disabled={isScanning}
-                                variant="secondary"
-                                size="sm"
-                                title={isIndexing ? "Stop indexing" : "Start indexing"}
-                            >
-                                {isIndexing ? (
-                                    <MdStop className="text-base" />
-                                ) : (
-                                    <MdPlayArrow className="text-base" />
-                                )}
-                            </Button>
-                        )}
                     </div>
 
                     <div className="relative">
