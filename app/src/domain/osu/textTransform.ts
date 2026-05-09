@@ -83,6 +83,32 @@ export function removeNewComboExceptFirst(content: string): string {
   return lines.join(detectEol(content));
 }
 
+export function addNewComboToAll(content: string): string {
+  const lines = content.split(/\r?\n/);
+  let inHit = false;
+  for (let i = 0; i < lines.length; i++) {
+    const raw = lines[i];
+    if (/^\s*\[HitObjects\]\s*$/i.test(raw)) {
+      inHit = true;
+      continue;
+    }
+    if (isSectionHeader(raw)) {
+      inHit = false;
+      continue;
+    }
+    if (!inHit) continue;
+    const line = raw.trim();
+    if (line === "" || line.startsWith("//")) continue;
+    const a = line.split(",");
+    if (a.length < 4) continue;
+    const type = parseInt(a[3], 10);
+    if (isNaN(type)) continue;
+    a[3] = String(type | 4);
+    lines[i] = a.join(",");
+  }
+  return lines.join(detectEol(content));
+}
+
 export function whistleToClap_2to8(content: string): string {
   const lines = content.split(/\r?\n/);
   let inHit = false;

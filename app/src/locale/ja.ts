@@ -127,6 +127,8 @@ export const ja: Record<LocaleKey, string> = {
     "customizer.option.newCombo.desc": "New Combo フラグを除去 (osu!taiko)",
     "customizer.option.whistle.label": "Whistle → Clap",
     "customizer.option.whistle.desc": "Whistle を Clap に置換 (osu!taiko)",
+    "customizer.option.addNewCombo.label": "全ノーツを New Combo に",
+    "customizer.option.addNewCombo.desc": "全ヒットオブジェクトに New Combo フラグを付与 (全モード)",
     "customizer.option.fixUnsnaps.label": "アンスナップを修正",
     "customizer.option.fixUnsnaps.desc": "ヒットオブジェクトを最近傍のビート分割にスナップ (全モード)",
     "customizer.backup.label": "バックアップ作成",

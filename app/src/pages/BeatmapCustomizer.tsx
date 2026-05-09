@@ -10,7 +10,7 @@ import { useI18n } from "../hooks/i18nContext";
 import { useSongsFolder } from "../hooks/useStorage";
 
 import { Beatmapset } from "../types/beatmap";
-import { removeEditorBookmarks, removeNewComboExceptFirst, rewriteCenter, whistleToClap_2to8 } from "../domain/osu/textTransform";
+import { addNewComboToAll, removeEditorBookmarks, removeNewComboExceptFirst, rewriteCenter, whistleToClap_2to8 } from "../domain/osu/textTransform";
 import { requestParseBatch, requestFixUnsnaps } from "../utils/signalr";
 
 interface BeatmapCustomizerProps {
@@ -64,6 +64,7 @@ export function BeatmapCustomizer({ selectedBeatmap }: BeatmapCustomizerProps) {
     const [centerOn, setCenterOn] = useState(false);
     const [rmBookmarks, setRmBookmarks] = useState(false);
     const [rmNewCombo, setRmNewCombo] = useState(false);
+    const [addNewCombo, setAddNewCombo] = useState(false);
     const [w2cOn, setW2cOn] = useState(false);
     const [fixUnsnaps, setFixUnsnaps] = useState(false);
     const [createBackup, setCreateBackup] = useState(true);
@@ -167,9 +168,10 @@ export function BeatmapCustomizer({ selectedBeatmap }: BeatmapCustomizerProps) {
                 if (centerOn) text = rewriteCenter(text, 256, 192);
                 if (rmBookmarks) text = removeEditorBookmarks(text);
                 if (rmNewCombo) text = removeNewComboExceptFirst(text);
+                if (addNewCombo) text = addNewComboToAll(text);
                 if (w2cOn) text = whistleToClap_2to8(text);
 
-                if (centerOn || rmBookmarks || rmNewCombo || w2cOn) {
+                if (centerOn || rmBookmarks || rmNewCombo || addNewCombo || w2cOn) {
                     await writeTextFile(filePath, text);
                 }
                 if (fixUnsnaps) {
@@ -191,7 +193,7 @@ export function BeatmapCustomizer({ selectedBeatmap }: BeatmapCustomizerProps) {
         } finally {
             setProcessing(false);
         }
-    }, [selectedBeatmap, selectedFiles, centerOn, rmBookmarks, rmNewCombo, w2cOn, fixUnsnaps, createBackup, songsFolder]);
+    }, [selectedBeatmap, selectedFiles, centerOn, rmBookmarks, rmNewCombo, addNewCombo, w2cOn, fixUnsnaps, createBackup, songsFolder]);
 
     if (!selectedBeatmap) {
         return (
@@ -204,7 +206,7 @@ export function BeatmapCustomizer({ selectedBeatmap }: BeatmapCustomizerProps) {
         );
     }
 
-    const hasChanges = centerOn || rmBookmarks || rmNewCombo || w2cOn || fixUnsnaps;
+    const hasChanges = centerOn || rmBookmarks || rmNewCombo || addNewCombo || w2cOn || fixUnsnaps;
 
     return (
         <div className="relative h-full flex flex-col">
@@ -309,6 +311,12 @@ export function BeatmapCustomizer({ selectedBeatmap }: BeatmapCustomizerProps) {
                                 desc: t("customizer.option.fixUnsnaps.desc"),
                                 checked: fixUnsnaps,
                                 set: setFixUnsnaps,
+                            },
+                            {
+                                label: t("customizer.option.addNewCombo.label"),
+                                desc: t("customizer.option.addNewCombo.desc"),
+                                checked: addNewCombo,
+                                set: setAddNewCombo,
                             },
                         ].map((opt) => (
                             <button

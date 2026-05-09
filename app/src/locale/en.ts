@@ -125,6 +125,8 @@ export const en = {
     "customizer.option.newCombo.desc": "Remove new combo flags (osu!taiko)",
     "customizer.option.whistle.label": "Whistle → Clap",
     "customizer.option.whistle.desc": "Replace Whistle with Clap (osu!taiko)",
+    "customizer.option.addNewCombo.label": "Add New Combo to All",
+    "customizer.option.addNewCombo.desc": "Set new combo flag on every hit object (all modes)",
     "customizer.option.fixUnsnaps.label": "Fix unsnapped objects",
     "customizer.option.fixUnsnaps.desc": "Snap hit objects to nearest beat division (all modes)",
     "customizer.backup.label": "Create Backup",
