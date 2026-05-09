@@ -220,6 +220,8 @@ export const ja: Record<LocaleKey, string> = {
     "preview.controls.disableDt": "DT 無効",
     "preview.controls.enableHr": "HR 有効",
     "preview.controls.disableHr": "HR 無効",
+    "preview.controls.disableNoSV": "SV を無効",
+    "preview.controls.enableNoSV": "SV を有効",
     "preview.controls.showDebug": "デバッグ表示",
     "preview.controls.hideDebug": "デバッグ非表示",
 

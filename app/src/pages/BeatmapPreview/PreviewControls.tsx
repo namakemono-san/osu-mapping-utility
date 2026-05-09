@@ -64,6 +64,8 @@ export interface PreviewControlsProps {
     mods: ModState;
     toggleDT: () => void;
     toggleHR: () => void;
+    isNoSV: boolean;
+    toggleNoSV: () => void;
 
     debugMode: boolean;
     setDebugMode: (value: boolean | ((prev: boolean) => boolean)) => void;
@@ -98,6 +100,8 @@ export function PreviewControls({
     mods,
     toggleDT,
     toggleHR,
+    isNoSV,
+    toggleNoSV,
     debugMode,
     setDebugMode,
     musicVolume,
@@ -180,6 +184,17 @@ export function PreviewControls({
                     tooltip={mods.isHR ? t("preview.controls.disableHr") : t("preview.controls.enableHr")}
                 >
                     HR
+                </TooltipButton>
+
+                <TooltipButton
+                    onClick={toggleNoSV}
+                    className={`border font-bold ${isNoSV
+                        ? "border-orange-500 bg-orange-500/20 text-white"
+                        : "border-border-muted bg-surface-panel text-text-muted hover:border-border-strong"
+                        }`}
+                    tooltip={isNoSV ? t("preview.controls.enableNoSV") : t("preview.controls.disableNoSV")}
+                >
+                    SV
                 </TooltipButton>
 
                 <Button

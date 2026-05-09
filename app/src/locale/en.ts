@@ -218,6 +218,8 @@ export const en = {
     "preview.controls.disableDt": "Disable DT",
     "preview.controls.enableHr": "Enable HR",
     "preview.controls.disableHr": "Disable HR",
+    "preview.controls.disableNoSV": "Disable SV",
+    "preview.controls.enableNoSV": "Enable SV",
     "preview.controls.showDebug": "Show Debug",
     "preview.controls.hideDebug": "Hide Debug",
 

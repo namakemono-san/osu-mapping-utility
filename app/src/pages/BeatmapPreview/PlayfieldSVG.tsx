@@ -1,4 +1,5 @@
-import { useCallback } from "react";
+import { useCallback, useRef, useState } from "react";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import type { TaikoDifficulty, TaikoHitObjectWithStart } from "../../domain/osu/taikoMapper";
 import type { TimingLine } from "../../types/osu";
 import type { Tick } from "../../domain/osu/tickGenerator";
@@ -12,6 +13,15 @@ const JUDGMENT_CIRCLE_RADIUS = 20;
 const HIT_CIRCLE_SIZE = 30;
 const HIT_ANIMATION_DURATION_MS = 300;
 const HIT_ANIMATION_FLOAT_DISTANCE = 50;
+const APPROACH_TIME = 2000;
+
+function formatTimestamp(ms: number): string {
+    const totalSeconds = Math.floor(ms / 1000);
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
+    const millis = Math.floor(ms % 1000);
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}:${millis.toString().padStart(3, "0")}`;
+}
 
 export interface PlayfieldSVGProps {
     filteredDifficulties: TaikoDifficulty[];
@@ -22,6 +32,9 @@ export interface PlayfieldSVGProps {
     isViewSVLine: boolean;
     hitAnimations: HitAnimation[];
     calculateGameplayStart: (objectTime: number, timingLines: TimingLine[]) => number;
+    isPlaying: boolean;
+    seekTo: (timeMs: number) => void;
+    duration: number;
 }
 
 export function PlayfieldSVG({
@@ -33,7 +46,49 @@ export function PlayfieldSVG({
     isViewSVLine,
     hitAnimations,
     calculateGameplayStart,
+    isPlaying,
+    seekTo,
+    duration,
 }: PlayfieldSVGProps) {
+
+    const [hoveredNote, setHoveredNote] = useState<{ time: number; x: number; y: number } | null>(null);
+    const [isDragging, setIsDragging] = useState(false);
+    const [feedbackFlashes, setFeedbackFlashes] = useState<Array<{
+        id: number; x: number; y: number; text: string; color: string;
+    }>>([]);
+    const flashIdRef = useRef(0);
+
+    const addFeedback = useCallback((x: number, y: number, text: string, color: string) => {
+        const id = flashIdRef.current++;
+        setFeedbackFlashes(prev => [...prev, { id, x, y, text, color }]);
+        setTimeout(() => setFeedbackFlashes(prev => prev.filter(f => f.id !== id)), 700);
+    }, []);
+
+    const handleMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+        if (isPlaying) return;
+        e.preventDefault();
+        setHoveredNote(null);
+        setIsDragging(true);
+
+        const startX = e.clientX;
+        const startTime = currentTime;
+        const msPerPx = APPROACH_TIME / VISIBLE_LENGTH;
+
+        const handleMouseMove = (moveEvent: MouseEvent) => {
+            const deltaX = moveEvent.clientX - startX;
+            const newTime = Math.max(0, Math.min(duration, startTime - deltaX * msPerPx));
+            seekTo(newTime);
+        };
+
+        const handleMouseUp = () => {
+            setIsDragging(false);
+            document.removeEventListener("mousemove", handleMouseMove);
+            document.removeEventListener("mouseup", handleMouseUp);
+        };
+
+        document.addEventListener("mousemove", handleMouseMove);
+        document.addEventListener("mouseup", handleMouseUp);
+    }, [isPlaying, currentTime, duration, seekTo]);
 
     const getObjectX = useCallback((objectTime: number, gameplayStart: number) => {
         const total = objectTime - gameplayStart;
@@ -43,6 +98,28 @@ export function PlayfieldSVG({
         const progress = (currentTime - gameplayStart) / total;
         return JUDGMENT_LINE_X + VISIBLE_LENGTH * (1 - progress);
     }, [currentTime]);
+
+    const handleNoteMouseEnter = useCallback((time: number, x: number, y: number) => {
+        if (!isPlaying && !isDragging) {
+            setHoveredNote({ time, x, y });
+        }
+    }, [isPlaying, isDragging]);
+
+    const handleNoteClick = useCallback((e: React.MouseEvent, time: number, x: number, y: number) => {
+        if (!isPlaying && e.ctrlKey) {
+            e.preventDefault();
+            openUrl(`osu://edit/${formatTimestamp(time)}`).catch(console.error);
+            addFeedback(x, y - 24, "Opened!", "#60a5fa");
+        }
+    }, [isPlaying, addFeedback]);
+
+    const handleNoteContextMenu = useCallback((e: React.MouseEvent, time: number, x: number, y: number) => {
+        if (!isPlaying && e.ctrlKey) {
+            e.preventDefault();
+            navigator.clipboard.writeText(`${formatTimestamp(time)} - `).catch(console.error);
+            addFeedback(x, y - 24, "Copied!", "#4ade80");
+        }
+    }, [isPlaying, addFeedback]);
 
     const renderHitObject = useCallback((obj: TaikoHitObjectWithStart, difficulty: TaikoDifficulty, yOffset: number, index: number) => {
         const headX = getObjectX(obj.time, obj.gameplayStart);
@@ -79,6 +156,11 @@ export function PlayfieldSVG({
                     strokeWidth={2}
                     opacity={0.7}
                     rx={20}
+                    style={{ cursor: !isPlaying ? "pointer" : "default" }}
+                    onMouseEnter={() => handleNoteMouseEnter(obj.time, headX, centerY - 20)}
+                    onMouseLeave={() => setHoveredNote(null)}
+                    onClick={(e) => handleNoteClick(e, obj.time, headX, centerY - 20)}
+                    onContextMenu={(e) => handleNoteContextMenu(e, obj.time, headX, centerY - 20)}
                 />
             );
         } else if (obj.type === "spinner" && obj.endTime) {
@@ -108,6 +190,11 @@ export function PlayfieldSVG({
                     strokeWidth={2}
                     opacity={0.7}
                     rx={25}
+                    style={{ cursor: !isPlaying ? "pointer" : "default" }}
+                    onMouseEnter={() => handleNoteMouseEnter(obj.time, headX, centerY - 25)}
+                    onMouseLeave={() => setHoveredNote(null)}
+                    onClick={(e) => handleNoteClick(e, obj.time, headX, centerY - 25)}
+                    onContextMenu={(e) => handleNoteContextMenu(e, obj.time, headX, centerY - 25)}
                 />
             );
         } else {
@@ -125,10 +212,15 @@ export function PlayfieldSVG({
                     fill={color}
                     stroke="#ffffff"
                     strokeWidth={isBig ? 3 : 1.5}
+                    style={{ cursor: !isPlaying ? "pointer" : "default" }}
+                    onMouseEnter={() => handleNoteMouseEnter(obj.time, headX, centerY)}
+                    onMouseLeave={() => setHoveredNote(null)}
+                    onClick={(e) => handleNoteClick(e, obj.time, headX, centerY)}
+                    onContextMenu={(e) => handleNoteContextMenu(e, obj.time, headX, centerY)}
                 />
             );
         }
-    }, [getObjectX, calculateGameplayStart]);
+    }, [getObjectX, calculateGameplayStart, isPlaying, handleNoteMouseEnter, handleNoteClick, handleNoteContextMenu]);
 
     const renderSVLines = useCallback((difficulty: TaikoDifficulty, yOffset: number) => {
         if (isGameplayMode || !isViewSVLine) return null;
@@ -250,13 +342,21 @@ export function PlayfieldSVG({
         return ticks;
     }, [getObjectX, processedDifficulties, isGameplayMode]);
 
+    const playfieldHeight = filteredDifficulties.length * 100;
+
     return (
         <div className="flex items-center justify-center mb-4">
             <div
                 className="relative bg-surface-input rounded-lg border border-border-muted overflow-hidden"
-                style={{ width: `${PLAYFIELD_WIDTH}px`, height: `${filteredDifficulties.length * 100}px` }}
+                style={{
+                    width: `${PLAYFIELD_WIDTH}px`,
+                    height: `${playfieldHeight}px`,
+                    cursor: isPlaying ? "default" : isDragging ? "grabbing" : "grab",
+                    userSelect: "none",
+                }}
+                onMouseDown={handleMouseDown}
             >
-                <svg width={PLAYFIELD_WIDTH} height={filteredDifficulties.length * 100}>
+                <svg width={PLAYFIELD_WIDTH} height={playfieldHeight}>
                     {filteredDifficulties.map((diff, diffIndex) => {
                         const yOffset = diffIndex * 100;
                         const centerY = yOffset + 50;
@@ -326,7 +426,7 @@ export function PlayfieldSVG({
                             style={{
                                 left: `${anim.x}px`,
                                 top: `${anim.y + offsetY}px`,
-                                transform: 'translate(-50%, -50%)',
+                                transform: "translate(-50%, -50%)",
                                 opacity,
                             }}
                         >
@@ -342,6 +442,39 @@ export function PlayfieldSVG({
                         </div>
                     );
                 })}
+
+                {hoveredNote && !isPlaying && (
+                    <div
+                        key={hoveredNote.time}
+                        className="tooltip-in absolute pointer-events-none z-10 px-2 py-1.5 rounded-md bg-zinc-900/95 border border-zinc-600 text-xs text-zinc-200 whitespace-nowrap shadow-lg"
+                        style={{
+                            left: `${hoveredNote.x}px`,
+                            top: `${hoveredNote.y - 52}px`,
+                            transform: "translateX(-50%)",
+                        }}
+                    >
+                        <div className="font-mono text-center text-zinc-100 mb-0.5">{formatTimestamp(hoveredNote.time)}</div>
+                        <div className="text-zinc-500 text-[10px] text-center leading-tight">
+                            Ctrl+Click · Ctrl+R-Click to copy
+                        </div>
+                    </div>
+                )}
+
+                {feedbackFlashes.map(flash => (
+                    <div
+                        key={flash.id}
+                        className="feedback-flash absolute pointer-events-none z-20 text-xs font-bold whitespace-nowrap"
+                        style={{
+                            left: `${flash.x}px`,
+                            top: `${flash.y}px`,
+                            color: flash.color,
+                            textShadow: `0 0 8px ${flash.color}80`,
+                            transform: "translateX(-50%)",
+                        }}
+                    >
+                        {flash.text}
+                    </div>
+                ))}
             </div>
         </div>
     );

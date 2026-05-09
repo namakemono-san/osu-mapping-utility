@@ -84,6 +84,9 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
         isHR: false
     });
 
+    const [isNoSV, setIsNoSV] = useState(false);
+    const toggleNoSV = useCallback(() => setIsNoSV(prev => !prev), []);
+
     const [hitAnimations, setHitAnimations] = useState<HitAnimation[]>([]);
     const [audioLeadIn, setAudioLeadIn] = useState(0);
     const [debugInfo, setDebugInfo] = useState<string[]>([]);
@@ -166,14 +169,15 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
     }, []);
 
     const getCurrentSV = useCallback((time: number, timingLines: TimingLine[]): number => {
+        if (isNoSV) return 1.0;
         const { svMultiplier: hrMultiplier } = getModMultipliers();
         return getSV(time, timingLines, hrMultiplier);
-    }, [getModMultipliers]);
+    }, [getModMultipliers, isNoSV]);
 
     const calculateGameplayStart = useCallback((objectTime: number, timingLines: TimingLine[]): number => {
         const { arMultiplier, svMultiplier: hrSVMultiplier } = getModMultipliers();
-        return calcGameplayStart(objectTime, timingLines, isGameplayMode, APPROACH_TIME, arMultiplier, hrSVMultiplier);
-    }, [isGameplayMode, getModMultipliers]);
+        return calcGameplayStart(objectTime, timingLines, isGameplayMode, APPROACH_TIME, arMultiplier, hrSVMultiplier, isNoSV);
+    }, [isGameplayMode, getModMultipliers, isNoSV]);
 
     const generateTicks = useCallback((timingPoint: TimingLine, nextTime: number, timingLines: TimingLine[]): Tick[] => {
         return genTicks(timingPoint, nextTime, timingLines, isGameplayMode, calculateGameplayStart);
@@ -584,6 +588,9 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
                             isViewSVLine={isViewSVLine}
                             hitAnimations={hitAnimations}
                             calculateGameplayStart={calculateGameplayStart}
+                            isPlaying={isPlaying}
+                            seekTo={seekTo}
+                            duration={duration}
                         />
 
                         <PreviewControls
@@ -601,6 +608,8 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
                             mods={mods}
                             toggleDT={toggleDT}
                             toggleHR={toggleHR}
+                            isNoSV={isNoSV}
+                            toggleNoSV={toggleNoSV}
                             debugMode={debugMode}
                             setDebugMode={setDebugMode}
                             musicVolume={musicVolume}

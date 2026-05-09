@@ -41,6 +41,7 @@ export function calculateGameplayStart(
     fixedApproachTime: number,
     arMultiplier: number,
     hrSVMultiplier: number,
+    noSV: boolean = false,
 ): number {
     if (isGameplayMode) {
         let currentBeatLength = 500;
@@ -52,12 +53,12 @@ export function calculateGameplayStart(
             if (tp.uninherited) {
                 currentBeatLength = tp.beatLength;
                 baseSvMultiplier = 1.0;
-            } else {
+            } else if (!noSV) {
                 baseSvMultiplier = tp.svMult;
             }
         }
 
-        const finalSV = baseSvMultiplier * hrSVMultiplier;
+        const finalSV = noSV ? 1.0 : baseSvMultiplier * hrSVMultiplier;
         const approachTime = (4 * currentBeatLength) / (finalSV * arMultiplier);
         return objectTime - approachTime;
     } else {
