@@ -8,27 +8,12 @@ import { CheckCategorySection } from "./CheckCategorySection";
 import { Beatmapset } from "../../types/beatmap";
 import { useSongsFolder } from "../../hooks/useStorage";
 import { useI18n } from "../../hooks/i18nContext";
-import { getModeName } from "../../domain/osu/rcDifficultyNames";
-import { runAllChecks } from "../../domain/rc/checker";
-import { requestParseBatch } from "../../utils/signalr";
-import type { CheckResult, CheckCategory } from "../../domain/rc/types";
-import type { GameMode, Beatmap } from "../../types/osu";
-import type { LocaleKey } from "../../locale";
+import { requestParseBatch, requestRunChecks } from "../../utils/signalr";
+import type { CheckResult, IssueResult } from "../../domain/rc/types";
 
 interface MetadataCheckerProps {
     selectedBeatmap?: Beatmapset | null;
 }
-
-const CATEGORY_ORDER: CheckCategory[] = [
-    "general",
-    "metadata",
-    "audio",
-    "files",
-    "spread",
-    "difficulty_settings",
-];
-
-type SeverityFilter = "all" | "rule" | "guideline";
 
 interface AudioCheckInfo {
     format: string;
@@ -63,81 +48,51 @@ function buildAudioCheckResults(info: AudioCheckInfo): CheckResult[] {
     const bitrateOk = info.average_bitrate_kbps <= maxBitrate;
     const cutoffOk = info.frequency_cutoff_hz >= expectedCutoff;
 
+    const makeIssue = (msg: string, level: "Warning" | "Problem"): IssueResult => ({
+        level,
+        formattedMessage: msg,
+        beatmapVersion: null,
+    });
+
     if (bitrateOk && cutoffOk) {
         return [{
             checkId: "audio.quality",
-            messageKey: "rc.audio.quality.pass",
-            messageParams: {
-                format: recommendedFormat,
-                bitrate: info.average_bitrate_kbps,
-                cutoff: formatHz(info.frequency_cutoff_hz),
-            },
-            severity: "guideline",
-            category: "audio",
+            category: "Audio",
+            message: "Audio quality check.",
+            scope: "general",
+            beatmapVersion: null,
             passed: true,
+            issues: [],
         }];
     }
 
     if (!cutoffOk) {
         return [{
             checkId: "audio.quality",
-            messageKey: "rc.audio.quality.bloated",
-            messageParams: {
-                format: recommendedFormat,
-                bitrate: info.average_bitrate_kbps,
-                cutoff: formatHz(info.frequency_cutoff_hz),
-                expected: formatHz(expectedCutoff),
-            },
-            severity: "rule",
-            category: "audio",
+            category: "Audio",
+            message: "Audio quality check.",
+            scope: "general",
+            beatmapVersion: null,
             passed: false,
+            issues: [makeIssue(
+                `${recommendedFormat} ${info.average_bitrate_kbps} kbps — may be bloated (cutoff ${formatHz(info.frequency_cutoff_hz)}, expected ≥${formatHz(expectedCutoff)})`,
+                "Problem",
+            )],
         }];
     }
 
     return [{
         checkId: "audio.quality",
-        messageKey: "rc.audio.quality.bitrateHigh",
-        messageParams: {
-            format: recommendedFormat,
-            bitrate: info.average_bitrate_kbps,
-            max: maxBitrate,
-            altFormat: alternativeFormat,
-            altMax: alternativeMax,
-        },
-        severity: "guideline",
-        category: "audio",
+        category: "Audio",
+        message: "Audio quality check.",
+        scope: "general",
+        beatmapVersion: null,
         passed: false,
+        issues: [makeIssue(
+            `${recommendedFormat} ${info.average_bitrate_kbps} kbps exceeds ≤${maxBitrate} kbps — consider ${alternativeFormat} (≤${alternativeMax} kbps)`,
+            "Warning",
+        )],
     }];
-}
-
-function aggregateResults(results: CheckResult[], allDiffNames: string[]): CheckResult[] {
-    const groups = new Map<string, CheckResult[]>();
-
-    for (const r of results) {
-        const key = `${r.checkId}|${r.passed}|${r.messageKey}|${JSON.stringify(r.messageParams ?? {})}`;
-        if (!groups.has(key)) groups.set(key, []);
-        groups.get(key)!.push(r);
-    }
-
-    const aggregated: CheckResult[] = [];
-    for (const group of groups.values()) {
-        if (group.length === 1 || !group[0].difficultyName) {
-            aggregated.push(...group);
-            continue;
-        }
-
-        const diffNames = group.map(r => r.difficultyName!).filter(Boolean);
-        const isAll = allDiffNames.length > 0 && diffNames.length >= allDiffNames.length;
-
-        const merged: CheckResult = {
-            ...group[0],
-            difficultyName: undefined,
-            difficultyNames: isAll ? undefined : diffNames,
-        };
-        aggregated.push(merged);
-    }
-
-    return aggregated;
 }
 
 export function MetadataChecker({ selectedBeatmap }: MetadataCheckerProps) {
@@ -146,12 +101,11 @@ export function MetadataChecker({ selectedBeatmap }: MetadataCheckerProps) {
 
     const [loading, setLoading] = useState(false);
     const [asyncChecking, setAsyncChecking] = useState(false);
-    const [beatmapsetData, setBeatmapsetData] = useState<Beatmap[] | null>(null);
-    const [results, setResults] = useState<CheckResult[]>([]);
-
+    const [diffNames, setDiffNames] = useState<string[]>([]);
+    const [activeTab, setActiveTab] = useState<string>("general");
+    const [allChecks, setAllChecks] = useState<CheckResult[]>([]);
     const [showPassed, setShowPassed] = useState(false);
-    const [severityFilter, setSeverityFilter] = useState<SeverityFilter>("all");
-    const [diffFilter, setDiffFilter] = useState<string>("all");
+    const [modeError, setModeError] = useState<string | null>(null);
 
     const cancelRef = useRef(false);
 
@@ -161,40 +115,46 @@ export function MetadataChecker({ selectedBeatmap }: MetadataCheckerProps) {
         cancelRef.current = false;
         setLoading(true);
         setAsyncChecking(false);
-        setBeatmapsetData(null);
-        setResults([]);
+        setDiffNames([]);
+        setActiveTab("general");
+        setAllChecks([]);
+        setModeError(null);
 
         try {
             const beatmapFolder = `${songsFolder}\\${selectedBeatmap.folder_name}`;
-            const data = await requestParseBatch(beatmapFolder, []);
-            setBeatmapsetData(data);
+            const beatmaps = await requestParseBatch(beatmapFolder, []);
 
-            const checkResults = runAllChecks(data);
-            setResults([...checkResults]);
+            if (beatmaps.length > 0 && beatmaps[0].general.mode !== 1) {
+                setModeError(t("rc.modeNotSupported"));
+                setLoading(false);
+                return;
+            }
+
+            const names = [...new Set(beatmaps.map(b => b.metadata.version))];
+            setDiffNames(names);
+
+            const response = await requestRunChecks(beatmapFolder, []);
+            setAllChecks([...response.checks]);
             setLoading(false);
             setAsyncChecking(true);
 
-            const audioFilename = data[0]?.general.audioFilename;
+            const audioFilename = beatmaps[0]?.general.audioFilename;
+            if (audioFilename) {
+                const audioResults = await invoke<AudioCheckInfo>("check_audio_info", {
+                    filePath: `${beatmapFolder}\\${audioFilename}`,
+                })
+                    .then(info => buildAudioCheckResults(info))
+                    .catch(err => {
+                        console.warn("[RC Checker] Audio check failed:", err);
+                        return [] as CheckResult[];
+                    });
 
-            const audioPromise = audioFilename
-                ? invoke<AudioCheckInfo>("check_audio_info", {
-                      filePath: `${beatmapFolder}\\${audioFilename}`,
-                  })
-                      .then(info => buildAudioCheckResults(info))
-                      .catch(err => {
-                          console.warn("[RC Checker] Audio check failed:", err);
-                          return [] as CheckResult[];
-                      })
-                : Promise.resolve([] as CheckResult[]);
-
-            const audioResults = await audioPromise;
-
-            if (!cancelRef.current) {
-                if (audioResults.length > 0) {
-                    setResults(prev => [...prev, ...audioResults]);
+                if (!cancelRef.current && audioResults.length > 0) {
+                    setAllChecks(prev => [...prev, ...audioResults]);
                 }
-                setAsyncChecking(false);
             }
+
+            if (!cancelRef.current) setAsyncChecking(false);
         } catch (err) {
             console.error("[RC Checker] Error:", err);
             setLoading(false);
@@ -207,50 +167,40 @@ export function MetadataChecker({ selectedBeatmap }: MetadataCheckerProps) {
         return () => { cancelRef.current = true; };
     }, [loadAndCheck]);
 
-    const mode: GameMode = beatmapsetData?.[0]?.general.mode ?? 0;
-    const diffNames = useMemo(() => {
-        if (!beatmapsetData) return [];
-        return [...new Set(beatmapsetData.map(d => d.metadata.version))];
-    }, [beatmapsetData]);
-
-    const aggregatedResults = useMemo(() => {
-        return aggregateResults(results, diffNames);
-    }, [results, diffNames]);
-
-    const filteredResults = useMemo(() => {
-        let filtered = results;
-
-        if (!showPassed) {
-            filtered = filtered.filter(r => !r.passed);
+    const tabFailCounts = useMemo(() => {
+        const counts: Record<string, number> = { general: 0 };
+        for (const c of allChecks) {
+            if (c.issues.length === 0) continue;
+            if (c.scope === "general" || c.scope === "set") {
+                counts["general"] = (counts["general"] ?? 0) + 1;
+            } else if (c.scope === "beatmap" && c.beatmapVersion) {
+                counts[c.beatmapVersion] = (counts[c.beatmapVersion] ?? 0) + 1;
+            }
         }
+        return counts;
+    }, [allChecks]);
 
-        if (severityFilter !== "all") {
-            filtered = filtered.filter(r => {
-                if (severityFilter === "rule") return r.severity === "rule";
-                return r.severity === "guideline" || r.severity === "warning";
-            });
+    const tabChecks = useMemo(() => {
+        if (activeTab === "general") {
+            return allChecks.filter(c => c.scope === "general" || c.scope === "set");
         }
+        return allChecks.filter(c => c.scope === "beatmap" && c.beatmapVersion === activeTab);
+    }, [allChecks, activeTab]);
 
-        if (diffFilter !== "all") {
-            filtered = filtered.filter(r => {
-                if (!r.difficultyName && !r.difficultyNames) return true;
-                if (r.difficultyName) return r.difficultyName === diffFilter;
-                if (r.difficultyNames) return r.difficultyNames.includes(diffFilter);
-                return true;
-            });
-        }
+    const filteredChecks = useMemo(() => {
+        return showPassed ? tabChecks : tabChecks.filter(c => c.issues.length > 0);
+    }, [tabChecks, showPassed]);
 
-        return aggregateResults(filtered, diffNames);
-    }, [results, showPassed, severityFilter, diffFilter, diffNames]);
-
-    const groupedResults = useMemo(() => {
-        const groups: Partial<Record<CheckCategory, CheckResult[]>> = {};
-        for (const r of filteredResults) {
-            if (!groups[r.category]) groups[r.category] = [];
-            groups[r.category]!.push(r);
+    const groupedByCategory = useMemo(() => {
+        const groups = new Map<string, CheckResult[]>();
+        for (const c of filteredChecks) {
+            if (!groups.has(c.category)) groups.set(c.category, []);
+            groups.get(c.category)!.push(c);
         }
         return groups;
-    }, [filteredResults]);
+    }, [filteredChecks]);
+
+    const categoryOrder = ["General", "Metadata", "Timing", "Settings", "Spread", "Audio"];
 
     if (!selectedBeatmap) {
         return (
@@ -268,7 +218,13 @@ export function MetadataChecker({ selectedBeatmap }: MetadataCheckerProps) {
         );
     }
 
-    if (!beatmapsetData) return null;
+    if (modeError) {
+        return (
+            <div className="flex items-center justify-center h-full">
+                <p className="text-text-muted">{modeError}</p>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-4 max-w-4xl mx-auto">
@@ -278,17 +234,51 @@ export function MetadataChecker({ selectedBeatmap }: MetadataCheckerProps) {
                 </h1>
                 <div className="flex flex-wrap gap-3 text-sm text-text-muted">
                     <span>{selectedBeatmap.title || selectedBeatmap.folder_name}</span>
-                    <span>{t("rc.header.mode", { mode: getModeName(mode) })}</span>
+                    <span>osu!taiko</span>
                     <span>{t("rc.header.files", {
-                        count: beatmapsetData.length,
-                        plural: beatmapsetData.length === 1 ? "" : "s",
+                        count: diffNames.length,
+                        plural: diffNames.length === 1 ? "" : "s",
                     })}</span>
                 </div>
             </Card>
 
-            <CheckSummaryBar results={aggregatedResults} asyncChecking={asyncChecking} />
+            <CheckSummaryBar results={allChecks} asyncChecking={asyncChecking} />
 
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex gap-1 flex-wrap border-b border-border-muted">
+                {(["general", ...diffNames] as string[]).map(tab => {
+                    const isActive = activeTab === tab;
+                    const label = tab === "general" ? t("rc.tab.general") : tab;
+                    const failCount = tabFailCounts[tab] ?? 0;
+                    return (
+                        <button
+                            key={tab}
+                            onClick={() => setActiveTab(tab)}
+                            className={[
+                                "relative flex items-center gap-1.5 px-4 py-2 text-sm font-medium transition-colors",
+                                "border-b-2 -mb-px",
+                                isActive
+                                    ? "border-accent text-text-primary"
+                                    : "border-transparent text-text-muted hover:text-text-secondary hover:border-border-strong",
+                            ].join(" ")}
+                        >
+                            {label}
+                            {failCount > 0 && (
+                                <span className={[
+                                    "inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[11px] tabular-nums",
+                                    isActive
+                                        ? "bg-red-500 text-white"
+                                        : "bg-red-500/70 text-white",
+                                ].join(" ")}
+                                    style={{ lineHeight: "18px" }}>
+                                    {failCount}
+                                </span>
+                            )}
+                        </button>
+                    );
+                })}
+            </div>
+
+            <div className="flex items-center">
                 <label className="flex items-center gap-2 text-sm text-text-secondary cursor-pointer">
                     <input
                         type="checkbox"
@@ -298,54 +288,33 @@ export function MetadataChecker({ selectedBeatmap }: MetadataCheckerProps) {
                     />
                     {t("rc.filter.showPassed")}
                 </label>
-
-                <div className="flex gap-1 ml-auto">
-                    {(["all", "rule", "guideline"] as const).map(f => (
-                        <button
-                            key={f}
-                            onClick={() => setSeverityFilter(f as SeverityFilter)}
-                            className={`px-3 py-1 text-xs rounded-md transition-colors ${
-                                severityFilter === f
-                                    ? "bg-surface-active text-text-primary"
-                                    : "text-text-muted hover:bg-surface-hover"
-                            }`}
-                        >
-                            {t(`rc.filter.${f === "all" ? "all" : f === "rule" ? "rules" : "guidelines"}` as LocaleKey)}
-                        </button>
-                    ))}
-                </div>
-
-                {diffNames.length > 1 && (
-                    <select
-                        value={diffFilter}
-                        onChange={e => setDiffFilter(e.target.value)}
-                        className="h-8 px-2 rounded-md bg-surface-hover border border-border-strong text-sm text-text-primary"
-                    >
-                        <option value="all">{t("rc.filter.allDiffs")}</option>
-                        {diffNames.map(name => (
-                            <option key={name} value={name}>{name}</option>
-                        ))}
-                    </select>
-                )}
             </div>
 
             <div className="space-y-3">
-                {CATEGORY_ORDER.map(cat => {
-                    const catResults = groupedResults[cat];
-                    if (!catResults || catResults.length === 0) return null;
+                {categoryOrder.map(cat => {
+                    const catChecks = groupedByCategory.get(cat);
+                    if (!catChecks || catChecks.length === 0) return null;
                     return (
                         <CheckCategorySection
                             key={cat}
                             category={cat}
-                            results={catResults}
+                            results={catChecks}
                         />
                     );
                 })}
+                {[...groupedByCategory.entries()]
+                    .filter(([cat]) => !categoryOrder.includes(cat))
+                    .map(([cat, checks]) => (
+                        <CheckCategorySection key={cat} category={cat} results={checks} />
+                    ))
+                }
             </div>
 
-            {filteredResults.length === 0 && (
+            {filteredChecks.length === 0 && (
                 <div className="text-center py-8 text-text-muted text-sm">
-                    {showPassed ? t("rc.summary.passed", { count: 0 }) : t("rc.summary.passed", { count: aggregatedResults.filter(r => r.passed).length })}
+                    {showPassed
+                        ? t("rc.empty.noChecks")
+                        : t("rc.summary.passed", { count: tabChecks.filter(c => c.passed).length })}
                 </div>
             )}
         </div>

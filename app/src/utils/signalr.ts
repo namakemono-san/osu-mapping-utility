@@ -1,5 +1,6 @@
 import * as signalR from "@microsoft/signalr";
 import type { Beatmap, MetadataWriteInput, Background } from "../types/osu";
+import type { RcCheckResponse } from "../domain/rc/types";
 
 const connection = new signalR.HubConnectionBuilder()
     .withUrl("http://localhost:7001/beatmap")
@@ -93,6 +94,25 @@ export async function requestFixUnsnaps(filePath: string): Promise<number> {
         connection.on("FixUnsnapsComplete", onResult);
         connection.on("ParseError", onError);
         connection.invoke("RequestFixUnsnaps", filePath).catch(reject);
+    });
+}
+
+
+export async function requestRunChecks(folderPath: string, fileNames: string[]): Promise<RcCheckResponse> {
+    return new Promise((resolve, reject) => {
+        const onResult = (json: string) => {
+            connection.off("RunChecksComplete", onResult);
+            connection.off("ParseError", onError);
+            resolve(JSON.parse(json) as RcCheckResponse);
+        };
+        const onError = (message: string) => {
+            connection.off("RunChecksComplete", onResult);
+            connection.off("ParseError", onError);
+            reject(new Error(message));
+        };
+        connection.on("RunChecksComplete", onResult);
+        connection.on("ParseError", onError);
+        connection.invoke("RequestRunChecks", folderPath, fileNames).catch(reject);
     });
 }
 

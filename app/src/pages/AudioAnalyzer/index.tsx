@@ -61,8 +61,6 @@ export function AudioAnalyzer({ className = "" }: AudioAnalyzerProps) {
             if (audioFile) {
               handleAnalyze(audioFile);
             }
-            // Re-register after each drop: Windows resets drag state after drop,
-            // causing subsequent drag events to stop firing on the same listener.
             unlisten?.();
             unlisten = undefined;
             if (active) register();
