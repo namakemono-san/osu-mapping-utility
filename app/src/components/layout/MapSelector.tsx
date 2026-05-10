@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo, memo } from "react";
-import { MdRefresh, MdFolder, MdSearch, MdFolderOpen, MdOpenInBrowser, MdComment, MdDownload, MdPlayArrow, MdStop } from "react-icons/md";
+import { MdRefresh, MdFolder, MdSearch, MdFolderOpen, MdOpenInBrowser, MdComment, MdDownload } from "react-icons/md";
 import { createPortal } from "react-dom";
 
 import { open } from "@tauri-apps/plugin-dialog";
@@ -170,8 +170,6 @@ export function MapSelector({
     const [search, setSearch] = useState("");
     const [debouncedSearch, setDebouncedSearch] = useState("");
     const [isScanning, setIsScanning] = useState(false);
-    const [isIndexing, setIsIndexing] = useState(false);
-    const [indexingProgress, setIndexingProgress] = useState<{total: number, processed: number} | null>(null);
     const [songsFolder, setSongsFolder] = useSongsFolder();
     const [loadError, setLoadError] = useState<string | null>(null);
     const [currentIndex, setCurrentIndex] = useState(0);
@@ -189,47 +187,6 @@ export function MapSelector({
     const pendingReloadRef = useRef<{ folder: string; searchQuery: string } | null>(null);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const isInitialMount = useRef(true);
-    const indexingAbortRef = useRef(false);
-
-    const stopIndexing = useCallback(() => {
-        indexingAbortRef.current = true;
-        setIsIndexing(false);
-        setIndexingProgress(null);
-    }, []);
-
-    const startProgressiveIndexing = useCallback(async (basePath: string) => {
-        indexingAbortRef.current = false;
-        setIsIndexing(true);
-        setIndexingProgress({ total: 0, processed: 0 });
-
-        try {
-            let completed = false;
-            let totalProcessed = 0;
-
-            while (!completed && !indexingAbortRef.current) {
-                const result = await invoke<[number, number, boolean]>("warmup_search_cache_chunked", {
-                    basePath,
-                    chunkSize: 20,
-                    maxChunksPerCall: 3
-                });
-
-                const [total, processed, isComplete] = result;
-                totalProcessed += processed;
-                completed = isComplete;
-
-                setIndexingProgress({ total, processed: totalProcessed });
-
-                if (!completed && !indexingAbortRef.current) {
-                    await new Promise(resolve => setTimeout(resolve, 50));
-                }
-            }
-        } catch (error) {
-            console.error("[indexing] Error:", error);
-        } finally {
-            setIsIndexing(false);
-            setIndexingProgress(null);
-        }
-    }, []);
 
 
     useEffect(() => {
@@ -580,29 +537,6 @@ export function MapSelector({
                             className="w-full h-8 pl-9 pr-3 rounded-lg bg-surface-hover border border-border-strong text-sm placeholder-text-muted focus:outline-none focus:border-border-focus transition-colors"
                         />
                     </div>
-                    {isIndexing && (
-                        <div className="text-xs text-text-muted space-y-1">
-                            <p className="animate-pulse">{t("mapSelector.indexing")}</p>
-                            {indexingProgress && (
-                                <div className="space-y-1">
-                                    <div className="flex justify-between text-xs">
-                                        <span>{indexingProgress.processed}</span>
-                                        <span>{indexingProgress.total}</span>
-                                    </div>
-                                    <div className="w-full bg-surface-hover rounded-full h-1">
-                                        <div
-                                            className="bg-accent-primary h-1 rounded-full transition-all duration-300"
-                                            style={{
-                                                width: `${indexingProgress.total > 0
-                                                    ? (indexingProgress.processed / indexingProgress.total) * 100
-                                                    : 0}%`
-                                            }}
-                                        />
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    )}
                 </div>
             </div>
 
