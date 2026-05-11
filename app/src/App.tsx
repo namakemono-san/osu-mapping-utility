@@ -20,6 +20,7 @@ const MAP_TOOLS: SidebarKey[] = [
   "beatmap_customizer",
   "metadata_editor",
   "metadata_checker",
+  "spread_analyzer",
 ];
 
 const BeatmapClone = lazy(async () => ({
@@ -45,6 +46,9 @@ const AudioAnalyzer = lazy(async () => ({
 }));
 const MetadataChecker = lazy(async () => ({
   default: (await import("./pages/MetadataChecker")).MetadataChecker,
+}));
+const SpreadAnalyzer = lazy(async () => ({
+  default: (await import("./pages/SpreadAnalyzer")).SpreadAnalyzer,
 }));
 
 function ToolLoading() {
@@ -103,6 +107,8 @@ function App() {
         return <MetadataEditor selectedBeatmap={selectedBeatmap} />;
       case "metadata_checker":
         return <MetadataChecker selectedBeatmap={selectedBeatmap} />;
+      case "spread_analyzer":
+        return <SpreadAnalyzer selectedBeatmap={selectedBeatmap} />;
       case "offset_calibrator":
         return <OffsetCalibrator />;
       case "video_downloader":
