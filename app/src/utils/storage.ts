@@ -56,14 +56,6 @@ export function setStorage<T>(key: StorageKey, value: T): void {
     }
 }
 
-export function removeStorage(key: StorageKey): void {
-    try {
-        localStorage.removeItem(key);
-    } catch (e) {
-        console.error(`Failed to remove from localStorage: ${key}`, e);
-    }
-}
-
 export function getStorageString(key: StorageKey, defaultValue?: string): string | null {
     try {
         const item = localStorage.getItem(key);

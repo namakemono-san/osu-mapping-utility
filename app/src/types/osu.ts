@@ -1,4 +1,4 @@
-export type GameMode = 0 | 1 | 2 | 3;
+type GameMode = 0 | 1 | 2 | 3;
 
 export interface TimingLine {
     offset: number;
@@ -31,17 +31,17 @@ export interface Background {
     yOffset: number;
 }
 
-export interface Video {
+interface Video {
     filename: string;
     offset: number;
 }
 
-export interface Break {
+interface Break {
     startTime: number;
     endTime: number;
 }
 
-export interface GeneralSettings {
+interface GeneralSettings {
     audioFilename: string;
     audioLeadIn: number;
     previewTime: number;
@@ -64,7 +64,7 @@ export interface MetadataSettings {
     beatmapSetId: number;
 }
 
-export interface DifficultySettings {
+interface DifficultySettings {
     hpDrainRate: number;
     circleSize: number;
     overallDifficulty: number;
@@ -97,10 +97,4 @@ export interface MetadataWriteInput {
     creator: string;
     source: string;
     tags: string;
-}
-
-export interface BackgroundWriteInput {
-    filename: string;
-    xOffset: number;
-    yOffset: number;
 }

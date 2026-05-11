@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-export interface AudioPlayerState {
+interface AudioPlayerState {
     isPlaying: boolean;
     currentTime: number;
     duration: number;
 }
 
-export interface AudioPlayerActions {
+interface AudioPlayerActions {
     loadAudio: (audioData: number[]) => Promise<void>;
     togglePlayPause: () => void;
     seekTo: (timeMs: number) => void;

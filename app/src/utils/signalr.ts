@@ -21,24 +21,6 @@ export async function startConnection(): Promise<boolean> {
     return false;
 }
 
-export async function requestParse(filePath: string): Promise<Beatmap> {
-    return new Promise((resolve, reject) => {
-        const onResult = (json: string) => {
-            connection.off("UpdateBeatmap", onResult);
-            connection.off("ParseError", onError);
-            resolve(JSON.parse(json) as Beatmap);
-        };
-        const onError = (message: string) => {
-            connection.off("UpdateBeatmap", onResult);
-            connection.off("ParseError", onError);
-            reject(new Error(message));
-        };
-        connection.on("UpdateBeatmap", onResult);
-        connection.on("ParseError", onError);
-        connection.invoke("RequestParse", filePath).catch(reject);
-    });
-}
-
 export async function requestParseBatch(folderPath: string, fileNames: string[]): Promise<Beatmap[]> {
     return new Promise((resolve, reject) => {
         const onResult = (json: string) => {
@@ -116,20 +98,3 @@ export async function requestRunChecks(folderPath: string, fileNames: string[]):
     });
 }
 
-export function onUpdateBeatmap(callback: (beatmap: Beatmap) => void) {
-    connection.on("UpdateBeatmap", (json: string) => {
-        callback(JSON.parse(json) as Beatmap);
-    });
-}
-
-export function onUpdateBeatmapset(callback: (beatmaps: Beatmap[]) => void) {
-    connection.on("UpdateBeatmapset", (json: string) => {
-        callback(JSON.parse(json) as Beatmap[]);
-    });
-}
-
-export function onParseError(callback: (message: string) => void) {
-    connection.on("ParseError", callback);
-}
-
-export default connection;

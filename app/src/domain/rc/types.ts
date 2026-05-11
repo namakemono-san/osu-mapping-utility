@@ -1,5 +1,5 @@
 export type IssueLevel = "Problem" | "Warning" | "Minor" | "Check" | "Info";
-export type CheckScope = "general" | "set" | "beatmap";
+type CheckScope = "general" | "set" | "beatmap";
 
 export interface IssueResult {
     level: IssueLevel;

@@ -4,7 +4,7 @@ import { useAppState } from "./appState";
 
 type StorageKey = (typeof STORAGE_KEYS)[keyof typeof STORAGE_KEYS];
 
-export function useStorage<T>(key: StorageKey, defaultValue: T): [T, (value: T | ((prev: T) => T)) => void] {
+function useStorage<T>(key: StorageKey, defaultValue: T): [T, (value: T | ((prev: T) => T)) => void] {
     const [state, setState] = useState<T>(() => {
         const stored = getStorage<T>(key);
         return stored !== null ? stored : defaultValue;
@@ -21,7 +21,7 @@ export function useStorage<T>(key: StorageKey, defaultValue: T): [T, (value: T |
     return [state, setValue];
 }
 
-export function useStorageString(key: StorageKey, defaultValue: string = ""): [string, (value: string) => void] {
+function useStorageString(key: StorageKey, defaultValue: string = ""): [string, (value: string) => void] {
     const [state, setState] = useState<string>(() => {
         return getStorageString(key) ?? defaultValue;
     });

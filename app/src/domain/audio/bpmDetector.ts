@@ -1,8 +1,8 @@
-export function expAlpha(fc: number, sr: number): number {
+function expAlpha(fc: number, sr: number): number {
     return 1 - Math.exp(-2 * Math.PI * fc / sr);
 }
 
-export function movingAvg(arr: Float32Array, win: number): Float32Array {
+function movingAvg(arr: Float32Array, win: number): Float32Array {
     const out = new Float32Array(arr.length);
     let acc = 0;
     for (let i = 0; i < arr.length; i++) {
@@ -13,7 +13,7 @@ export function movingAvg(arr: Float32Array, win: number): Float32Array {
     return out;
 }
 
-export function autocorrRange(
+function autocorrRange(
     x: Float32Array,
     lagMin: number,
     lagMax: number,
@@ -39,7 +39,7 @@ export function autocorrRange(
     return ac;
 }
 
-export function pickLocalPeaks(
+function pickLocalPeaks(
     ac: Float32Array,
     lagMin: number,
     lagMax: number,
@@ -52,7 +52,7 @@ export function pickLocalPeaks(
     return peaks;
 }
 
-export function buildODFMultiBand(
+function buildODFMultiBand(
     buf: AudioBuffer,
     frame = 1024,
     hop = 512,
@@ -130,12 +130,12 @@ export function buildODFMultiBand(
     return { odf, hopSec: hop / sr };
 }
 
-export interface OdfPeak {
+interface OdfPeak {
     t: number;
     w: number;
 }
 
-export function pickOdfPeaks(
+function pickOdfPeaks(
     x: Float32Array,
     hopSec: number,
     thrMul = 0.35,
@@ -165,13 +165,13 @@ export function pickOdfPeaks(
     return peaks.map(p => ({ t: p.idx * hopSec, w: vmax > 0 ? p.v / vmax : 0 }));
 }
 
-export function foldBpm(b: number, min = 60, max = 240): number {
+function foldBpm(b: number, min = 60, max = 240): number {
     while (b < min) b *= 2;
     while (b > max) b /= 2;
     return b;
 }
 
-export function windowVotes(
+function windowVotes(
     x: Float32Array,
     hopSec: number,
     bpmMin = 60,
@@ -253,7 +253,7 @@ function phaseCost(
     return { phi: bestPhi, cost: bestC };
 }
 
-export function refineBpmAround(
+function refineBpmAround(
     bpm0: number,
     peaks: OdfPeak[],
 ): { bpm: number; phi: number; cost: number } {

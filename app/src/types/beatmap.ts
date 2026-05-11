@@ -7,5 +7,3 @@ export interface Beatmapset {
     beatmapID: string;
     beatmapSetID: string;
 }
-
-export type BeatmapsetPartial = Pick<Beatmapset, 'folder_name' | 'title' | 'artist' | 'creator'>;

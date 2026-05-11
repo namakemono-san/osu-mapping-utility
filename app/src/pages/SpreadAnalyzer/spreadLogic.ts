@@ -1,28 +1,28 @@
 import type { Beatmap } from "../../types/osu";
 import { categorizeDifficulty } from "../../domain/osu/difficultyUtils";
 
-export interface MeasureNoteCount {
+interface MeasureNoteCount {
     start: number;
     noteCount: number;
 }
 
-export interface DensityData {
+interface DensityData {
     measures: MeasureNoteCount[];
 }
 
-export interface FinisherNote {
+interface FinisherNote {
     time: number;
     kind: "D" | "K";
 }
 
-export interface ScrollSample {
+interface ScrollSample {
     time: number;
     bpm: number;
     sv: number;
     pxPerSecond: number;
 }
 
-export interface RapidChange {
+interface RapidChange {
     time: number;
     fromSpeed: number;
     toSpeed: number;
@@ -31,7 +31,7 @@ export interface RapidChange {
     gapMs: number;
 }
 
-export interface ScrollSpeedSummary {
+interface ScrollSpeedSummary {
     minSpeed: number;
     maxSpeed: number;
     deltaSpeed: number;
@@ -40,7 +40,7 @@ export interface ScrollSpeedSummary {
     maxSv: number;
 }
 
-export interface ScrollSpeedData {
+interface ScrollSpeedData {
     samples: ScrollSample[];
     summary: ScrollSpeedSummary | null;
     rapidChanges: RapidChange[];

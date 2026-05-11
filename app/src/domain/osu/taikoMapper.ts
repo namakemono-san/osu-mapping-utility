@@ -2,7 +2,7 @@ import type { Beatmap, HitObject, TimingLine } from "../../types/osu";
 
 export type TaikoHitType = "don" | "kat" | "don-big" | "kat-big" | "drumroll" | "spinner";
 
-export interface TaikoHitObject {
+interface TaikoHitObject {
     time: number;
     type: TaikoHitType;
     endTime?: number;
@@ -31,7 +31,7 @@ export interface TaikoBeatmapData {
     difficulties: TaikoDifficulty[];
 }
 
-export function mapToTaikoHitObject(ho: HitObject): TaikoHitObject | null {
+function mapToTaikoHitObject(ho: HitObject): TaikoHitObject | null {
     const isCircle = (ho.typeFlags & 1) !== 0;
     const isSlider = (ho.typeFlags & 2) !== 0;
     const isSpinner = (ho.typeFlags & 8) !== 0;
