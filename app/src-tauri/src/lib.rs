@@ -21,6 +21,13 @@ struct AppState {
     server: Mutex<Option<ServerProcess>>,
 }
 
+#[tauri::command]
+fn stop_server(state: tauri::State<'_, AppState>) {
+    if let Ok(mut guard) = state.server.lock() {
+        guard.take();
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -34,10 +41,11 @@ pub fn run() {
             use tauri::Manager;
             use tauri_plugin_shell::ShellExt;
 
+            let pid = std::process::id().to_string();
             let server_state = match app
                 .shell()
                 .sidecar("MappingUtility.Server")
-                .and_then(|cmd| cmd.spawn())
+                .and_then(|cmd| cmd.args(["--parent-pid", &pid]).spawn())
             {
                 Ok((_, child)) => Some(ServerProcess(Some(child))),
                 Err(e) => {
@@ -105,6 +113,7 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            stop_server,
             commands::detect_osu_path,
             commands::scan_beatmapsets,
             commands::search_beatmapsets,
