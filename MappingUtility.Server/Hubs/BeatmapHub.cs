@@ -120,5 +120,4 @@ public class BeatmapHub : Hub
             await Clients.Caller.SendAsync("ParseError", ex.Message);
         }
     }
-
 }
