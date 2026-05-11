@@ -1,5 +1,9 @@
 # osu! mapping utility
 
+[![Check](https://github.com/namakemono-san/osu-mapping-utility/workflows/Check/badge.svg)](https://github.com/namakemono-san/osu-mapping-utility/actions/workflows/check.yml)
+[![CodeFactor](https://www.codefactor.io/repository/github/namakemono-san/osu-mapping-utility/badge)](https://www.codefactor.io/repository/github/namakemono-san/osu-mapping-utility)
+[![GitHub Release](https://img.shields.io/github/v/release/namakemono-san/osu-mapping-utility)](https://github.com/namakemono-san/osu-mapping-utility/releases/latest)
+
 osu! mapping utility is a lightweight desktop tool designed to assist with auxiliary tasks surrounding osu! beatmap creation.
 It provides a streamlined environment for operations such as duplicating beatmapsets, editing metadata, and obtaining external audio sources — tasks typically performed outside the official editor.
 
