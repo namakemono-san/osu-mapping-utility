@@ -94,6 +94,81 @@ function TimeScrubber({ currentTime, duration, seekTo }: TimeScrubberProps) {
     );
 }
 
+interface TimeDisplayProps {
+    currentTime: number;
+    duration: number;
+    seekTo: (ms: number) => void;
+}
+
+function TimeDisplay({ currentTime, duration, seekTo }: TimeDisplayProps) {
+    const [isEditing, setIsEditing] = useState(false);
+    const [timeInput, setTimeInput] = useState("");
+
+    const handleSubmit = useCallback(() => {
+        const timeMs = parseTimeInput(timeInput);
+        if (timeMs !== null && timeMs >= 0 && timeMs <= duration) seekTo(timeMs);
+        setIsEditing(false);
+        setTimeInput("");
+    }, [timeInput, duration, seekTo]);
+
+    const handleCancel = useCallback(() => { setIsEditing(false); setTimeInput(""); }, []);
+
+    if (isEditing) {
+        return (
+            <div className="flex items-center gap-1">
+                <input
+                    type="text"
+                    value={timeInput}
+                    onChange={(e) => setTimeInput(e.target.value)}
+                    placeholder="00:00:000"
+                    className="w-28 px-2 py-1 bg-surface-control border border-border-muted rounded text-text-secondary text-xs font-mono focus:outline-none focus:border-accent-primary"
+                    onKeyDown={(e) => { if (e.key === "Enter") handleSubmit(); else if (e.key === "Escape") handleCancel(); }}
+                    autoFocus
+                />
+                <button onClick={handleSubmit} className="p-1 text-green-400 hover:text-green-300"><FiCheck className="w-4 h-4" /></button>
+                <button onClick={handleCancel} className="p-1 text-red-400 hover:text-red-300"><FiX className="w-4 h-4" /></button>
+            </div>
+        );
+    }
+
+    return (
+        <button
+            onClick={() => { setTimeInput(formatTime(currentTime)); setIsEditing(true); }}
+            className="flex items-center gap-1 text-text-muted hover:text-text-secondary transition-colors"
+        >
+            <span>{formatTime(currentTime)}</span>
+            <FiEdit2 className="w-3 h-3" />
+        </button>
+    );
+}
+
+type TranslateFunc = (key: LocaleKey, params?: Record<string, string | number>) => string;
+
+interface ModButtonGroupProps {
+    t: TranslateFunc;
+    mods: ModState;
+    isNoSV: boolean;
+    toggleDT: () => void;
+    toggleHR: () => void;
+    toggleNoSV: () => void;
+}
+
+function ModButtonGroup({ t, mods, isNoSV, toggleDT, toggleHR, toggleNoSV }: ModButtonGroupProps) {
+    const activeBase = "text-white";
+    const inactiveBase = "border-border-muted bg-surface-panel text-text-muted hover:border-border-strong";
+    const dtClass = mods.isDT ? `border-accent-primary bg-accent-primary/20 ${activeBase}` : inactiveBase;
+    const hrClass = mods.isHR ? `border-red-500 bg-red-500/20 ${activeBase}` : inactiveBase;
+    const svClass = isNoSV ? `border-orange-500 bg-orange-500/20 ${activeBase}` : inactiveBase;
+
+    return (
+        <>
+            <TooltipButton onClick={toggleDT} className={`border font-bold ${dtClass}`} tooltip={mods.isDT ? t("preview.controls.disableDt") : t("preview.controls.enableDt")}>DT</TooltipButton>
+            <TooltipButton onClick={toggleHR} className={`border font-bold ${hrClass}`} tooltip={mods.isHR ? t("preview.controls.disableHr") : t("preview.controls.enableHr")}>HR</TooltipButton>
+            <TooltipButton onClick={toggleNoSV} className={`border font-bold ${svClass}`} tooltip={isNoSV ? t("preview.controls.enableNoSV") : t("preview.controls.disableNoSV")}>SV</TooltipButton>
+        </>
+    );
+}
+
 export interface PreviewControlsProps {
     t: (key: LocaleKey, params?: Record<string, string | number>) => string;
 
@@ -165,18 +240,6 @@ export function PreviewControls({
     debugInfo,
     beatmapData,
 }: PreviewControlsProps) {
-    const [isEditingTime, setIsEditingTime] = useState(false);
-    const [timeInput, setTimeInput] = useState("");
-
-    const handleTimeInputSubmit = useCallback(() => {
-        const timeMs = parseTimeInput(timeInput);
-        if (timeMs !== null && timeMs >= 0 && timeMs <= duration) {
-            seekTo(timeMs);
-        }
-        setIsEditingTime(false);
-        setTimeInput("");
-    }, [timeInput, duration, seekTo]);
-
     return (
         <div className="space-y-4">
             <div className="flex items-center gap-2">
@@ -212,93 +275,14 @@ export function PreviewControls({
                     {isViewSVLine ? <FiEye className="w-4 h-4" /> : <FiEyeOff className="w-4 h-4" />}
                 </TooltipButton>
 
-                <TooltipButton
-                    onClick={toggleDT}
-                    className={`border font-bold ${mods.isDT
-                        ? "border-accent-primary bg-accent-primary/20 text-white"
-                        : "border-border-muted bg-surface-panel text-text-muted hover:border-border-strong"
-                        }`}
-                    tooltip={mods.isDT ? t("preview.controls.disableDt") : t("preview.controls.enableDt")}
-                >
-                    DT
-                </TooltipButton>
+                <ModButtonGroup t={t} mods={mods} isNoSV={isNoSV} toggleDT={toggleDT} toggleHR={toggleHR} toggleNoSV={toggleNoSV} />
 
-                <TooltipButton
-                    onClick={toggleHR}
-                    className={`border font-bold ${mods.isHR
-                        ? "border-red-500 bg-red-500/20 text-white"
-                        : "border-border-muted bg-surface-panel text-text-muted hover:border-border-strong"
-                        }`}
-                    tooltip={mods.isHR ? t("preview.controls.disableHr") : t("preview.controls.enableHr")}
-                >
-                    HR
-                </TooltipButton>
-
-                <TooltipButton
-                    onClick={toggleNoSV}
-                    className={`border font-bold ${isNoSV
-                        ? "border-orange-500 bg-orange-500/20 text-white"
-                        : "border-border-muted bg-surface-panel text-text-muted hover:border-border-strong"
-                        }`}
-                    tooltip={isNoSV ? t("preview.controls.enableNoSV") : t("preview.controls.disableNoSV")}
-                >
-                    SV
-                </TooltipButton>
-
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setDebugMode(!debugMode)}
-                >
+                <Button variant="ghost" size="sm" onClick={() => setDebugMode(!debugMode)}>
                     {debugMode ? t("preview.controls.hideDebug") : t("preview.controls.showDebug")}
                 </Button>
 
                 <div className="flex items-center gap-2 text-sm font-mono ml-auto">
-                    {isEditingTime ? (
-                        <div className="flex items-center gap-1">
-                            <input
-                                type="text"
-                                value={timeInput}
-                                onChange={(e) => setTimeInput(e.target.value)}
-                                placeholder="00:00:000"
-                                className="w-28 px-2 py-1 bg-surface-control border border-border-muted rounded text-text-secondary text-xs font-mono focus:outline-none focus:border-accent-primary"
-                                onKeyDown={(e) => {
-                                    if (e.key === "Enter") handleTimeInputSubmit();
-                                    if (e.key === "Escape") {
-                                        setIsEditingTime(false);
-                                        setTimeInput("");
-                                    }
-                                }}
-                                autoFocus
-                            />
-                            <button
-                                onClick={handleTimeInputSubmit}
-                                className="p-1 text-green-400 hover:text-green-300"
-                            >
-                                <FiCheck className="w-4 h-4" />
-                            </button>
-                            <button
-                                onClick={() => {
-                                    setIsEditingTime(false);
-                                    setTimeInput("");
-                                }}
-                                className="p-1 text-red-400 hover:text-red-300"
-                            >
-                                <FiX className="w-4 h-4" />
-                            </button>
-                        </div>
-                    ) : (
-                        <button
-                            onClick={() => {
-                                setTimeInput(formatTime(currentTime));
-                                setIsEditingTime(true);
-                            }}
-                            className="flex items-center gap-1 text-text-muted hover:text-text-secondary transition-colors"
-                        >
-                            <span>{formatTime(currentTime)}</span>
-                            <FiEdit2 className="w-3 h-3" />
-                        </button>
-                    )}
+                    <TimeDisplay currentTime={currentTime} duration={duration} seekTo={seekTo} />
                     <span className="text-text-muted">/</span>
                     <span className="text-text-muted">{formatTime(duration)}</span>
                 </div>
@@ -331,11 +315,7 @@ export function PreviewControls({
                         <span className="text-sm text-text-secondary ml-auto">{Math.round(musicVolume * 100)}%</span>
                     </div>
                     <input
-                        type="range"
-                        min="0"
-                        max="1"
-                        step="0.01"
-                        value={musicVolume}
+                        type="range" min="0" max="1" step="0.01" value={musicVolume}
                         onChange={(e) => setMusicVolume(parseFloat(e.target.value))}
                         className="w-full h-2 bg-surface-hover rounded-full appearance-none cursor-pointer slider-thumb"
                     />
@@ -348,11 +328,7 @@ export function PreviewControls({
                         <span className="text-sm text-text-secondary ml-auto">{Math.round(hitsoundVolume * 100)}%</span>
                     </div>
                     <input
-                        type="range"
-                        min="0"
-                        max="1"
-                        step="0.01"
-                        value={hitsoundVolume}
+                        type="range" min="0" max="1" step="0.01" value={hitsoundVolume}
                         onChange={(e) => setHitsoundVolume(parseFloat(e.target.value))}
                         className="w-full h-2 bg-surface-hover rounded-full appearance-none cursor-pointer slider-thumb"
                     />

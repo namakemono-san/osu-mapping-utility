@@ -40,6 +40,20 @@ function evalStatus(ratio: number, rule: RatioRule): "ok" | "warning" | "error" 
     return "error";
 }
 
+type Status = ReturnType<typeof evalStatus> | null;
+
+function statusClass(status: Status): string {
+    if (status === "ok") return "text-green-400";
+    if (status === "warning") return "text-yellow-400";
+    if (status === "error") return "text-red-400";
+    return "text-text-muted";
+}
+
+function formatNoteDelta(delta: number | null): string {
+    if (delta === null) return "—";
+    return delta >= 0 ? `+${delta}` : `${delta}`;
+}
+
 interface NoteCountRowProps {
     r: SpreadDiffResult;
     prev: SpreadDiffResult | null;
@@ -52,31 +66,24 @@ function NoteCountRow({ r, prev }: NoteCountRowProps) {
     const transition = prev !== null ? getTransition(prev.category, r.category) : null;
     const rule = transition ? RATIO_RULES[transition] : null;
     const status = ratio !== null && rule !== null ? evalStatus(ratio, rule) : null;
-
-    const statusClass =
-        status === "ok"      ? "text-green-400"  :
-        status === "warning" ? "text-yellow-400" :
-        status === "error"   ? "text-red-400"    :
-        "text-text-muted";
-
-    const statusLabel =
-        status === "ok"      ? t("spread.status.ok")      :
-        status === "warning" ? t("spread.status.warning") :
-        status === "error"   ? t("spread.status.error")   :
-        t("spread.status.na");
+    const statusLabels: Record<string, string> = {
+        ok: t("spread.status.ok"),
+        warning: t("spread.status.warning"),
+        error: t("spread.status.error"),
+    };
 
     return (
         <tr className="border-b border-border-muted/40">
             <td className="py-2 pr-4 font-medium text-text-primary max-w-[120px] truncate">{r.version}</td>
             <td className="py-2 pr-4 text-text-secondary">{r.category}</td>
             <td className="py-2 pr-4 text-text-primary tabular-nums">{r.noteCount.toLocaleString()}</td>
-            <td className="py-2 pr-4 text-text-muted tabular-nums">
-                {delta !== null ? (delta >= 0 ? `+${delta}` : `${delta}`) : "—"}
-            </td>
+            <td className="py-2 pr-4 text-text-muted tabular-nums">{formatNoteDelta(delta)}</td>
             <td className="py-2 pr-4 text-text-secondary tabular-nums">
                 {ratio !== null ? `×${ratio.toFixed(2)}` : "—"}
             </td>
-            <td className={`py-2 font-medium ${statusClass}`}>{statusLabel}</td>
+            <td className={`py-2 font-medium ${statusClass(status)}`}>
+                {status !== null ? statusLabels[status] : t("spread.status.na")}
+            </td>
         </tr>
     );
 }

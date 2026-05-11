@@ -343,7 +343,7 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
         lastHitTimeRef.current.clear();
     }, [selectedDifficulties]);
 
-    const processHitObjectSound = useCallback((
+    const processLongObjectSound = useCallback((
         obj: TaikoHitObjectWithStart,
         key: string,
         diff: TaikoDifficulty,
@@ -351,40 +351,58 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
         yOffset: number,
     ) => {
         const lastHit = lastHitTimeRef.current.get(key) || -1000;
-
-        if ((obj.type === "drumroll" || obj.type === "spinner") && obj.endTime) {
-            let currentTP = diff.timingLines.find(tp => tp.uninherited);
-            if (!currentTP) return;
-            for (const tp of diff.timingLines) {
-                if (tp.offset <= obj.time && tp.uninherited) currentTP = tp;
-                else if (tp.offset > obj.time) break;
-            }
-            const interval = currentTP.beatLength / 4;
-            if (adjustedTimeMs < obj.time || adjustedTimeMs > obj.endTime) return;
-            if (adjustedTimeMs - lastHit < interval) return;
-
-            lastHitTimeRef.current.set(key, adjustedTimeMs);
-            if (obj.type === "spinner") {
-                const hitType = Math.floor((adjustedTimeMs - obj.time) / interval) % 2 === 0 ? "don" : "kat";
-                playHitSound(hitType);
-                addHitAnimation(JUDGMENT_LINE_X, yOffset, hitType === "don" ? "#ff5555" : "#5599ff");
-            } else {
-                playHitSound("don");
-                addHitAnimation(JUDGMENT_LINE_X, yOffset, "#ff5555");
-            }
-            if (debugMode)
-                setDebugInfo(prev => [...prev.slice(-9), `${obj.type} hit at ${adjustedTimeMs.toFixed(0)}ms (interval: ${interval.toFixed(1)}ms)`]);
-        } else {
-            const timeDiff = obj.time - adjustedTimeMs;
-            if (timeDiff > 0 || timeDiff <= -HIT_WINDOW || lastHit >= obj.time) return;
-
-            lastHitTimeRef.current.set(key, obj.time);
-            playHitSound(obj.type);
-            addHitAnimation(JUDGMENT_LINE_X, yOffset, obj.type.includes("don") ? "#ff5555" : "#5599ff");
-            if (debugMode)
-                setDebugInfo(prev => [...prev.slice(-9), `Hit: ${obj.type} at ${obj.time.toFixed(0)}ms, actual: ${adjustedTimeMs.toFixed(0)}ms, diff: ${timeDiff.toFixed(1)}ms`]);
+        let currentTP = diff.timingLines.find(tp => tp.uninherited);
+        if (!currentTP) return;
+        for (const tp of diff.timingLines) {
+            if (tp.offset <= obj.time && tp.uninherited) currentTP = tp;
+            else if (tp.offset > obj.time) break;
         }
+        const interval = currentTP.beatLength / 4;
+        if (adjustedTimeMs < obj.time || adjustedTimeMs > obj.endTime!) return;
+        if (adjustedTimeMs - lastHit < interval) return;
+
+        lastHitTimeRef.current.set(key, adjustedTimeMs);
+        if (obj.type === "spinner") {
+            const hitType = Math.floor((adjustedTimeMs - obj.time) / interval) % 2 === 0 ? "don" : "kat";
+            playHitSound(hitType);
+            addHitAnimation(JUDGMENT_LINE_X, yOffset, hitType === "don" ? "#ff5555" : "#5599ff");
+        } else {
+            playHitSound("don");
+            addHitAnimation(JUDGMENT_LINE_X, yOffset, "#ff5555");
+        }
+        if (debugMode)
+            setDebugInfo(prev => [...prev.slice(-9), `${obj.type} hit at ${adjustedTimeMs.toFixed(0)}ms (interval: ${interval.toFixed(1)}ms)`]);
     }, [playHitSound, addHitAnimation, debugMode]);
+
+    const processCircleSound = useCallback((
+        obj: TaikoHitObjectWithStart,
+        key: string,
+        adjustedTimeMs: number,
+        yOffset: number,
+    ) => {
+        const lastHit = lastHitTimeRef.current.get(key) || -1000;
+        const timeDiff = obj.time - adjustedTimeMs;
+        if (timeDiff > 0 || timeDiff <= -HIT_WINDOW || lastHit >= obj.time) return;
+
+        lastHitTimeRef.current.set(key, obj.time);
+        playHitSound(obj.type);
+        addHitAnimation(JUDGMENT_LINE_X, yOffset, obj.type.includes("don") ? "#ff5555" : "#5599ff");
+        if (debugMode)
+            setDebugInfo(prev => [...prev.slice(-9), `Hit: ${obj.type} at ${obj.time.toFixed(0)}ms, actual: ${adjustedTimeMs.toFixed(0)}ms, diff: ${timeDiff.toFixed(1)}ms`]);
+    }, [playHitSound, addHitAnimation, debugMode]);
+
+    const processHitObjectSound = useCallback((
+        obj: TaikoHitObjectWithStart,
+        key: string,
+        diff: TaikoDifficulty,
+        adjustedTimeMs: number,
+        yOffset: number,
+    ) => {
+        if ((obj.type === "drumroll" || obj.type === "spinner") && obj.endTime)
+            processLongObjectSound(obj, key, diff, adjustedTimeMs, yOffset);
+        else
+            processCircleSound(obj, key, adjustedTimeMs, yOffset);
+    }, [processLongObjectSound, processCircleSound]);
 
     const updateTime = useCallback(() => {
         if (!isPlaying) return;

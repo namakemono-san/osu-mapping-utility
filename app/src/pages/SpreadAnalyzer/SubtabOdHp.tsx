@@ -19,6 +19,25 @@ const CATEGORY_RULES: Record<string, OdHpRule | null> = {
     "Custom": null,
 };
 
+function isOdViolation(rule: OdHpRule | null, od: number): boolean {
+    if (!rule) return false;
+    if (rule.odMax !== undefined && od > rule.odMax) return true;
+    if (rule.odMin !== undefined && od < rule.odMin) return true;
+    return false;
+}
+
+function isHpViolation(rule: OdHpRule | null, hp: number): boolean {
+    if (!rule) return false;
+    if (rule.hpMin !== undefined && hp < rule.hpMin) return true;
+    if (rule.hpMax !== undefined && hp > rule.hpMax) return true;
+    return false;
+}
+
+function formatDelta(delta: number | null): string {
+    if (delta === null) return "—";
+    return delta >= 0 ? `+${delta.toFixed(1)}` : delta.toFixed(1);
+}
+
 function ruleLabel(rule: OdHpRule | null): string {
     if (!rule) return "—";
     const parts: string[] = [];
@@ -37,16 +56,8 @@ interface OdHpRowProps {
 function OdHpRow({ r, prev }: OdHpRowProps) {
     const { t } = useI18n();
     const rule = CATEGORY_RULES[r.category] ?? null;
-
-    const odViolation = rule !== null && (
-        (rule.odMax !== undefined && r.od > rule.odMax) ||
-        (rule.odMin !== undefined && r.od < rule.odMin)
-    );
-    const hpViolation = rule !== null && (
-        (rule.hpMin !== undefined && r.hp < rule.hpMin) ||
-        (rule.hpMax !== undefined && r.hp > rule.hpMax)
-    );
-
+    const odViolation = isOdViolation(rule, r.od);
+    const hpViolation = isHpViolation(rule, r.hp);
     const odDelta = prev !== null ? r.od - prev.od : null;
     const hpDelta = prev !== null ? r.hp - prev.hp : null;
     const odDeltaWarn = odDelta !== null && odDelta < 0;
@@ -57,18 +68,10 @@ function OdHpRow({ r, prev }: OdHpRowProps) {
         <tr className="border-b border-border-muted/40">
             <td className="py-2 pr-4 font-medium text-text-primary max-w-[120px] truncate">{r.version}</td>
             <td className="py-2 pr-4 text-text-secondary">{r.category}</td>
-            <td className={`py-2 pr-4 ${odViolation ? "text-red-400 font-medium" : "text-text-primary"}`}>
-                {r.od}
-            </td>
-            <td className={`py-2 pr-4 ${odDeltaWarn ? "text-yellow-400" : "text-text-muted"}`}>
-                {odDelta !== null ? (odDelta >= 0 ? `+${odDelta.toFixed(1)}` : odDelta.toFixed(1)) : "—"}
-            </td>
-            <td className={`py-2 pr-4 ${hpViolation ? "text-red-400 font-medium" : "text-text-primary"}`}>
-                {r.hp}
-            </td>
-            <td className={`py-2 pr-4 ${hpDeltaWarn ? "text-yellow-400" : "text-text-muted"}`}>
-                {hpDelta !== null ? (hpDelta >= 0 ? `+${hpDelta.toFixed(1)}` : hpDelta.toFixed(1)) : "—"}
-            </td>
+            <td className={`py-2 pr-4 ${odViolation ? "text-red-400 font-medium" : "text-text-primary"}`}>{r.od}</td>
+            <td className={`py-2 pr-4 ${odDeltaWarn ? "text-yellow-400" : "text-text-muted"}`}>{formatDelta(odDelta)}</td>
+            <td className={`py-2 pr-4 ${hpViolation ? "text-red-400 font-medium" : "text-text-primary"}`}>{r.hp}</td>
+            <td className={`py-2 pr-4 ${hpDeltaWarn ? "text-yellow-400" : "text-text-muted"}`}>{formatDelta(hpDelta)}</td>
             <td className="py-2 pr-4 text-text-muted text-xs whitespace-nowrap">{ruleLabel(rule)}</td>
             <td className={`py-2 font-medium ${hasWarning ? "text-yellow-400" : "text-green-400"}`}>
                 {hasWarning ? t("spread.status.warning") : t("spread.status.ok")}
