@@ -343,6 +343,49 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
         lastHitTimeRef.current.clear();
     }, [selectedDifficulties]);
 
+    const processHitObjectSound = useCallback((
+        obj: TaikoHitObjectWithStart,
+        key: string,
+        diff: TaikoDifficulty,
+        adjustedTimeMs: number,
+        yOffset: number,
+    ) => {
+        const lastHit = lastHitTimeRef.current.get(key) || -1000;
+
+        if ((obj.type === "drumroll" || obj.type === "spinner") && obj.endTime) {
+            let currentTP = diff.timingLines.find(tp => tp.uninherited);
+            if (!currentTP) return;
+            for (const tp of diff.timingLines) {
+                if (tp.offset <= obj.time && tp.uninherited) currentTP = tp;
+                else if (tp.offset > obj.time) break;
+            }
+            const interval = currentTP.beatLength / 4;
+            if (adjustedTimeMs < obj.time || adjustedTimeMs > obj.endTime) return;
+            if (adjustedTimeMs - lastHit < interval) return;
+
+            lastHitTimeRef.current.set(key, adjustedTimeMs);
+            if (obj.type === "spinner") {
+                const hitType = Math.floor((adjustedTimeMs - obj.time) / interval) % 2 === 0 ? "don" : "kat";
+                playHitSound(hitType);
+                addHitAnimation(JUDGMENT_LINE_X, yOffset, hitType === "don" ? "#ff5555" : "#5599ff");
+            } else {
+                playHitSound("don");
+                addHitAnimation(JUDGMENT_LINE_X, yOffset, "#ff5555");
+            }
+            if (debugMode)
+                setDebugInfo(prev => [...prev.slice(-9), `${obj.type} hit at ${adjustedTimeMs.toFixed(0)}ms (interval: ${interval.toFixed(1)}ms)`]);
+        } else {
+            const timeDiff = obj.time - adjustedTimeMs;
+            if (timeDiff > 0 || timeDiff <= -HIT_WINDOW || lastHit >= obj.time) return;
+
+            lastHitTimeRef.current.set(key, obj.time);
+            playHitSound(obj.type);
+            addHitAnimation(JUDGMENT_LINE_X, yOffset, obj.type.includes("don") ? "#ff5555" : "#5599ff");
+            if (debugMode)
+                setDebugInfo(prev => [...prev.slice(-9), `Hit: ${obj.type} at ${obj.time.toFixed(0)}ms, actual: ${adjustedTimeMs.toFixed(0)}ms, diff: ${timeDiff.toFixed(1)}ms`]);
+        }
+    }, [playHitSound, addHitAnimation, debugMode]);
+
     const updateTime = useCallback(() => {
         if (!isPlaying) return;
 
@@ -360,79 +403,21 @@ export function BeatmapPreview({ selectedBeatmap }: BeatmapPreviewProps) {
         setHitAnimations(prev => prev.filter(anim => now - anim.timestamp < HIT_ANIMATION_DURATION_MS));
 
         if (beatmapData && hitsoundVolume > 0) {
-            beatmapData.difficulties
-                .filter(d => selectedDifficulties.has(d.version))
-                .forEach(diff => {
-                    const processedData = processedDifficultiesRef.current.get(diff.version);
-                    if (!processedData) return;
-
-                    processedData.hitObjects.forEach(obj => {
-                        const key = `${diff.version}-${obj.time}`;
-                        const lastHit = lastHitTimeRef.current.get(key) || -1000;
-
-                        const diffIndex = beatmapData.difficulties
-                            .filter(d => selectedDifficulties.has(d.version))
-                            .findIndex(d => d.version === diff.version);
-                        const yOffset = diffIndex * 100 + 50;
-
-                        if ((obj.type === "drumroll" || obj.type === "spinner") && obj.endTime) {
-                            let currentTP = diff.timingLines.find(tp => tp.uninherited);
-                            if (!currentTP) return;
-
-                            for (const tp of diff.timingLines) {
-                                if (tp.offset <= obj.time && tp.uninherited) {
-                                    currentTP = tp;
-                                } else if (tp.offset > obj.time) {
-                                    break;
-                                }
-                            }
-
-                            const interval = currentTP.beatLength / 4;
-
-                            if (adjustedTimeMs >= obj.time && adjustedTimeMs <= obj.endTime) {
-                                if (adjustedTimeMs - lastHit >= interval) {
-                                    lastHitTimeRef.current.set(key, adjustedTimeMs);
-
-                                    if (obj.type === "spinner") {
-                                        const hitCount = Math.floor((adjustedTimeMs - obj.time) / interval);
-                                        const hitType = hitCount % 2 === 0 ? "don" : "kat";
-                                        playHitSound(hitType);
-
-                                        const color = hitType === "don" ? "#ff5555" : "#5599ff";
-                                        addHitAnimation(JUDGMENT_LINE_X, yOffset, color);
-                                    } else {
-                                        playHitSound("don");
-                                        addHitAnimation(JUDGMENT_LINE_X, yOffset, "#ff5555");
-                                    }
-
-                                    if (debugMode) {
-                                        const info = `${obj.type} hit at ${adjustedTimeMs.toFixed(0)}ms (interval: ${interval.toFixed(1)}ms)`;
-                                        setDebugInfo(prev => [...prev.slice(-9), info]);
-                                    }
-                                }
-                            }
-                        } else {
-                            const timeDiff = obj.time - adjustedTimeMs;
-
-                            if (timeDiff <= 0 && timeDiff > -HIT_WINDOW && lastHit < obj.time) {
-                                lastHitTimeRef.current.set(key, obj.time);
-                                playHitSound(obj.type);
-
-                                if (debugMode) {
-                                    const info = `Hit: ${obj.type} at ${obj.time.toFixed(0)}ms, actual: ${adjustedTimeMs.toFixed(0)}ms, diff: ${timeDiff.toFixed(1)}ms`;
-                                    setDebugInfo(prev => [...prev.slice(-9), info]);
-                                }
-
-                                const color = obj.type.includes("don") ? "#ff5555" : "#5599ff";
-                                addHitAnimation(JUDGMENT_LINE_X, yOffset, color);
-                            }
-                        }
-                    });
+            const activeDiffs = beatmapData.difficulties.filter(d => selectedDifficulties.has(d.version));
+            activeDiffs.forEach(diff => {
+                const processedData = processedDifficultiesRef.current.get(diff.version);
+                if (!processedData) return;
+                const diffIndex = activeDiffs.findIndex(d => d.version === diff.version);
+                const yOffset = diffIndex * 100 + 50;
+                processedData.hitObjects.forEach(obj => {
+                    const key = `${diff.version}-${obj.time}`;
+                    processHitObjectSound(obj, key, diff, adjustedTimeMs, yOffset);
                 });
+            });
         }
 
         animationFrameRef.current = requestAnimationFrame(updateTime);
-    }, [isPlaying, beatmapData, selectedDifficulties, hitsoundVolume, playHitSound, addHitAnimation, debugMode, audioLeadIn, getCurrentTimeMs, duration, cleanupAudio]);
+    }, [isPlaying, beatmapData, selectedDifficulties, hitsoundVolume, processHitObjectSound, audioLeadIn, getCurrentTimeMs, duration, cleanupAudio]);
 
     useEffect(() => {
         if (isPlaying) {

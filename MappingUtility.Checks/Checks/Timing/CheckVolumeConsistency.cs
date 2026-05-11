@@ -43,6 +43,12 @@ public class CheckVolumeConsistency : BeatmapSetCheck
             .OrderBy(x => x)
             .ToList();
 
+        foreach (var r in BuildRegions(beatmaps, boundaries))
+            yield return BuildIssue(r);
+    }
+
+    private static List<Region> BuildRegions(IReadOnlyList<Beatmap> beatmaps, List<double> boundaries)
+    {
         Region? current = null;
         var regions = new List<Region>();
 
@@ -52,47 +58,43 @@ public class CheckVolumeConsistency : BeatmapSetCheck
             var end = boundaries[i + 1];
             if (end - start < MinDurationMs) continue;
 
-            var vols = beatmaps
-                .Select(b => (
-                    Version: b.Metadata.Version ?? "",
-                    Volume: b.TimingLines.Where(t => t.Offset <= start).LastOrDefault()?.Volume ?? 100
-                ))
-                .ToList();
-
-            var minVol = vols.Min(v => v.Volume);
-            var maxVol = vols.Max(v => v.Volume);
-            if (maxVol - minVol < ThresholdPercent) continue;
+            var vols = GetVolumesAt(beatmaps, start);
+            if (vols.Max(v => v.Volume) - vols.Min(v => v.Volume) < ThresholdPercent) continue;
 
             var (outlierVersion, isAbove, outlierVol, othersMin, othersMax) = GetOutlierInfo(vols);
             if (outlierVersion == null) continue;
 
             if (current != null && current.CanMerge(outlierVersion, isAbove, start))
-            {
                 current.Extend(end, outlierVol, othersMin, othersMax);
-            }
             else
             {
                 if (current != null) regions.Add(current);
-                current = new Region(start, end, outlierVersion, isAbove,
-                    outlierVol, othersMin, othersMax);
+                current = new Region(start, end, outlierVersion, isAbove, outlierVol, othersMin, othersMax);
             }
         }
 
         if (current != null) regions.Add(current);
+        return regions;
+    }
 
-        foreach (var r in regions)
-        {
-            var range = $"{RcUtils.FormatMs(r.Start)} ~ {RcUtils.FormatMs(r.End)}";
-            var outlierRange = r.OutlierMin == r.OutlierMax
-                ? $"{r.OutlierMin}"
-                : $"{r.OutlierMin}–{r.OutlierMax}";
-            var othersRange = r.OthersMin == r.OthersMax
-                ? $"~{r.OthersMin}"
-                : $"~{r.OthersMin}–{r.OthersMax}";
+    private static List<(string Version, int Volume)> GetVolumesAt(IReadOnlyList<Beatmap> beatmaps, double start)
+        => beatmaps
+            .Select(b => (
+                Version: b.Metadata.Version ?? "",
+                Volume: b.TimingLines.Where(t => t.Offset <= start).LastOrDefault()?.Volume ?? 100
+            ))
+            .ToList();
 
-            yield return new Issue(GetTemplate("Warning"), null,
-                range, r.Outlier, outlierRange, othersRange);
-        }
+    private Issue BuildIssue(Region r)
+    {
+        var range = $"{RcUtils.FormatMs(r.Start)} ~ {RcUtils.FormatMs(r.End)}";
+        var outlierRange = r.OutlierMin == r.OutlierMax
+            ? $"{r.OutlierMin}"
+            : $"{r.OutlierMin}–{r.OutlierMax}";
+        var othersRange = r.OthersMin == r.OthersMax
+            ? $"~{r.OthersMin}"
+            : $"~{r.OthersMin}–{r.OthersMax}";
+        return new Issue(GetTemplate("Warning"), null, range, r.Outlier, outlierRange, othersRange);
     }
 
     private static (string? Version, bool IsAbove, int OutlierVol, int OthersMin, int OthersMax)

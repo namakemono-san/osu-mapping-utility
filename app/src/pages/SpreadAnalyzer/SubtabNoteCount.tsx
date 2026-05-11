@@ -40,6 +40,47 @@ function evalStatus(ratio: number, rule: RatioRule): "ok" | "warning" | "error" 
     return "error";
 }
 
+interface NoteCountRowProps {
+    r: SpreadDiffResult;
+    prev: SpreadDiffResult | null;
+}
+
+function NoteCountRow({ r, prev }: NoteCountRowProps) {
+    const { t } = useI18n();
+    const delta = prev !== null ? r.noteCount - prev.noteCount : null;
+    const ratio = prev !== null && prev.noteCount > 0 ? r.noteCount / prev.noteCount : null;
+    const transition = prev !== null ? getTransition(prev.category, r.category) : null;
+    const rule = transition ? RATIO_RULES[transition] : null;
+    const status = ratio !== null && rule !== null ? evalStatus(ratio, rule) : null;
+
+    const statusClass =
+        status === "ok"      ? "text-green-400"  :
+        status === "warning" ? "text-yellow-400" :
+        status === "error"   ? "text-red-400"    :
+        "text-text-muted";
+
+    const statusLabel =
+        status === "ok"      ? t("spread.status.ok")      :
+        status === "warning" ? t("spread.status.warning") :
+        status === "error"   ? t("spread.status.error")   :
+        t("spread.status.na");
+
+    return (
+        <tr className="border-b border-border-muted/40">
+            <td className="py-2 pr-4 font-medium text-text-primary max-w-[120px] truncate">{r.version}</td>
+            <td className="py-2 pr-4 text-text-secondary">{r.category}</td>
+            <td className="py-2 pr-4 text-text-primary tabular-nums">{r.noteCount.toLocaleString()}</td>
+            <td className="py-2 pr-4 text-text-muted tabular-nums">
+                {delta !== null ? (delta >= 0 ? `+${delta}` : `${delta}`) : "—"}
+            </td>
+            <td className="py-2 pr-4 text-text-secondary tabular-nums">
+                {ratio !== null ? `×${ratio.toFixed(2)}` : "—"}
+            </td>
+            <td className={`py-2 font-medium ${statusClass}`}>{statusLabel}</td>
+        </tr>
+    );
+}
+
 interface Props {
     results: SpreadDiffResult[];
 }
@@ -61,41 +102,9 @@ export function SubtabNoteCount({ results }: Props) {
                     </tr>
                 </thead>
                 <tbody>
-                    {results.map((r, i) => {
-                        const prev = i > 0 ? results[i - 1] : null;
-                        const delta = prev !== null ? r.noteCount - prev.noteCount : null;
-                        const ratio = prev !== null && prev.noteCount > 0
-                            ? r.noteCount / prev.noteCount
-                            : null;
-                        const transition = prev !== null ? getTransition(prev.category, r.category) : null;
-                        const rule = transition ? RATIO_RULES[transition] : null;
-                        const status = ratio !== null && rule !== null ? evalStatus(ratio, rule) : null;
-
-                        return (
-                            <tr key={r.version} className="border-b border-border-muted/40">
-                                <td className="py-2 pr-4 font-medium text-text-primary max-w-[120px] truncate">{r.version}</td>
-                                <td className="py-2 pr-4 text-text-secondary">{r.category}</td>
-                                <td className="py-2 pr-4 text-text-primary tabular-nums">{r.noteCount.toLocaleString()}</td>
-                                <td className="py-2 pr-4 text-text-muted tabular-nums">
-                                    {delta !== null ? (delta >= 0 ? `+${delta}` : `${delta}`) : "—"}
-                                </td>
-                                <td className="py-2 pr-4 text-text-secondary tabular-nums">
-                                    {ratio !== null ? `×${ratio.toFixed(2)}` : "—"}
-                                </td>
-                                <td className={`py-2 font-medium ${
-                                    status === "ok"      ? "text-green-400"  :
-                                    status === "warning" ? "text-yellow-400" :
-                                    status === "error"   ? "text-red-400"   :
-                                    "text-text-muted"
-                                }`}>
-                                    {status === "ok"      ? t("spread.status.ok")      :
-                                     status === "warning" ? t("spread.status.warning") :
-                                     status === "error"   ? t("spread.status.error")   :
-                                     t("spread.status.na")}
-                                </td>
-                            </tr>
-                        );
-                    })}
+                    {results.map((r, i) => (
+                        <NoteCountRow key={r.version} r={r} prev={i > 0 ? results[i - 1] : null} />
+                    ))}
                 </tbody>
             </table>
         </div>

@@ -52,6 +52,48 @@ function extractMetadata(osuText: string): { beatmapId?: string; beatmapSetId?: 
     return { beatmapId, beatmapSetId };
 }
 
+function buildTimestamp(): string {
+    const now = new Date();
+    return now.getFullYear().toString()
+        + (now.getMonth() + 1).toString().padStart(2, '0')
+        + now.getDate().toString().padStart(2, '0')
+        + now.getHours().toString().padStart(2, '0')
+        + now.getMinutes().toString().padStart(2, '0')
+        + now.getSeconds().toString().padStart(2, '0');
+}
+
+async function tryCreateBackup(filePath: string, fileName: string, text: string, timestamp: string) {
+    const metadata = extractMetadata(text);
+    if (!metadata.beatmapSetId || !metadata.beatmapId) {
+        console.warn(`Could not extract metadata from ${fileName}, skipping backup`);
+        return;
+    }
+    const backupDir = `backup/${metadata.beatmapSetId}/${metadata.beatmapId}`;
+    try {
+        await mkdir(backupDir, { baseDir: BaseDirectory.AppData, recursive: true });
+        await copyFile(filePath, `${backupDir}/${timestamp}_${fileName}`, { toPathBaseDir: BaseDirectory.AppData });
+    } catch (err) {
+        console.warn(`Failed to create backup for ${fileName}:`, err);
+    }
+}
+
+interface TransformOptions {
+    centerOn: boolean;
+    rmBookmarks: boolean;
+    rmNewCombo: boolean;
+    addNewCombo: boolean;
+    w2cOn: boolean;
+}
+
+function applyTransforms(text: string, opts: TransformOptions): string {
+    if (opts.centerOn) text = rewriteCenter(text, 256, 192);
+    if (opts.rmBookmarks) text = removeEditorBookmarks(text);
+    if (opts.rmNewCombo) text = removeNewComboExceptFirst(text);
+    if (opts.addNewCombo) text = addNewComboToAll(text);
+    if (opts.w2cOn) text = whistleToClap_2to8(text);
+    return text;
+}
+
 export function BeatmapCustomizer({ selectedBeatmap }: BeatmapCustomizerProps) {
     const { t } = useI18n();
     const [songsFolder] = useSongsFolder();
@@ -126,57 +168,19 @@ export function BeatmapCustomizer({ selectedBeatmap }: BeatmapCustomizerProps) {
             if (!songsFolder) throw new Error("Songs folder not found");
 
             const beatmapPath = `${songsFolder}\\${selectedBeatmap.folder_name}`;
+            const timestamp = buildTimestamp();
             let successCount = 0;
-
-            const now = new Date();
-            const timestamp = now.getFullYear().toString() +
-                (now.getMonth() + 1).toString().padStart(2, '0') +
-                now.getDate().toString().padStart(2, '0') +
-                now.getHours().toString().padStart(2, '0') +
-                now.getMinutes().toString().padStart(2, '0') +
-                now.getSeconds().toString().padStart(2, '0');
 
             for (const fileName of selectedFiles) {
                 const filePath = `${beatmapPath}\\${fileName}`;
-
                 let text = await readTextFile(filePath);
 
-                if (createBackup) {
-                    const metadata = extractMetadata(text);
+                if (createBackup) await tryCreateBackup(filePath, fileName, text, timestamp);
 
-                    if (metadata.beatmapSetId && metadata.beatmapId) {
-                        const backupDir = `backup/${metadata.beatmapSetId}/${metadata.beatmapId}`;
-
-                        try {
-                            await mkdir(backupDir, {
-                                baseDir: BaseDirectory.AppData,
-                                recursive: true
-                            });
-                            const backupPath = `${backupDir}/${timestamp}_${fileName}`;
-                            await copyFile(filePath, backupPath, {
-                                toPathBaseDir: BaseDirectory.AppData
-                            });
-                            console.log(`Backup created: ${backupPath}`);
-                        } catch (err) {
-                            console.warn(`Failed to create backup for ${fileName}:`, err);
-                        }
-                    } else {
-                        console.warn(`Could not extract metadata from ${fileName}, skipping backup`);
-                    }
-                }
-
-                if (centerOn) text = rewriteCenter(text, 256, 192);
-                if (rmBookmarks) text = removeEditorBookmarks(text);
-                if (rmNewCombo) text = removeNewComboExceptFirst(text);
-                if (addNewCombo) text = addNewComboToAll(text);
-                if (w2cOn) text = whistleToClap_2to8(text);
-
-                if (centerOn || rmBookmarks || rmNewCombo || addNewCombo || w2cOn) {
+                text = applyTransforms(text, { centerOn, rmBookmarks, rmNewCombo, addNewCombo, w2cOn });
+                if (centerOn || rmBookmarks || rmNewCombo || addNewCombo || w2cOn)
                     await writeTextFile(filePath, text);
-                }
-                if (fixUnsnaps) {
-                    await requestFixUnsnaps(filePath);
-                }
+                if (fixUnsnaps) await requestFixUnsnaps(filePath);
                 successCount++;
             }
 

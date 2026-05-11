@@ -46,6 +46,54 @@ function parseTimeInput(input: string): number | null {
     return mins * 60 * 1000 + secs * 1000 + millis;
 }
 
+interface TimeScrubberProps {
+    currentTime: number;
+    duration: number;
+    seekTo: (ms: number) => void;
+}
+
+function TimeScrubber({ currentTime, duration, seekTo }: TimeScrubberProps) {
+    const percent = duration > 0 ? (currentTime / duration) * 100 : 0;
+
+    const handleTrackClick = (e: React.MouseEvent<HTMLDivElement>) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        seekTo((e.clientX - rect.left) / rect.width * duration);
+    };
+
+    const handleThumbMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+        e.stopPropagation();
+        const parent = e.currentTarget.parentElement;
+        if (!parent) return;
+
+        const handleMouseMove = (ev: MouseEvent) => {
+            const rect = parent.getBoundingClientRect();
+            seekTo(Math.max(0, Math.min(1, (ev.clientX - rect.left) / rect.width)) * duration);
+        };
+        const handleMouseUp = () => {
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+        };
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+    };
+
+    return (
+        <div className="relative">
+            <div
+                className="h-2 bg-surface-hover rounded-full cursor-pointer relative overflow-visible"
+                onClick={handleTrackClick}
+            >
+                <div className="h-full bg-accent-primary rounded-full" style={{ width: `${percent}%` }} />
+                <div
+                    className="absolute top-1/2 w-3 h-3 bg-white rounded-full shadow-lg cursor-grab active:cursor-grabbing"
+                    style={{ left: `${percent}%`, transform: 'translate(-50%, -50%)' }}
+                    onMouseDown={handleThumbMouseDown}
+                />
+            </div>
+        </div>
+    );
+}
+
 export interface PreviewControlsProps {
     t: (key: LocaleKey, params?: Record<string, string | number>) => string;
 
@@ -273,46 +321,7 @@ export function PreviewControls({
                 />
             )}
 
-            <div className="relative">
-                <div
-                    className="h-2 bg-surface-hover rounded-full cursor-pointer relative overflow-visible"
-                    onClick={(e) => {
-                        const rect = e.currentTarget.getBoundingClientRect();
-                        const x = e.clientX - rect.left;
-                        const percent = x / rect.width;
-                        seekTo(percent * duration);
-                    }}
-                >
-                    <div
-                        className="h-full bg-accent-primary rounded-full"
-                        style={{ width: `${(currentTime / duration) * 100}%` }}
-                    />
-                    <div
-                        className="absolute top-1/2 w-3 h-3 bg-white rounded-full shadow-lg cursor-grab active:cursor-grabbing"
-                        style={{ left: `${(currentTime / duration) * 100}%`, transform: 'translate(-50%, -50%)' }}
-                        onMouseDown={(e) => {
-                            e.stopPropagation();
-                            const parent = e.currentTarget.parentElement;
-                            if (!parent) return;
-
-                            const handleMouseMove = (moveEvent: MouseEvent) => {
-                                const rect = parent.getBoundingClientRect();
-                                const x = moveEvent.clientX - rect.left;
-                                const percent = Math.max(0, Math.min(1, x / rect.width));
-                                seekTo(percent * duration);
-                            };
-
-                            const handleMouseUp = () => {
-                                document.removeEventListener('mousemove', handleMouseMove);
-                                document.removeEventListener('mouseup', handleMouseUp);
-                            };
-
-                            document.addEventListener('mousemove', handleMouseMove);
-                            document.addEventListener('mouseup', handleMouseUp);
-                        }}
-                    />
-                </div>
-            </div>
+            <TimeScrubber currentTime={currentTime} duration={duration} seekTo={seekTo} />
 
             <div className="grid grid-cols-2 gap-4">
                 <div>

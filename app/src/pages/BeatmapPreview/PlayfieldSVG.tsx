@@ -121,106 +121,82 @@ export function PlayfieldSVG({
         }
     }, [isPlaying, addFeedback]);
 
-    const renderHitObject = useCallback((obj: TaikoHitObjectWithStart, difficulty: TaikoDifficulty, yOffset: number, index: number) => {
-        const headX = getObjectX(obj.time, obj.gameplayStart);
-        const size = obj.type.includes("big") ? 60 : 40;
-        const centerY = yOffset + 50;
-
+    const renderLongObject = useCallback((
+        obj: TaikoHitObjectWithStart,
+        difficulty: TaikoDifficulty,
+        headX: number,
+        centerY: number,
+        index: number,
+    ) => {
+        const isDrumroll = obj.type === "drumroll";
+        const halfHeight = isDrumroll ? 20 : 25;
+        const fill = isDrumroll ? "#ffaa00" : "#8b5cf6";
         const DRUMROLL_LEFT = JUDGMENT_LINE_X - 25;
         const RIGHT_LIMIT = PLAYFIELD_WIDTH + 100;
 
-        if (obj.type === "drumroll" && obj.endTime) {
-            const endGameplayStart = calculateGameplayStart(obj.endTime, difficulty.timingLines);
-            const tailX = getObjectX(obj.endTime, endGameplayStart);
+        const endGameplayStart = calculateGameplayStart(obj.endTime!, difficulty.timingLines);
+        const tailX = getObjectX(obj.endTime!, endGameplayStart);
+        const leftX = Math.min(headX, tailX);
+        const rightX = Math.max(headX, tailX);
 
-            const leftX = Math.min(headX, tailX);
-            const rightX = Math.max(headX, tailX);
+        if (rightX < DRUMROLL_LEFT || leftX > RIGHT_LIMIT) return null;
 
-            if (rightX < DRUMROLL_LEFT || leftX > RIGHT_LIMIT) return null;
+        const displayX = Math.max(leftX, DRUMROLL_LEFT);
+        const displayWidth = Math.min(rightX, RIGHT_LIMIT) - displayX;
+        if (displayWidth <= 0) return null;
 
-            const displayX = Math.max(leftX, DRUMROLL_LEFT);
-            const displayEndX = Math.min(rightX, RIGHT_LIMIT);
-            const displayWidth = displayEndX - displayX;
-
-            if (displayWidth <= 0) return null;
-
-            return (
-                <rect
-                    key={`${index}-drumroll`}
-                    x={displayX}
-                    y={centerY - 20}
-                    width={displayWidth}
-                    height={40}
-                    fill="#ffaa00"
-                    stroke="#ffffff"
-                    strokeWidth={2}
-                    opacity={0.7}
-                    rx={20}
-                    style={{ cursor: !isPlaying ? "pointer" : "default" }}
-                    onMouseEnter={() => handleNoteMouseEnter(obj.time, headX, centerY - 20)}
-                    onMouseLeave={() => setHoveredNote(null)}
-                    onClick={(e) => handleNoteClick(e, obj.time, headX, centerY - 20)}
-                    onContextMenu={(e) => handleNoteContextMenu(e, obj.time, headX, centerY - 20)}
-                />
-            );
-        } else if (obj.type === "spinner" && obj.endTime) {
-            const endGameplayStart = calculateGameplayStart(obj.endTime, difficulty.timingLines);
-            const tailX = getObjectX(obj.endTime, endGameplayStart);
-
-            const leftX = Math.min(headX, tailX);
-            const rightX = Math.max(headX, tailX);
-
-            if (rightX < DRUMROLL_LEFT || leftX > RIGHT_LIMIT) return null;
-
-            const displayX = Math.max(leftX, DRUMROLL_LEFT);
-            const displayEndX = Math.min(rightX, RIGHT_LIMIT);
-            const displayWidth = displayEndX - displayX;
-
-            if (displayWidth <= 0) return null;
-
-            return (
-                <rect
-                    key={`${index}-spinner`}
-                    x={displayX}
-                    y={centerY - 25}
-                    width={displayWidth}
-                    height={50}
-                    fill="#8b5cf6"
-                    stroke="#ffffff"
-                    strokeWidth={2}
-                    opacity={0.7}
-                    rx={25}
-                    style={{ cursor: !isPlaying ? "pointer" : "default" }}
-                    onMouseEnter={() => handleNoteMouseEnter(obj.time, headX, centerY - 25)}
-                    onMouseLeave={() => setHoveredNote(null)}
-                    onClick={(e) => handleNoteClick(e, obj.time, headX, centerY - 25)}
-                    onContextMenu={(e) => handleNoteContextMenu(e, obj.time, headX, centerY - 25)}
-                />
-            );
-        } else {
-            if (headX < JUDGMENT_LINE_X || headX > PLAYFIELD_WIDTH + 100) return null;
-
-            const color = obj.type.includes("don") ? "#ff5555" : "#5599ff";
-            const isBig = obj.type.includes("big");
-
-            return (
-                <circle
-                    key={`${index}-circle`}
-                    cx={headX}
-                    cy={centerY}
-                    r={size / 2}
-                    fill={color}
-                    stroke="#ffffff"
-                    strokeWidth={isBig ? 3 : 1.5}
-                    style={{ cursor: !isPlaying ? "pointer" : "default" }}
-                    onMouseEnter={() => handleNoteMouseEnter(obj.time, headX, centerY)}
-                    onMouseLeave={() => setHoveredNote(null)}
-                    onClick={(e) => handleNoteClick(e, obj.time, headX, centerY)}
-                    onContextMenu={(e) => handleNoteContextMenu(e, obj.time, headX, centerY)}
-                />
-            );
-        }
+        const topY = centerY - halfHeight;
+        return (
+            <rect
+                key={`${index}-${obj.type}`}
+                x={displayX}
+                y={topY}
+                width={displayWidth}
+                height={halfHeight * 2}
+                fill={fill}
+                stroke="#ffffff"
+                strokeWidth={2}
+                opacity={0.7}
+                rx={halfHeight}
+                style={{ cursor: !isPlaying ? "pointer" : "default" }}
+                onMouseEnter={() => handleNoteMouseEnter(obj.time, headX, topY)}
+                onMouseLeave={() => setHoveredNote(null)}
+                onClick={(e) => handleNoteClick(e, obj.time, headX, topY)}
+                onContextMenu={(e) => handleNoteContextMenu(e, obj.time, headX, topY)}
+            />
+        );
     }, [getObjectX, calculateGameplayStart, isPlaying, handleNoteMouseEnter, handleNoteClick, handleNoteContextMenu]);
+
+    const renderHitObject = useCallback((obj: TaikoHitObjectWithStart, difficulty: TaikoDifficulty, yOffset: number, index: number) => {
+        const headX = getObjectX(obj.time, obj.gameplayStart);
+        const centerY = yOffset + 50;
+
+        if ((obj.type === "drumroll" || obj.type === "spinner") && obj.endTime)
+            return renderLongObject(obj, difficulty, headX, centerY, index);
+
+        if (headX < JUDGMENT_LINE_X || headX > PLAYFIELD_WIDTH + 100) return null;
+
+        const color = obj.type.includes("don") ? "#ff5555" : "#5599ff";
+        const isBig = obj.type.includes("big");
+        const size = isBig ? 60 : 40;
+
+        return (
+            <circle
+                key={`${index}-circle`}
+                cx={headX}
+                cy={centerY}
+                r={size / 2}
+                fill={color}
+                stroke="#ffffff"
+                strokeWidth={isBig ? 3 : 1.5}
+                style={{ cursor: !isPlaying ? "pointer" : "default" }}
+                onMouseEnter={() => handleNoteMouseEnter(obj.time, headX, centerY)}
+                onMouseLeave={() => setHoveredNote(null)}
+                onClick={(e) => handleNoteClick(e, obj.time, headX, centerY)}
+                onContextMenu={(e) => handleNoteContextMenu(e, obj.time, headX, centerY)}
+            />
+        );
+    }, [getObjectX, renderLongObject, isPlaying, handleNoteMouseEnter, handleNoteClick, handleNoteContextMenu]);
 
     const renderSVLines = useCallback((difficulty: TaikoDifficulty, yOffset: number) => {
         if (isGameplayMode || !isViewSVLine) return null;

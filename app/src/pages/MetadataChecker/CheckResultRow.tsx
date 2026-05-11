@@ -58,7 +58,7 @@ export function CheckResultRow({ result }: CheckResultRowProps) {
             ? t(`rc.level.${topLevelIssue}` as LocaleKey)
             : t("rc.level.issue");
 
-    const displayMessage = (t as any)(`rc.check.${result.checkId}`) || result.message;
+    const displayMessage = t(`rc.check.${result.checkId}` as LocaleKey) || result.message;
 
     return (
         <div className={effectivePassed ? "opacity-60" : ""}>
