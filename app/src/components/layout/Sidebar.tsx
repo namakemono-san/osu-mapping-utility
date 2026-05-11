@@ -12,6 +12,7 @@ import {
     MdImage,
     MdGraphicEq,
     MdCheckCircle,
+    MdBarChart,
 } from "react-icons/md";
 import { appDataDir } from "@tauri-apps/api/path";
 import { openPath } from '@tauri-apps/plugin-opener';
@@ -29,6 +30,7 @@ export type SidebarKey =
     | "video_downloader"
     | "image_downloader"
     | "metadata_checker"
+    | "spread_analyzer"
 
 type SidebarProps = {
     active?: SidebarKey;
@@ -57,6 +59,7 @@ const CATEGORIES: SidebarCategory[] = [
             { key: "beatmap_customizer", label: "tool.beatmap_customizer", Icon: MdContentCut },
             { key: "metadata_editor", label: "tool.metadata_editor", Icon: MdEdit },
             { key: "metadata_checker", label: "tool.metadata_checker", Icon: MdCheckCircle },
+            { key: "spread_analyzer", label: "tool.spread_analyzer", Icon: MdBarChart },
         ],
     },
     {

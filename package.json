@@ -9,6 +9,8 @@
   "scripts": {
     "dev": "pnpm --filter app tauri dev",
     "build": "pnpm --filter app tauri build",
+    "check": "pnpm --filter app typecheck && dotnet build MappingUtility.sln --nologo -v q",
+    "knip": "pnpm --filter app knip",
     "add:app": "pnpm --filter app add",
     "remove:app": "pnpm --filter app remove"
   },

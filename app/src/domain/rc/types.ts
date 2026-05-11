@@ -1,22 +1,22 @@
-import type { Beatmap } from "../../types/osu";
+export type IssueLevel = "Problem" | "Warning" | "Minor" | "Check" | "Info";
+type CheckScope = "general" | "set" | "beatmap";
 
-export type CheckSeverity = "rule" | "guideline" | "warning";
-export type CheckCategory = "general" | "metadata" | "timing" | "difficulty_settings" | "spread" | "audio" | "files";
+export interface IssueResult {
+    level: IssueLevel;
+    formattedMessage: string;
+    beatmapVersion: string | null;
+}
 
 export interface CheckResult {
     checkId: string;
-    messageKey: string;
-    messageParams?: Record<string, string | number>;
-    severity: CheckSeverity;
-    category: CheckCategory;
-    difficultyName?: string;
-    difficultyNames?: string[];
+    category: string;
+    message: string;
+    scope: CheckScope;
+    beatmapVersion: string | null;
     passed: boolean;
+    issues: IssueResult[];
 }
 
-export interface CheckDefinition {
-    id: string;
-    severity: CheckSeverity;
-    category: CheckCategory;
-    run: (data: Beatmap[]) => CheckResult[];
+export interface RcCheckResponse {
+    checks: CheckResult[];
 }

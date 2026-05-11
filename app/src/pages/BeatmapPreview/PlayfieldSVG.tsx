@@ -1,4 +1,5 @@
-import { useCallback } from "react";
+import { useCallback, useRef, useState } from "react";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import type { TaikoDifficulty, TaikoHitObjectWithStart } from "../../domain/osu/taikoMapper";
 import type { TimingLine } from "../../types/osu";
 import type { Tick } from "../../domain/osu/tickGenerator";
@@ -12,6 +13,15 @@ const JUDGMENT_CIRCLE_RADIUS = 20;
 const HIT_CIRCLE_SIZE = 30;
 const HIT_ANIMATION_DURATION_MS = 300;
 const HIT_ANIMATION_FLOAT_DISTANCE = 50;
+const APPROACH_TIME = 2000;
+
+function formatTimestamp(ms: number): string {
+    const totalSeconds = Math.floor(ms / 1000);
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
+    const millis = Math.floor(ms % 1000);
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}:${millis.toString().padStart(3, "0")}`;
+}
 
 export interface PlayfieldSVGProps {
     filteredDifficulties: TaikoDifficulty[];
@@ -22,6 +32,9 @@ export interface PlayfieldSVGProps {
     isViewSVLine: boolean;
     hitAnimations: HitAnimation[];
     calculateGameplayStart: (objectTime: number, timingLines: TimingLine[]) => number;
+    isPlaying: boolean;
+    seekTo: (timeMs: number) => void;
+    duration: number;
 }
 
 export function PlayfieldSVG({
@@ -33,7 +46,49 @@ export function PlayfieldSVG({
     isViewSVLine,
     hitAnimations,
     calculateGameplayStart,
+    isPlaying,
+    seekTo,
+    duration,
 }: PlayfieldSVGProps) {
+
+    const [hoveredNote, setHoveredNote] = useState<{ time: number; x: number; y: number } | null>(null);
+    const [isDragging, setIsDragging] = useState(false);
+    const [feedbackFlashes, setFeedbackFlashes] = useState<Array<{
+        id: number; x: number; y: number; text: string; color: string;
+    }>>([]);
+    const flashIdRef = useRef(0);
+
+    const addFeedback = useCallback((x: number, y: number, text: string, color: string) => {
+        const id = flashIdRef.current++;
+        setFeedbackFlashes(prev => [...prev, { id, x, y, text, color }]);
+        setTimeout(() => setFeedbackFlashes(prev => prev.filter(f => f.id !== id)), 700);
+    }, []);
+
+    const handleMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+        if (isPlaying) return;
+        e.preventDefault();
+        setHoveredNote(null);
+        setIsDragging(true);
+
+        const startX = e.clientX;
+        const startTime = currentTime;
+        const msPerPx = APPROACH_TIME / VISIBLE_LENGTH;
+
+        const handleMouseMove = (moveEvent: MouseEvent) => {
+            const deltaX = moveEvent.clientX - startX;
+            const newTime = Math.max(0, Math.min(duration, startTime - deltaX * msPerPx));
+            seekTo(newTime);
+        };
+
+        const handleMouseUp = () => {
+            setIsDragging(false);
+            document.removeEventListener("mousemove", handleMouseMove);
+            document.removeEventListener("mouseup", handleMouseUp);
+        };
+
+        document.addEventListener("mousemove", handleMouseMove);
+        document.addEventListener("mouseup", handleMouseUp);
+    }, [isPlaying, currentTime, duration, seekTo]);
 
     const getObjectX = useCallback((objectTime: number, gameplayStart: number) => {
         const total = objectTime - gameplayStart;
@@ -44,91 +99,104 @@ export function PlayfieldSVG({
         return JUDGMENT_LINE_X + VISIBLE_LENGTH * (1 - progress);
     }, [currentTime]);
 
-    const renderHitObject = useCallback((obj: TaikoHitObjectWithStart, difficulty: TaikoDifficulty, yOffset: number, index: number) => {
-        const headX = getObjectX(obj.time, obj.gameplayStart);
-        const size = obj.type.includes("big") ? 60 : 40;
-        const centerY = yOffset + 50;
+    const handleNoteMouseEnter = useCallback((time: number, x: number, y: number) => {
+        if (!isPlaying && !isDragging) {
+            setHoveredNote({ time, x, y });
+        }
+    }, [isPlaying, isDragging]);
 
+    const handleNoteClick = useCallback((e: React.MouseEvent, time: number, x: number, y: number) => {
+        if (!isPlaying && e.ctrlKey) {
+            e.preventDefault();
+            openUrl(`osu://edit/${formatTimestamp(time)}`).catch(console.error);
+            addFeedback(x, y - 24, "Opened!", "#60a5fa");
+        }
+    }, [isPlaying, addFeedback]);
+
+    const handleNoteContextMenu = useCallback((e: React.MouseEvent, time: number, x: number, y: number) => {
+        if (!isPlaying && e.ctrlKey) {
+            e.preventDefault();
+            navigator.clipboard.writeText(`${formatTimestamp(time)} - `).catch(console.error);
+            addFeedback(x, y - 24, "Copied!", "#4ade80");
+        }
+    }, [isPlaying, addFeedback]);
+
+    const renderLongObject = useCallback((
+        obj: TaikoHitObjectWithStart,
+        difficulty: TaikoDifficulty,
+        headX: number,
+        centerY: number,
+        index: number,
+    ) => {
+        const isDrumroll = obj.type === "drumroll";
+        const halfHeight = isDrumroll ? 20 : 25;
+        const fill = isDrumroll ? "#ffaa00" : "#8b5cf6";
         const DRUMROLL_LEFT = JUDGMENT_LINE_X - 25;
         const RIGHT_LIMIT = PLAYFIELD_WIDTH + 100;
 
-        if (obj.type === "drumroll" && obj.endTime) {
-            const endGameplayStart = calculateGameplayStart(obj.endTime, difficulty.timingLines);
-            const tailX = getObjectX(obj.endTime, endGameplayStart);
+        const endGameplayStart = calculateGameplayStart(obj.endTime!, difficulty.timingLines);
+        const tailX = getObjectX(obj.endTime!, endGameplayStart);
+        const leftX = Math.min(headX, tailX);
+        const rightX = Math.max(headX, tailX);
 
-            const leftX = Math.min(headX, tailX);
-            const rightX = Math.max(headX, tailX);
+        if (rightX < DRUMROLL_LEFT || leftX > RIGHT_LIMIT) return null;
 
-            if (rightX < DRUMROLL_LEFT || leftX > RIGHT_LIMIT) return null;
+        const displayX = Math.max(leftX, DRUMROLL_LEFT);
+        const displayWidth = Math.min(rightX, RIGHT_LIMIT) - displayX;
+        if (displayWidth <= 0) return null;
 
-            const displayX = Math.max(leftX, DRUMROLL_LEFT);
-            const displayEndX = Math.min(rightX, RIGHT_LIMIT);
-            const displayWidth = displayEndX - displayX;
+        const topY = centerY - halfHeight;
+        return (
+            <rect
+                key={`${index}-${obj.type}`}
+                x={displayX}
+                y={topY}
+                width={displayWidth}
+                height={halfHeight * 2}
+                fill={fill}
+                stroke="#ffffff"
+                strokeWidth={2}
+                opacity={0.7}
+                rx={halfHeight}
+                style={{ cursor: !isPlaying ? "pointer" : "default" }}
+                onMouseEnter={() => handleNoteMouseEnter(obj.time, headX, topY)}
+                onMouseLeave={() => setHoveredNote(null)}
+                onClick={(e) => handleNoteClick(e, obj.time, headX, topY)}
+                onContextMenu={(e) => handleNoteContextMenu(e, obj.time, headX, topY)}
+            />
+        );
+    }, [getObjectX, calculateGameplayStart, isPlaying, handleNoteMouseEnter, handleNoteClick, handleNoteContextMenu]);
 
-            if (displayWidth <= 0) return null;
+    const renderHitObject = useCallback((obj: TaikoHitObjectWithStart, difficulty: TaikoDifficulty, yOffset: number, index: number) => {
+        const headX = getObjectX(obj.time, obj.gameplayStart);
+        const centerY = yOffset + 50;
 
-            return (
-                <rect
-                    key={`${index}-drumroll`}
-                    x={displayX}
-                    y={centerY - 20}
-                    width={displayWidth}
-                    height={40}
-                    fill="#ffaa00"
-                    stroke="#ffffff"
-                    strokeWidth={2}
-                    opacity={0.7}
-                    rx={20}
-                />
-            );
-        } else if (obj.type === "spinner" && obj.endTime) {
-            const endGameplayStart = calculateGameplayStart(obj.endTime, difficulty.timingLines);
-            const tailX = getObjectX(obj.endTime, endGameplayStart);
+        if ((obj.type === "drumroll" || obj.type === "spinner") && obj.endTime)
+            return renderLongObject(obj, difficulty, headX, centerY, index);
 
-            const leftX = Math.min(headX, tailX);
-            const rightX = Math.max(headX, tailX);
+        if (headX < JUDGMENT_LINE_X || headX > PLAYFIELD_WIDTH + 100) return null;
 
-            if (rightX < DRUMROLL_LEFT || leftX > RIGHT_LIMIT) return null;
+        const color = obj.type.includes("don") ? "#ff5555" : "#5599ff";
+        const isBig = obj.type.includes("big");
+        const size = isBig ? 60 : 40;
 
-            const displayX = Math.max(leftX, DRUMROLL_LEFT);
-            const displayEndX = Math.min(rightX, RIGHT_LIMIT);
-            const displayWidth = displayEndX - displayX;
-
-            if (displayWidth <= 0) return null;
-
-            return (
-                <rect
-                    key={`${index}-spinner`}
-                    x={displayX}
-                    y={centerY - 25}
-                    width={displayWidth}
-                    height={50}
-                    fill="#8b5cf6"
-                    stroke="#ffffff"
-                    strokeWidth={2}
-                    opacity={0.7}
-                    rx={25}
-                />
-            );
-        } else {
-            if (headX < JUDGMENT_LINE_X || headX > PLAYFIELD_WIDTH + 100) return null;
-
-            const color = obj.type.includes("don") ? "#ff5555" : "#5599ff";
-            const isBig = obj.type.includes("big");
-
-            return (
-                <circle
-                    key={`${index}-circle`}
-                    cx={headX}
-                    cy={centerY}
-                    r={size / 2}
-                    fill={color}
-                    stroke="#ffffff"
-                    strokeWidth={isBig ? 3 : 1.5}
-                />
-            );
-        }
-    }, [getObjectX, calculateGameplayStart]);
+        return (
+            <circle
+                key={`${index}-circle`}
+                cx={headX}
+                cy={centerY}
+                r={size / 2}
+                fill={color}
+                stroke="#ffffff"
+                strokeWidth={isBig ? 3 : 1.5}
+                style={{ cursor: !isPlaying ? "pointer" : "default" }}
+                onMouseEnter={() => handleNoteMouseEnter(obj.time, headX, centerY)}
+                onMouseLeave={() => setHoveredNote(null)}
+                onClick={(e) => handleNoteClick(e, obj.time, headX, centerY)}
+                onContextMenu={(e) => handleNoteContextMenu(e, obj.time, headX, centerY)}
+            />
+        );
+    }, [getObjectX, renderLongObject, isPlaying, handleNoteMouseEnter, handleNoteClick, handleNoteContextMenu]);
 
     const renderSVLines = useCallback((difficulty: TaikoDifficulty, yOffset: number) => {
         if (isGameplayMode || !isViewSVLine) return null;
@@ -250,13 +318,21 @@ export function PlayfieldSVG({
         return ticks;
     }, [getObjectX, processedDifficulties, isGameplayMode]);
 
+    const playfieldHeight = filteredDifficulties.length * 100;
+
     return (
         <div className="flex items-center justify-center mb-4">
             <div
                 className="relative bg-surface-input rounded-lg border border-border-muted overflow-hidden"
-                style={{ width: `${PLAYFIELD_WIDTH}px`, height: `${filteredDifficulties.length * 100}px` }}
+                style={{
+                    width: `${PLAYFIELD_WIDTH}px`,
+                    height: `${playfieldHeight}px`,
+                    cursor: isPlaying ? "default" : isDragging ? "grabbing" : "grab",
+                    userSelect: "none",
+                }}
+                onMouseDown={handleMouseDown}
             >
-                <svg width={PLAYFIELD_WIDTH} height={filteredDifficulties.length * 100}>
+                <svg width={PLAYFIELD_WIDTH} height={playfieldHeight}>
                     {filteredDifficulties.map((diff, diffIndex) => {
                         const yOffset = diffIndex * 100;
                         const centerY = yOffset + 50;
@@ -326,7 +402,7 @@ export function PlayfieldSVG({
                             style={{
                                 left: `${anim.x}px`,
                                 top: `${anim.y + offsetY}px`,
-                                transform: 'translate(-50%, -50%)',
+                                transform: "translate(-50%, -50%)",
                                 opacity,
                             }}
                         >
@@ -342,6 +418,39 @@ export function PlayfieldSVG({
                         </div>
                     );
                 })}
+
+                {hoveredNote && !isPlaying && (
+                    <div
+                        key={hoveredNote.time}
+                        className="tooltip-in absolute pointer-events-none z-10 px-2 py-1.5 rounded-md bg-zinc-900/95 border border-zinc-600 text-xs text-zinc-200 whitespace-nowrap shadow-lg"
+                        style={{
+                            left: `${hoveredNote.x}px`,
+                            top: `${hoveredNote.y - 52}px`,
+                            transform: "translateX(-50%)",
+                        }}
+                    >
+                        <div className="font-mono text-center text-zinc-100 mb-0.5">{formatTimestamp(hoveredNote.time)}</div>
+                        <div className="text-zinc-500 text-[10px] text-center leading-tight">
+                            Ctrl+Click · Ctrl+R-Click to copy
+                        </div>
+                    </div>
+                )}
+
+                {feedbackFlashes.map(flash => (
+                    <div
+                        key={flash.id}
+                        className="feedback-flash absolute pointer-events-none z-20 text-xs font-bold whitespace-nowrap"
+                        style={{
+                            left: `${flash.x}px`,
+                            top: `${flash.y}px`,
+                            color: flash.color,
+                            textShadow: `0 0 8px ${flash.color}80`,
+                            transform: "translateX(-50%)",
+                        }}
+                    >
+                        {flash.text}
+                    </div>
+                ))}
             </div>
         </div>
     );

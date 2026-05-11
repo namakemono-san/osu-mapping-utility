@@ -86,7 +86,7 @@ function createKatSound(): string {
     return URL.createObjectURL(wavBlob);
 }
 
-export type HitSoundType = TaikoHitType;
+type HitSoundType = TaikoHitType;
 
 export interface UseHitSoundsReturn {
     playHitSound: (type: HitSoundType) => void;

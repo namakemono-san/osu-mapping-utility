@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.SignalR;
+using MappingUtility.Checks.Framework;
 using MappingUtility.Parser;
 using MappingUtility.Parser.Objects.Events;
 using MappingUtility.Parser.Settings;
@@ -83,6 +84,36 @@ public class BeatmapHub : Hub
             var newContent = OsuSerializer.ApplyMetadata(content, metadata, background);
             await File.WriteAllTextAsync(filePath, newContent);
             await Clients.Caller.SendAsync("ApplyMetadataComplete", filePath);
+        }
+        catch (Exception ex)
+        {
+            await Clients.Caller.SendAsync("ParseError", ex.Message);
+        }
+    }
+
+    public async Task RequestRunChecks(string folderPath, string[] fileNames)
+    {
+        try
+        {
+            var files = fileNames.Length > 0
+                ? fileNames
+                : Directory.GetFiles(folderPath, "*.osu")
+                           .Select(Path.GetFileName)
+                           .Where(f => f != null)
+                           .Cast<string>()
+                           .ToArray();
+
+            var beatmaps = new List<MappingUtility.Parser.Objects.Beatmap>();
+            foreach (var fileName in files)
+            {
+                var filePath = Path.Combine(folderPath, fileName);
+                var content = await File.ReadAllTextAsync(filePath);
+                beatmaps.Add(OsuParser.Parse(content, fileName));
+            }
+
+            var response = Checker.GetCheckResults(beatmaps);
+            var json = JsonSerializer.Serialize(response, JsonOptions);
+            await Clients.Caller.SendAsync("RunChecksComplete", json);
         }
         catch (Exception ex)
         {

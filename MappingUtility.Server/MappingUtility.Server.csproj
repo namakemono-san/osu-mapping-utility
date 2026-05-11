@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\MappingUtility.Parser\MappingUtility.Parser.csproj" />
+    <ProjectReference Include="..\MappingUtility.Checks\MappingUtility.Checks.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -12,7 +13,7 @@
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <Version>1.0.1</Version>
+    <Version>1.1.0</Version>
   </PropertyGroup>
 
 </Project>

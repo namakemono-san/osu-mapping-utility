@@ -1,5 +1,6 @@
 import * as signalR from "@microsoft/signalr";
 import type { Beatmap, MetadataWriteInput, Background } from "../types/osu";
+import type { RcCheckResponse } from "../domain/rc/types";
 
 const connection = new signalR.HubConnectionBuilder()
     .withUrl("http://localhost:7001/beatmap")
@@ -18,24 +19,6 @@ export async function startConnection(): Promise<boolean> {
         }
     }
     return false;
-}
-
-export async function requestParse(filePath: string): Promise<Beatmap> {
-    return new Promise((resolve, reject) => {
-        const onResult = (json: string) => {
-            connection.off("UpdateBeatmap", onResult);
-            connection.off("ParseError", onError);
-            resolve(JSON.parse(json) as Beatmap);
-        };
-        const onError = (message: string) => {
-            connection.off("UpdateBeatmap", onResult);
-            connection.off("ParseError", onError);
-            reject(new Error(message));
-        };
-        connection.on("UpdateBeatmap", onResult);
-        connection.on("ParseError", onError);
-        connection.invoke("RequestParse", filePath).catch(reject);
-    });
 }
 
 export async function requestParseBatch(folderPath: string, fileNames: string[]): Promise<Beatmap[]> {
@@ -96,20 +79,22 @@ export async function requestFixUnsnaps(filePath: string): Promise<number> {
     });
 }
 
-export function onUpdateBeatmap(callback: (beatmap: Beatmap) => void) {
-    connection.on("UpdateBeatmap", (json: string) => {
-        callback(JSON.parse(json) as Beatmap);
+
+export async function requestRunChecks(folderPath: string, fileNames: string[]): Promise<RcCheckResponse> {
+    return new Promise((resolve, reject) => {
+        const onResult = (json: string) => {
+            connection.off("RunChecksComplete", onResult);
+            connection.off("ParseError", onError);
+            resolve(JSON.parse(json) as RcCheckResponse);
+        };
+        const onError = (message: string) => {
+            connection.off("RunChecksComplete", onResult);
+            connection.off("ParseError", onError);
+            reject(new Error(message));
+        };
+        connection.on("RunChecksComplete", onResult);
+        connection.on("ParseError", onError);
+        connection.invoke("RequestRunChecks", folderPath, fileNames).catch(reject);
     });
 }
 
-export function onUpdateBeatmapset(callback: (beatmaps: Beatmap[]) => void) {
-    connection.on("UpdateBeatmapset", (json: string) => {
-        callback(JSON.parse(json) as Beatmap[]);
-    });
-}
-
-export function onParseError(callback: (message: string) => void) {
-    connection.on("ParseError", callback);
-}
-
-export default connection;

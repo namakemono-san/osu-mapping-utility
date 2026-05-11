@@ -1,6 +1,6 @@
 import type { Beatmap } from "../../types/osu";
 
-export const DIFFICULTY_ORDER = [
+const DIFFICULTY_ORDER = [
     "Kantan",
     "Futsuu",
     "Muzukashii",
@@ -11,7 +11,7 @@ export const DIFFICULTY_ORDER = [
     "Custom"
 ] as const;
 
-export const DIFFICULTY_PATTERNS: Record<string, RegExp> = {
+const DIFFICULTY_PATTERNS: Record<string, RegExp> = {
     "Kantan": /kantan/i,
     "Futsuu": /futsuu/i,
     "Muzukashii": /muzukashii/i,
