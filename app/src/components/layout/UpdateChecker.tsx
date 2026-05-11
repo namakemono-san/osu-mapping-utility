@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { check } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
+import { invoke } from "@tauri-apps/api/core";
 import { FiDownload } from "react-icons/fi";
 import { Button } from "../Button";
 import { Modal } from "../Modal";
@@ -75,6 +76,7 @@ export function UpdateChecker() {
                 }
             });
 
+            await invoke("stop_server");
             await relaunch();
         } catch (err) {
             console.error("Update error:", err);

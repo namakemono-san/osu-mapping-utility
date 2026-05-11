@@ -3274,7 +3274,7 @@ dependencies = [
 
 [[package]]
 name = "osu-mapping-utility"
-version = "1.1.0"
+version = "1.1.1"
 dependencies = [
  "ab_glyph",
  "base64 0.22.1",
