@@ -69,7 +69,7 @@ public static class RcUtils
             if (snapLen < 0.5) continue;
             var pos = time - uninherited.Offset;
             var snapIndex = Math.Round(pos / snapLen);
-            var nearestSnap = uninherited.Offset + snapIndex * snapLen;
+            var nearestSnap = uninherited.Offset + (snapIndex * snapLen);
             var snapped = (int)nearestSnap;
             var diff = snapped - (int)time;
             if (Math.Abs(diff) < bestAbsDiff)
