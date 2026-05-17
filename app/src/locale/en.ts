@@ -63,6 +63,22 @@ export const en = {
 
     "titlebar.docs": "Documentation",
     "titlebar.language": "Language: {lang}",
+    "titlebar.settings": "Settings",
+
+    "settings.title": "Settings",
+    "settings.section.general": "General",
+    "settings.language.label": "Language",
+    "settings.songsFolder.label": "osu! Songs Folder",
+    "settings.songsFolder.browse": "Browse",
+    "settings.songsFolder.change": "Change",
+    "settings.songsFolder.notSet": "Not set",
+    "settings.updates.title": "Application Updates",
+    "settings.updates.currentVersion": "Current Version",
+    "settings.updates.check": "Check for updates",
+    "settings.updates.checking": "Checking...",
+    "settings.updates.upToDate": "Up to date",
+    "settings.updates.available": "Update available",
+    "settings.updates.failed": "Check failed",
 
     "image.invalidUrl": "Invalid YouTube URL",
     "image.processing": "Processing...",

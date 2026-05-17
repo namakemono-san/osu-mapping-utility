@@ -65,6 +65,22 @@ export const ja: Record<LocaleKey, string> = {
 
     "titlebar.docs": "ドキュメント",
     "titlebar.language": "言語: {lang}",
+    "titlebar.settings": "設定",
+
+    "settings.title": "設定",
+    "settings.section.general": "一般",
+    "settings.language.label": "言語",
+    "settings.songsFolder.label": "osu! Songs フォルダ",
+    "settings.songsFolder.browse": "参照",
+    "settings.songsFolder.change": "変更",
+    "settings.songsFolder.notSet": "未設定",
+    "settings.updates.title": "アプリケーション更新",
+    "settings.updates.currentVersion": "現在のバージョン",
+    "settings.updates.check": "更新を確認",
+    "settings.updates.checking": "確認中...",
+    "settings.updates.upToDate": "最新版です",
+    "settings.updates.available": "更新があります",
+    "settings.updates.failed": "確認に失敗",
 
     "image.invalidUrl": "YouTube URL が正しくありません",
     "image.processing": "処理中...",
