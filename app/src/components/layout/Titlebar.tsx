@@ -50,12 +50,12 @@ export function Titlebar({ onOpenSettings }: { onOpenSettings?: () => void }) {
             onDoubleClick={() => appWindow.toggleMaximize()}
             className={`fixed top-0 left-0 w-full h-8 z-50 flex items-center pl-4 text-zinc-200 bg-surface-elevated border-b border-zinc-800/70 select-none ${isMax ? '' : 'rounded-t-lg'}`}
         >
-            <span className="text-base tracking-wide truncate">
+            <span data-tauri-drag-region className="text-base tracking-wide truncate">
                 osu! mapping utility
             </span>
-            {version && <span className="text-base tracking-wide truncate opacity-65 ml-2">v{version}</span>}
+            {version && <span data-tauri-drag-region className="text-base tracking-wide truncate opacity-65 ml-2">v{version}</span>}
 
-            <div className="flex-1" />
+            <div data-tauri-drag-region className="flex-1" />
 
             <div className="flex items-center h-full" data-tauri-drag-region="false">
                 <div className="flex gap-2" onDoubleClickCapture={(e) => e.stopPropagation()}>

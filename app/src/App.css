@@ -223,6 +223,13 @@
     font-weight: 400;
     scrollbar-width: none;
   }
+
+  * {
+    scrollbar-width: none;
+    &::-webkit-scrollbar {
+      display: none;
+    }
+  }
 }
 
 @utility scrollbar-hide {
