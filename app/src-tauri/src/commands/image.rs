@@ -213,6 +213,7 @@ pub async fn process_thumbnail_from_video_id(app: tauri::AppHandle, video_id: St
         .path()
         .app_data_dir()
         .map_err(|e| e.to_string())?
+        .join("caches")
         .join("thumbnails");
     std::fs::create_dir_all(&work_dir).map_err(|e| e.to_string())?;
 
@@ -272,6 +273,7 @@ pub async fn process_thumbnail_from_image(
         .path()
         .app_data_dir()
         .map_err(|e| e.to_string())?
+        .join("caches")
         .join("thumbnails");
     std::fs::create_dir_all(&work_dir).map_err(|e| e.to_string())?;
 
@@ -313,6 +315,7 @@ pub async fn process_thumbnail_from_url(
         .path()
         .app_data_dir()
         .map_err(|e| e.to_string())?
+        .join("caches")
         .join("thumbnails");
     std::fs::create_dir_all(&work_dir).map_err(|e| e.to_string())?;
 

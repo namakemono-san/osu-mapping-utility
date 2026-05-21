@@ -28,6 +28,22 @@ fn stop_server(state: tauri::State<'_, AppState>) {
     }
 }
 
+fn migrate_dir(from: &std::path::Path, to: &std::path::Path) {
+    if !from.exists() {
+        return;
+    }
+    let _ = std::fs::create_dir_all(to);
+    if let Ok(entries) = std::fs::read_dir(from) {
+        for entry in entries.flatten() {
+            let dest = to.join(entry.file_name());
+            if !dest.exists() {
+                let _ = std::fs::rename(entry.path(), &dest);
+            }
+        }
+    }
+    let _ = std::fs::remove_dir(from);
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -57,6 +73,21 @@ pub fn run() {
             app.manage(AppState {
                 server: Mutex::new(server_state),
             });
+
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.set_background_color(Some(tauri::window::Color(31, 31, 31, 255)));
+                let _ = window.show();
+            }
+
+            if let Ok(data_dir) = app.path().app_data_dir() {
+                let _ = std::fs::create_dir_all(data_dir.join("caches").join("downloads"));
+                let _ = std::fs::create_dir_all(data_dir.join("caches").join("thumbnails"));
+                let _ = std::fs::create_dir_all(data_dir.join("logs"));
+
+                migrate_dir(&data_dir.join("assets"), &data_dir.join("caches"));
+                migrate_dir(&data_dir.join("downloads"), &data_dir.join("caches").join("downloads"));
+                migrate_dir(&data_dir.join("thumbnails"), &data_dir.join("caches").join("thumbnails"));
+            }
 
             Ok(())
         })

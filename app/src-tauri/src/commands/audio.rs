@@ -12,7 +12,7 @@ fn ensure_blank(app: &tauri::AppHandle) -> Result<PathBuf, String> {
         .path()
         .app_data_dir()
         .map_err(|e| e.to_string())?
-        .join("assets");
+        .join("caches");
 
     std::fs::create_dir_all(&base_dir).map_err(|e| e.to_string())?;
 
@@ -602,6 +602,7 @@ pub async fn download_video(
         .path()
         .app_data_dir()
         .map_err(|e| e.to_string())?
+        .join("caches")
         .join("downloads");
 
     std::fs::create_dir_all(&cache_dir).map_err(|e| format!("failed to create cache dir: {e}"))?;
