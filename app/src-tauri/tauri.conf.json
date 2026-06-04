@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "osu! mapping utility",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "identifier": "osu-mapping-utility",
   "build": {
     "beforeDevCommand": "pnpm build:server && pnpm dev",
