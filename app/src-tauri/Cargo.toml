@@ -1,6 +1,6 @@
 [package]
 name = "osu-mapping-utility"
-version = "1.1.1"
+version = "1.1.2"
 description = "A tool featuring convenient functions for osu! mapping"
 authors = ["namakemono-san <me@nmkmn.moe>"]
 edition = "2021"

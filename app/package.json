@@ -1,7 +1,7 @@
 {
   "name": "app",
   "private": true,
-  "version": "1.1.1",
+  "version": "1.1.2",
   "author": "namakemono-san <me@nmkmn.moe>",
   "packageManager": "pnpm@10.30.3",
   "type": "module",

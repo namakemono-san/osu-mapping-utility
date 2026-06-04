@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { getVersion } from '@tauri-apps/api/app';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { FiX, FiMinus, FiMaximize, FiMinimize, FiGlobe } from 'react-icons/fi';
+import { FiX, FiMinus, FiMaximize, FiMinimize, FiSettings } from 'react-icons/fi';
 
 import { useI18n } from "../../hooks/i18nContext";
 
@@ -25,12 +25,12 @@ function ToolButton({ icon, label, onClick }: { icon: React.ReactNode; label: st
     );
 }
 
-export function Titlebar() {
+export function Titlebar({ onOpenSettings }: { onOpenSettings?: () => void }) {
     const appWindow = getCurrentWindow();
     const [isMax, setIsMax] = useState(false);
     const [version, setVersion] = useState<string>("");
 
-    const { lang, setLang, t } = useI18n();
+    const { t } = useI18n();
 
     useEffect(() => {
         let unlisten: (() => void) | undefined;
@@ -48,21 +48,21 @@ export function Titlebar() {
         <div
             data-tauri-drag-region
             onDoubleClick={() => appWindow.toggleMaximize()}
-            className={`fixed top-0 left-0 w-full h-10 z-50 flex items-center pl-4 text-zinc-200 bg-surface-elevated border-b border-zinc-800/70 select-none ${isMax ? '' : 'rounded-t-lg'}`}
+            className={`fixed top-0 left-0 w-full h-8 z-50 flex items-center pl-4 text-zinc-200 bg-surface-elevated border-b border-zinc-800/70 select-none ${isMax ? '' : 'rounded-t-lg'}`}
         >
-            <span className="text-sm font-medium tracking-wide truncate">
+            <span data-tauri-drag-region className="text-base tracking-wide truncate">
                 osu! mapping utility
             </span>
-            {version && <span className="text-xs text-zinc-500 ml-2">v{version}</span>}
+            {version && <span data-tauri-drag-region className="text-base tracking-wide truncate opacity-65 ml-2">v{version}</span>}
 
-            <div className="flex-1" />
+            <div data-tauri-drag-region className="flex-1" />
 
             <div className="flex items-center h-full" data-tauri-drag-region="false">
                 <div className="flex gap-2" onDoubleClickCapture={(e) => e.stopPropagation()}>
                     <ToolButton
-                        icon={<FiGlobe className="text-18" />}
-                        label={t("titlebar.language", { lang: lang.toUpperCase() })}
-                        onClick={() => setLang(lang === "en" ? "ja" : "en")}
+                        icon={<FiSettings className="text-18" />}
+                        label={t("titlebar.settings")}
+                        onClick={() => onOpenSettings?.()}
                     />
                 </div>
 
@@ -71,7 +71,7 @@ export function Titlebar() {
                 <div className="h-full flex">
                     <button
                         onClick={() => appWindow.minimize()}
-                        className="h-full w-11 grid place-items-center hover:bg-zinc-700/60 transition-colors"
+                        className="h-full w-9 grid place-items-center hover:bg-zinc-700/60 transition-colors"
                     >
                         <FiMinus />
                     </button>
@@ -80,13 +80,13 @@ export function Titlebar() {
                             await appWindow.toggleMaximize();
                             setIsMax(await appWindow.isMaximized());
                         }}
-                        className="h-full w-11 grid place-items-center hover:bg-zinc-700/60 transition-colors"
+                        className="h-full w-9 grid place-items-center hover:bg-zinc-700/60 transition-colors"
                     >
                         {isMax ? <FiMinimize /> : <FiMaximize />}
                     </button>
                     <button
                         onClick={() => appWindow.close()}
-                        className="h-full w-11 grid place-items-center hover:bg-red-600/90 hover:text-white transition-colors"
+                        className="h-full w-9 grid place-items-center hover:bg-red-500/20 hover:text-white transition-colors"
                     >
                         <FiX />
                     </button>

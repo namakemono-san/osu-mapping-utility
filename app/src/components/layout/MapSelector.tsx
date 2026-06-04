@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo, memo } from "react";
-import { MdRefresh, MdFolder, MdSearch, MdFolderOpen, MdOpenInBrowser, MdComment, MdDownload } from "react-icons/md";
+import { MdRefresh, MdSearch, MdClose, MdFolderOpen, MdOpenInBrowser, MdComment, MdDownload } from "react-icons/md";
 import { createPortal } from "react-dom";
 
 import { open } from "@tauri-apps/plugin-dialog";
@@ -498,24 +498,9 @@ export function MapSelector({
         <aside
             className={`h-full w-64 shrink-0 bg-surface-sidebar text-text-primary border-r border-border-muted flex flex-col ${className}`}
         >
-            <div className="px-3 py-3 border-b border-border-muted">
+            <div className="px-1 py-2 border-b border-border-muted">
                 <div className="space-y-2">
-                    <div className="flex gap-2">
-                        <Button
-                            variant="secondary"
-                            size="sm"
-                            className="flex-1"
-                            onClick={forceReload}
-                            disabled={isScanning}
-                            title={t("mapSelector.button.reloadTitle")}
-                            icon={
-                                <MdRefresh
-                                    className={`text-base ${isScanning ? "animate-spin" : ""}`}
-                                />
-                            }
-                        >
-                            {t("mapSelector.button.reload")}
-                        </Button>
+                    {/* <div className="flex gap-2">
                         <Button
                             onClick={selectFolder}
                             disabled={isScanning}
@@ -525,17 +510,38 @@ export function MapSelector({
                         >
                             <MdFolder className="text-base" />
                         </Button>
-                    </div>
-
-                    <div className="relative">
-                        <MdSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-base" />
-                        <input
-                            type="text"
-                            placeholder={t("mapSelector.search.placeholder")}
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            className="w-full h-8 pl-9 pr-3 rounded-lg bg-surface-hover border border-border-strong text-sm placeholder-text-muted focus:outline-none focus:border-border-focus transition-colors"
-                        />
+                    </div> */}
+                    <div className="flex gap-1">
+                        <div className="relative flex-1">
+                            <MdSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-base" />
+                            <input
+                                type="text"
+                                placeholder={t("mapSelector.search.placeholder")}
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                className={`w-full h-8 pl-9 ${search ? "pr-8" : "pr-3"} rounded-lg bg-surface-hover border border-border-strong text-sm placeholder-text-muted focus:outline-none focus:border-border-focus transition-colors`}
+                            />
+                            {search && (
+                                <button
+                                    onClick={() => setSearch("")}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-white transition-colors"
+                                    aria-label="Clear search"
+                                >
+                                    <MdClose className="text-base" />
+                                </button>
+                            )}
+                        </div>
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={forceReload}
+                            disabled={isScanning}
+                            title={t("mapSelector.button.reloadTitle")}
+                        >
+                            <MdRefresh
+                                className={`text-base ${isScanning ? "animate-spin" : ""}`}
+                            />
+                        </Button>
                     </div>
                 </div>
             </div>

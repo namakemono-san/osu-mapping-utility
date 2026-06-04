@@ -96,10 +96,10 @@ export function Sidebar({
             className={`h-full shrink-0 border-r border-border-muted bg-surface-sidebar text-text-primary flex flex-col transition-[width] duration-300 ease-in-out overflow-hidden ${isExpanded ? "w-56" : "w-16"
                 } ${className}`}
         >
-            <div className="border-b border-border-muted px-2 py-2">
+            <div className="border-b border-border-muted px-1 py-2">
                 <button
                     onClick={() => setIsExpanded(!isExpanded)}
-                    className="h-9 w-full rounded-lg text-text-muted hover:bg-surface-hover hover:text-text-primary transition-all duration-200 active:scale-95 flex items-center justify-center"
+                    className="h-8 w-full rounded-lg text-text-muted hover:bg-surface-hover hover:text-text-primary transition-all duration-200 active:scale-95 flex items-center justify-center"
                     aria-label={isExpanded ? t("sidebar.action.collapse") : t("sidebar.action.expand")}
                 >
                     {isExpanded ? (

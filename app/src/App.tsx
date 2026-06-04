@@ -7,6 +7,7 @@ import { Titlebar } from "./components/layout/Titlebar";
 import { Sidebar, SidebarKey } from "./components/layout/Sidebar";
 import { MapSelector } from "./components/layout/MapSelector";
 import { UpdateChecker } from "./components/layout/UpdateChecker";
+import { Settings } from "./components/layout/Settings";
 import { BeatmapCustomizer } from "./pages/BeatmapCustomizer";
 
 import { Beatmapset } from "./types/beatmap";
@@ -62,6 +63,7 @@ function ToolLoading() {
 function App() {
   const [activeTool, setActiveTool] = useState<SidebarKey>("beatmap_customizer");
   const [selectedBeatmap, setSelectedBeatmap] = useState<Beatmapset | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const { songsFolder } = useAppState();
 
@@ -125,7 +127,8 @@ function App() {
   return (
     <>
       <UpdateChecker />
-      <Titlebar />
+      <Titlebar onOpenSettings={() => setSettingsOpen(true)} />
+      <Settings isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
 
       {hasBackground && (
         <div
