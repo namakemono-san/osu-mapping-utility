@@ -1,0 +1,102 @@
+{
+  "name": "osu-mapping-utility-app",
+  "version": "2.0.0-canary.1",
+  "description": "A toolkit for osu! mappers: metadata/background batch editing, mapset cloning, audio inspection, and BPM/offset calibration.",
+  "author": "namakemono-san",
+  "main": "./out/main/index.js",
+  "scripts": {
+    "format": "prettier --write .",
+    "lint": "eslint --cache .",
+    "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
+    "typecheck:web": "tsc --noEmit -p tsconfig.web.json --composite false",
+    "typecheck": "pnpm run typecheck:node && pnpm run typecheck:web",
+    "start": "electron-vite preview",
+    "dev": "electron-vite dev",
+    "build:frontend": "pnpm run typecheck && electron-vite build",
+    "build:backend": "dotnet build ../MappingUtility.Server/MappingUtility.Server.csproj -c Release",
+    "fetch:bin": "node scripts/fetch-bin.mjs",
+    "postinstall": "node scripts/fetch-bin.mjs && electron-builder install-app-deps",
+    "publish:backend": "dotnet publish ../MappingUtility.Server/MappingUtility.Server.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -o resources/server",
+    "build": "pnpm run build:frontend && pnpm run publish:backend && electron-builder --dir",
+    "dist": "pnpm run build:frontend && pnpm run publish:backend && electron-builder --win",
+    "dist-canary": "copy /y build\\icon-canary.ico build\\icon.ico && pnpm run dist"
+  },
+  "build": {
+    "appId": "moe.nmkmn.osu-mapping-utility",
+    "productName": "osu! mapping utility",
+    "directories": {
+      "output": "../dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "!src/**",
+      "!electron.vite.config.*",
+      "!tsconfig*.json",
+      "!.eslintcache",
+      "!resources/bin/**",
+      "!resources/server/**"
+    ],
+    "extraResources": [
+      {
+        "from": "resources/bin",
+        "to": "bin"
+      },
+      {
+        "from": "resources/server",
+        "to": "server"
+      }
+    ],
+    "win": {
+      "executableName": "osu-mapping-utility"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "multiLanguageInstaller": true,
+      "displayLanguageSelector": true,
+      "include": "build/installer.nsh",
+      "artifactName": "osu-mapping-utility-${version}-setup.${ext}",
+      "shortcutName": "${productName}",
+      "uninstallDisplayName": "${productName}",
+      "createDesktopShortcut": "always"
+    },
+    "npmRebuild": false,
+    "publish": {
+      "provider": "github",
+      "owner": "namakemono-san",
+      "repo": "osu-mapping-utility"
+    }
+  },
+  "dependencies": {
+    "@electron-toolkit/preload": "^3.0.2",
+    "@electron-toolkit/utils": "^4.0.0",
+    "@microsoft/signalr": "^10.0.0",
+    "@tabler/icons-react": "^3.34.0",
+    "electron-updater": "^6.3.9",
+    "react-markdown": "^10.1.0",
+    "sonner": "^2.0.7"
+  },
+  "devDependencies": {
+    "@electron-toolkit/eslint-config-prettier": "^3.0.0",
+    "@electron-toolkit/eslint-config-ts": "^3.1.0",
+    "@electron-toolkit/tsconfig": "^2.0.0",
+    "@tailwindcss/vite": "^4.0.0",
+    "@types/node": "^22.19.1",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.1",
+    "electron": "^42.4.1",
+    "electron-builder": "^26.0.12",
+    "electron-vite": "^5.0.0",
+    "eslint": "^9.39.1",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.4.24",
+    "prettier": "^3.7.4",
+    "react": "^19.2.1",
+    "react-dom": "^19.2.1",
+    "tailwindcss": "^4.0.0",
+    "typescript": "^5.9.3",
+    "vite": "^7.2.6"
+  }
+}

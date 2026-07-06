@@ -1,0 +1,22 @@
+{
+  "name": "osu-mapping-utility",
+  "version": "2.0.0-canary.1",
+  "private": true,
+  "packageManager": "pnpm@10.30.3",
+  "scripts": {
+    "dev": "pnpm --filter ./app dev",
+    "build": "pnpm --filter ./app build",
+    "dist": "pnpm --filter ./app dist",
+    "dist-canary": "pnpm --filter ./app dist-canary",
+    "lint": "pnpm --filter ./app lint",
+    "typecheck": "pnpm --filter ./app typecheck",
+    "format": "pnpm --filter ./app format"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "electron",
+      "electron-winstaller",
+      "esbuild"
+    ]
+  }
+}

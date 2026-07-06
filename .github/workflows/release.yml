@@ -1,0 +1,118 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - master
+      - develop
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Read version
+        id: ver
+        shell: pwsh
+        run: |
+          $v = node -e "process.stdout.write(require('./package.json').version)"
+          "version=$v" >> $env:GITHUB_OUTPUT
+
+      - name: Determine tag
+        id: tag
+        shell: pwsh
+        run: |
+          $version = "${{ steps.ver.outputs.version }}"
+          if ("${{ github.ref_name }}" -eq "master") {
+            $base = ($version -split '-')[0]
+            "tag=v$base" >> $env:GITHUB_OUTPUT
+            "name=osu! mapping utility v$base" >> $env:GITHUB_OUTPUT
+            "prerelease=false" >> $env:GITHUB_OUTPUT
+          } else {
+            "tag=v$version" >> $env:GITHUB_OUTPUT
+            "name=osu! mapping utility v$version" >> $env:GITHUB_OUTPUT
+            "prerelease=true" >> $env:GITHUB_OUTPUT
+          }
+
+      - name: Check existing tag
+        id: check
+        shell: pwsh
+        run: |
+          git fetch --tags --force
+          $tag = "${{ steps.tag.outputs.tag }}"
+          git show-ref --tags --verify --quiet "refs/tags/$tag"
+          $exists = ($LASTEXITCODE -eq 0)
+          $global:LASTEXITCODE = 0
+          if ($exists) {
+            Write-Host "Tag $tag already exists, skipping"
+            "skip=true" >> $env:GITHUB_OUTPUT
+          } else {
+            "skip=false" >> $env:GITHUB_OUTPUT
+          }
+
+      - name: Get pnpm store path
+        if: steps.check.outputs.skip == 'false'
+        id: pnpm-cache
+        shell: pwsh
+        run: |
+          $store = pnpm store path --silent
+          "store=$store" >> $env:GITHUB_OUTPUT
+
+      - uses: actions/cache@v4
+        if: steps.check.outputs.skip == 'false'
+        with:
+          path: ${{ steps.pnpm-cache.outputs.store }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+
+      - name: Install dependencies
+        if: steps.check.outputs.skip == 'false'
+        run: pnpm install --frozen-lockfile
+
+      - name: Swap canary icon
+        if: steps.check.outputs.skip == 'false' && steps.tag.outputs.prerelease == 'true'
+        shell: pwsh
+        run: Copy-Item app/build/icon-canary.ico app/build/icon.ico -Force
+
+      - name: Build
+        if: steps.check.outputs.skip == 'false'
+        shell: pwsh
+        run: |
+          pnpm --filter ./app run build:frontend
+          pnpm --filter ./app run publish:backend
+          pnpm --filter ./app exec electron-builder --win --publish never
+
+      - name: Release
+        if: steps.check.outputs.skip == 'false'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: ${{ steps.tag.outputs.name }}
+          prerelease: ${{ steps.tag.outputs.prerelease }}
+          generate_release_notes: true
+          files: |
+            dist/*.exe
+            dist/latest*.yml

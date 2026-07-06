@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>MappingUtility.Server</AssemblyName>
+    <RootNamespace>MappingUtility.Server</RootNamespace>
+    <!-- Kept in sync with the root package.json version by .github/scripts/sync-version.mjs -->
+    <Version>2.0.0-canary.1</Version>
+    <!--
+      CA1416: this app targets Windows only (see .vscode/launch.json, WinExe packaging), so
+      platform-compatibility warnings for Windows-only APIs (e.g. Registry access in
+      BeatmapsetHub.DetectSongsPath) are not actionable.
+      NU1902/NU1903: the only vulnerable advisories currently reported (AutoMapper,
+      MessagePack, SharpCompress) come transitively from ppy.osu.Game, used solely for
+      StarRatingCalculator's difficulty calculation. Our code never touches osu!'s
+      multiplayer/replay/storyboard features that pull those packages in, and force-pinning
+      a newer major version of a third-party engine's own dependencies risks breaking the
+      difficulty calculator with no way to verify compatibility here. Re-run
+      "dotnet list package vulnerable, include-transitive" after any ppy.osu.Game upgrade
+      to confirm this is still the case.
+    -->
+    <NoWarn>CA1416;NU1902;NU1903</NoWarn>
+  </PropertyGroup>
+
+
+  <ItemGroup>
+    <ProjectReference Include="..\MappingUtility.Parser\MappingUtility.Parser.csproj" />
+    <ProjectReference Include="..\MappingUtility.Logging\MappingUtility.Logging.csproj" />
+  </ItemGroup>
+
+
+  <ItemGroup>
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.11" />
+    <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="2.1.4" />
+  </ItemGroup>
+
+</Project>
