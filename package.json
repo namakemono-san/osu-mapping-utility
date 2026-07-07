@@ -11,12 +11,5 @@
     "lint": "pnpm --filter ./app lint",
     "typecheck": "pnpm --filter ./app typecheck",
     "format": "pnpm --filter ./app format"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "electron",
-      "electron-winstaller",
-      "esbuild"
-    ]
   }
 }
