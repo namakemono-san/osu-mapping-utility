@@ -5,8 +5,8 @@ const LOOK_AHEAD_MS = 25
 const SCHEDULE_AHEAD_SEC = 0.25
 
 const METRONOME_SOUND_URLS = {
-  tick: ['/sounds/metronome/metronome-tick.wav'],
-  tickDownbeat: ['/sounds/metronome/metronome-tick-downbeat.wav']
+  tick: ['sounds/metronome/metronome-tick.wav'],
+  tickDownbeat: ['sounds/metronome/metronome-tick-downbeat.wav']
 } as const
 
 interface MetronomeSounds {
@@ -25,7 +25,7 @@ function looksLikeAudioData(buf: ArrayBuffer): boolean {
 }
 
 async function decodeAudioFromUrl(ctx: AudioContext, url: string): Promise<AudioBuffer> {
-  const assetUrl = new URL(url, window.location.origin).toString()
+  const assetUrl = new URL(url, window.location.href).toString()
   const response = await fetch(assetUrl, { cache: 'no-store' })
   if (!response.ok || response.headers.get('content-type')?.includes('text/html')) {
     throw new Error(`Failed to load metronome sound: ${assetUrl}`)
