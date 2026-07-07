@@ -1,29 +1,17 @@
-using System.Text;
 using Microsoft.Extensions.Logging;
 
 namespace MappingUtility.Logging;
 
 public sealed class FileLoggerProvider(string component) : ILoggerProvider
 {
-    private readonly object _lock = new();
-
-    public ILogger CreateLogger(string categoryName) => new FileLogger(this, categoryName);
-
-    internal void Write(string line)
-    {
-        lock (_lock)
-        {
-            System.IO.Directory.CreateDirectory(LogPaths.Directory);
-            File.AppendAllText(LogPaths.FileFor(component), line + Environment.NewLine, new UTF8Encoding(false));
-        }
-    }
+    public ILogger CreateLogger(string categoryName) => new FileLogger(component, categoryName);
 
     public void Dispose()
     {
     }
 }
 
-internal sealed class FileLogger(FileLoggerProvider provider, string categoryName) : ILogger
+internal sealed class FileLogger(string component, string categoryName) : ILogger
 {
     public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
 
@@ -38,6 +26,6 @@ internal sealed class FileLogger(FileLoggerProvider provider, string categoryNam
         var message = formatter(state, exception);
         var line = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] [{logLevel}] [{categoryName}] {message}";
         if (exception is not null) line += Environment.NewLine + exception;
-        provider.Write(line);
+        LogPaths.AppendLine(component, line);
     }
 }
