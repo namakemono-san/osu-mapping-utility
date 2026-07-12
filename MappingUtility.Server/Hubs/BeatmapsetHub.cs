@@ -367,9 +367,12 @@ public class BeatmapsetHub : Hub
                 try
                 {
                     var b = Beatmap.FromFile(f);
-                    var tp = b.TimingPoints.OfType<UninheritedPoint>().FirstOrDefault();
-                    if (tp is null) return null;
-                    return (object?)new { version = b.Metadata.Version, bpm = Math.Round(tp.Bpm, 3), offsetMs = tp.Time };
+                    var points = b.TimingPoints.OfType<UninheritedPoint>()
+                        .OrderBy(tp => tp.Time)
+                        .Select(tp => new { time = tp.Time, bpm = Math.Round(tp.Bpm, 3) })
+                        .ToList();
+                    if (points.Count == 0) return null;
+                    return (object?)new { version = b.Metadata.Version, points };
                 }
                 catch (Exception ex)
                 {
@@ -671,10 +674,12 @@ public class BeatmapsetHub : Hub
             var p = t.Split(',');
             if (p.Length < 8) continue;
 
-            var time        = p[0].Trim();
-            var beatLength  = p[1].Trim();
-            var meter       = p[2].Trim();
             var uninherited = p[6].Trim();
+            if (uninherited != "1") continue;
+
+            var time       = p[0].Trim();
+            var beatLength = p[1].Trim();
+            var meter      = p[2].Trim();
 
             result.Add($"{time},{beatLength},{meter},1,0,100,{uninherited},0");
         }
