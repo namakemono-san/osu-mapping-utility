@@ -26,6 +26,11 @@ import {
 } from '../utils/signalr'
 import { jsonCodec, useLocalStorage } from '../utils/useLocalStorage'
 
+function sanitizeBpm(bpm: number): number {
+  if (!Number.isFinite(bpm) || bpm <= 0) return 1
+  return Math.min(bpm, 2000)
+}
+
 interface OffsetCalibratorProps {
   beatmapset: Beatmapset | null
 }
@@ -256,7 +261,7 @@ function WaveformCanvas({
   audioBuffer,
   getCurrentPlayheadMs,
   durationMs,
-  bpm,
+  segments,
   offsetMs,
   zoom,
   viewStartMs,
@@ -269,7 +274,7 @@ function WaveformCanvas({
   audioBuffer: AudioBuffer | null
   getCurrentPlayheadMs: () => number
   durationMs: number
-  bpm: number
+  segments: { time: number; bpm: number }[]
   offsetMs: number
   zoom: number
   viewStartMs: number
@@ -285,10 +290,12 @@ function WaveformCanvas({
   const rafRef = useRef<number | null>(null)
   const dragging = useRef<{ startX: number; startView: number } | null>(null)
   const clickArmed = useRef(false)
+  const followPlayheadRef = useRef(true)
+  const wasPlayingRef = useRef(isPlaying)
 
   const audioBufferRef = useRef(audioBuffer)
   const durationMsRef = useRef(durationMs)
-  const bpmRef = useRef(bpm)
+  const segmentsRef = useRef(segments)
   const offsetMsRef = useRef(offsetMs)
   const zoomRef = useRef(zoom)
   const viewStartMsRef = useRef(viewStartMs)
@@ -302,8 +309,8 @@ function WaveformCanvas({
     durationMsRef.current = durationMs
   }, [durationMs])
   useLayoutEffect(() => {
-    bpmRef.current = bpm
-  }, [bpm])
+    segmentsRef.current = segments
+  }, [segments])
   useLayoutEffect(() => {
     offsetMsRef.current = offsetMs
   }, [offsetMs])
@@ -332,14 +339,24 @@ function WaveformCanvas({
     const clampedEnd = Math.min(dur, clampedStart + vRange)
 
     let vStart: number
-    if (playing) {
+    if (playing && followPlayheadRef.current) {
       vStart = headMs - vRange / 2
+    } else if (playing) {
+      vStart = clampedStart
     } else {
       const headOutsideView = headMs < clampedStart || headMs > clampedEnd
       vStart = headOutsideView ? clampViewStart(headMs - vRange / 2, dur, vRange) : clampedStart
     }
     return { vStart, vEnd: Math.min(dur, vStart + vRange) }
   }, [])
+
+  useEffect(() => {
+    if (isPlaying && !wasPlayingRef.current) followPlayheadRef.current = true
+    if (!isPlaying && wasPlayingRef.current) {
+      onViewStartChange(getViewRange().vStart)
+    }
+    wasPlayingRef.current = isPlaying
+  }, [isPlaying, getViewRange, onViewStartChange])
 
   const draw = useCallback(() => {
     const wc = waveCanvasRef.current
@@ -369,7 +386,7 @@ function WaveformCanvas({
     wctx.fillRect(0, 0, w, h)
 
     const buf = audioBufferRef.current
-    const bpmVal = bpmRef.current
+    const segmentsVal = segmentsRef.current
     const offVal = offsetMsRef.current
     const z = zoomRef.current
     const playing = isPlayingRef.current
@@ -411,12 +428,21 @@ function WaveformCanvas({
     octx.scale(dpr, dpr)
     octx.clearRect(0, 0, w, h)
 
-    if (bpmVal > 0) {
-      const beatMs = 60000 / bpmVal
-      for (let t = offVal; t <= vEnd; t += beatMs) {
+    for (let si = 0; si < segmentsVal.length; si++) {
+      const seg = segmentsVal[si]
+      if (seg.bpm <= 0) continue
+      const segEnd = si + 1 < segmentsVal.length ? segmentsVal[si + 1].time : Infinity
+      const rangeEnd = Math.min(vEnd, segEnd)
+      if (rangeEnd < vStart) continue
+      const beatMs = 60000 / seg.bpm
+      const rangeStart = Math.max(vStart, seg.time)
+      const firstIdx = Math.ceil((rangeStart - seg.time) / beatMs)
+      const maxLines = w * 2 + 16
+      for (let idx = Math.max(0, firstIdx), drawn = 0; drawn < maxLines; idx++, drawn++) {
+        const t = seg.time + idx * beatMs
+        if (t > rangeEnd) break
         if (t < vStart) continue
         const x = ((t - vStart) / (vEnd - vStart)) * w + 0.5
-        const idx = Math.round((t - offVal) / beatMs)
         const isMeasureStart = idx % 4 === 0
         octx.strokeStyle = isMeasureStart ? 'rgba(239,68,68,0.6)' : 'rgba(255,255,255,0.3)'
         octx.lineWidth = isMeasureStart ? 2 : 1
@@ -479,7 +505,9 @@ function WaveformCanvas({
   const handleMouseMove = (e: React.MouseEvent): void => {
     if (!dragging.current || !durationMs) return
     const dx = e.clientX - dragging.current.startX
-    if (Math.abs(dx) > 4) clickArmed.current = false
+    if (Math.abs(dx) <= 4) return
+    clickArmed.current = false
+    followPlayheadRef.current = false
     const panMs = -(dx / (containerRef.current?.clientWidth ?? 1)) * visibleRangeMs
     onViewStartChange(Math.max(0, Math.min(maxStart, dragging.current.startView + panMs)))
   }
@@ -491,6 +519,7 @@ function WaveformCanvas({
     const { vStart, vEnd } = getViewRange()
     const rect = e.currentTarget.getBoundingClientRect()
     const ms = vStart + ((e.clientX - rect.left) / rect.width) * (vEnd - vStart)
+    followPlayheadRef.current = true
     onSeek(Math.max(0, Math.min(durationMs, ms)))
   }
 
@@ -523,12 +552,14 @@ export function OffsetCalibrator({ beatmapset }: OffsetCalibratorProps): React.J
   const [audioFilename, setAudioFilename] = useState<string | null>(null)
   const [timingInfos, setTimingInfos] = useState<TimingInfo[]>([])
   const [selectedVersion, setSelectedVersion] = useState('')
+  const [selectedPointIndex, setSelectedPointIndex] = useState(0)
 
   const [bpm, setBpm] = useState(120)
   const [bpmCandidates, setBpmCandidates] = useState<number[]>([])
   const [offsetMs, setOffsetMs] = useState(0)
   const [analyzing, setAnalyzing] = useState(false)
   const [analyzingOffset, setAnalyzingOffset] = useState(false)
+  const [ctrlBoost, setCtrlBoost] = useState(false)
 
   const [audioBuffer, setAudioBuffer] = useState<AudioBuffer | null>(null)
 
@@ -570,7 +601,17 @@ export function OffsetCalibrator({ beatmapset }: OffsetCalibratorProps): React.J
       : undefined
   const visibleRangeMs = durationMs > 0 ? Math.max(200, durationMs / zoom) : 0
   const currentTiming = timingInfos.find((t) => t.version === selectedVersion) ?? timingInfos[0]
-  const deltaMs = currentTiming != null ? offsetMs - Math.round(currentTiming.offsetMs) : null
+  const currentPoint = currentTiming?.points[selectedPointIndex] ?? currentTiming?.points[0]
+  const deltaMs = currentPoint != null ? offsetMs - Math.round(currentPoint.time) : null
+  const effectiveBpm = ctrlBoost ? bpm * 2 : bpm
+  const segments = useMemo(
+    () =>
+      currentTiming?.points.map((p, i) => ({
+        time: p.time + (deltaMs ?? 0),
+        bpm: sanitizeBpm(i === selectedPointIndex ? effectiveBpm : p.bpm)
+      })) ?? [],
+    [currentTiming, selectedPointIndex, effectiveBpm, deltaMs]
+  )
 
   const ensureAudioCtx = useCallback((): AudioContext => {
     if (!audioCtxRef.current) audioCtxRef.current = new AudioContext()
@@ -589,8 +630,7 @@ export function OffsetCalibrator({ beatmapset }: OffsetCalibratorProps): React.J
   }, [])
 
   useMetronome({
-    bpm,
-    offsetMs,
+    segments,
     metroOn,
     metroVol,
     isPlaying: playing,
@@ -598,6 +638,51 @@ export function OffsetCalibrator({ beatmapset }: OffsetCalibratorProps): React.J
     songMsToCtxTime,
     ensureAudioCtx
   })
+
+  const lastAutoSectionRef = useRef(-1)
+  useEffect(() => {
+    if (!playing || !currentTiming) return
+    let raf = 0
+    const tick = (): void => {
+      const nowSong = getCurrentPlayheadMs()
+      const points = currentTiming.points
+      let idx = 0
+      for (let i = 0; i < points.length; i++) {
+        if (points[i].time <= nowSong) idx = i
+        else break
+      }
+      if (idx !== lastAutoSectionRef.current) {
+        lastAutoSectionRef.current = idx
+        setSelectedPointIndex(idx)
+        const p = points[idx]
+        if (p) {
+          setBpm(Math.round(p.bpm))
+          setOffsetMs(Math.round(p.time))
+        }
+      }
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [playing, currentTiming, getCurrentPlayheadMs])
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === 'Control') setCtrlBoost(true)
+    }
+    const onKeyUp = (e: KeyboardEvent): void => {
+      if (e.key === 'Control') setCtrlBoost(false)
+    }
+    const onBlur = (): void => setCtrlBoost(false)
+    window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('keyup', onKeyUp)
+    window.addEventListener('blur', onBlur)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('keyup', onKeyUp)
+      window.removeEventListener('blur', onBlur)
+    }
+  }, [])
 
   const stopPlayback = useCallback((reset = false) => {
     let nextCursor = cursorMsRef.current
@@ -732,10 +817,6 @@ export function OffsetCalibrator({ beatmapset }: OffsetCalibratorProps): React.J
         .then((infos) => {
           if (cancelled) return
           setTimingInfos(infos)
-          if (infos[0]) {
-            setBpm(Math.round(infos[0].bpm))
-            setOffsetMs(Math.round(infos[0].offsetMs))
-          }
         })
         .catch(() => {})
     })
@@ -755,6 +836,21 @@ export function OffsetCalibrator({ beatmapset }: OffsetCalibratorProps): React.J
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [beatmapset?.folderPath])
+
+  const prevVersionRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!currentTiming) return
+    const versionChanged = prevVersionRef.current !== selectedVersion
+    prevVersionRef.current = selectedVersion
+    const idx = versionChanged ? 0 : Math.min(selectedPointIndex, currentTiming.points.length - 1)
+    if (versionChanged) setSelectedPointIndex(idx)
+    const p = currentTiming.points[idx]
+    if (p) {
+      setBpm(Math.round(p.bpm))
+      setOffsetMs(Math.round(p.time))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedVersion, timingInfos])
 
   useEffect(() => {
     if (!audioUrl) {
@@ -975,6 +1071,12 @@ export function OffsetCalibrator({ beatmapset }: OffsetCalibratorProps): React.J
               />
               <span className="invisible text-xs text-text-muted">ms</span>
             </div>
+            {ctrlBoost && (
+              <div className={CHIP}>
+                <span className="text-xs text-text-muted">×2</span>
+                <span className="font-mono">{effectiveBpm}</span>
+              </div>
+            )}
             <AdjustButtons
               value={bpm}
               min={1}
@@ -1057,6 +1159,29 @@ export function OffsetCalibrator({ beatmapset }: OffsetCalibratorProps): React.J
               </>
             )}
           </div>
+
+          {currentTiming && currentTiming.points.length > 1 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs text-text-muted">Section</span>
+              {currentTiming.points.map((p, i) => (
+                <button
+                  key={i}
+                  onClick={() => {
+                    setSelectedPointIndex(i)
+                    setBpm(Math.round(p.bpm))
+                    setOffsetMs(Math.round(p.time))
+                  }}
+                  className={`h-8 rounded-md px-2 font-mono text-xs transition-colors ${
+                    i === selectedPointIndex
+                      ? 'bg-primary text-white'
+                      : 'bg-surface-raised text-text-secondary hover:bg-surface-hover hover:text-text-primary'
+                  }`}
+                >
+                  {i + 1}: {Math.round(p.bpm)} BPM @ {formatTime(p.time)}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="flex min-h-0 flex-1 flex-col gap-2 xl:flex-row">
@@ -1065,7 +1190,7 @@ export function OffsetCalibrator({ beatmapset }: OffsetCalibratorProps): React.J
               audioBuffer={audioBuffer}
               getCurrentPlayheadMs={getCurrentPlayheadMs}
               durationMs={durationMs}
-              bpm={bpm}
+              segments={segments}
               offsetMs={offsetMs}
               zoom={zoom}
               viewStartMs={viewStartMs}
@@ -1126,7 +1251,7 @@ export function OffsetCalibrator({ beatmapset }: OffsetCalibratorProps): React.J
           <div className="w-full xl:w-64">
             <BeatWaveformList
               audioBuffer={audioBuffer}
-              bpm={bpm}
+              bpm={effectiveBpm}
               offsetMs={offsetMs}
               isPlaying={playing}
               getCurrentPlayheadMs={getCurrentPlayheadMs}

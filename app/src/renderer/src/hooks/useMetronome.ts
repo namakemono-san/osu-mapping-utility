@@ -14,6 +14,11 @@ interface MetronomeSounds {
   tickDownbeat: AudioBuffer
 }
 
+export interface MetronomeSegment {
+  time: number
+  bpm: number
+}
+
 let cachedMetronomeSounds: MetronomeSounds | null = null
 let loadingPromise: Promise<MetronomeSounds> | null = null
 
@@ -73,24 +78,50 @@ async function loadMetronomeSounds(ctx: AudioContext): Promise<MetronomeSounds> 
   }
 }
 
+const limiterNodes = new WeakMap<AudioContext, DynamicsCompressorNode>()
+
+function ensureLimiter(ctx: AudioContext): DynamicsCompressorNode {
+  let limiter = limiterNodes.get(ctx)
+  if (!limiter) {
+    limiter = ctx.createDynamicsCompressor()
+    limiter.threshold.value = -18
+    limiter.knee.value = 6
+    limiter.ratio.value = 20
+    limiter.attack.value = 0.001
+    limiter.release.value = 0.1
+    limiter.connect(ctx.destination)
+    limiterNodes.set(ctx, limiter)
+  }
+  return limiter
+}
+
 function playMetronomeSound(
   ctx: AudioContext,
   buffer: AudioBuffer,
   whenSec: number,
   volume: number
-): void {
+): AudioBufferSourceNode {
   const src = ctx.createBufferSource()
   const gain = ctx.createGain()
   src.buffer = buffer
   src.connect(gain)
-  gain.connect(ctx.destination)
-  gain.gain.setValueAtTime(Math.max(0, volume), whenSec)
+  gain.connect(ensureLimiter(ctx))
+  gain.gain.setValueAtTime(Math.min(1, Math.max(0, volume)), whenSec)
   src.start(whenSec)
+  return src
+}
+
+function segmentIndexAt(segments: readonly MetronomeSegment[], songMs: number): number {
+  let idx = 0
+  for (let i = 0; i < segments.length; i++) {
+    if (segments[i].time <= songMs) idx = i
+    else break
+  }
+  return idx
 }
 
 export interface UseMetronomeOptions {
-  bpm: number
-  offsetMs: number
+  segments: MetronomeSegment[]
   metroOn: boolean
   metroVol: number
   isPlaying: boolean
@@ -100,8 +131,7 @@ export interface UseMetronomeOptions {
 }
 
 export function useMetronome({
-  bpm,
-  offsetMs,
+  segments,
   metroOn,
   metroVol,
   isPlaying,
@@ -110,8 +140,25 @@ export function useMetronome({
   ensureAudioCtx
 }: UseMetronomeOptions): void {
   const schedulerRef = useRef<number | null>(null)
+  const segmentIndexRef = useRef(0)
   const nextBeatIndexRef = useRef(0)
   const soundsRef = useRef<MetronomeSounds | null>(cachedMetronomeSounds)
+  const startMetroRef = useRef<() => void>(() => {})
+  const lastClickWhenRef = useRef(-Infinity)
+  const pendingRef = useRef<{ src: AudioBufferSourceNode; when: number }[]>([])
+
+  const cancelPendingClicks = useCallback((ctx: AudioContext) => {
+    for (const { src, when } of pendingRef.current) {
+      if (when <= ctx.currentTime) continue
+      try {
+        src.onended = null
+        src.stop()
+      } catch {
+        /* already stopped/ended */
+      }
+    }
+    pendingRef.current = []
+  }, [])
 
   const clickSound = useCallback(
     (whenSec: number, strong: boolean) => {
@@ -119,7 +166,9 @@ export function useMetronome({
       const sounds = soundsRef.current
       if (!sounds) return
       const buffer = strong ? sounds.tickDownbeat : sounds.tick
-      playMetronomeSound(ctx, buffer, whenSec, metroVol)
+      const src = playMetronomeSound(ctx, buffer, whenSec, metroVol)
+      pendingRef.current = pendingRef.current.filter((p) => p.when > ctx.currentTime)
+      pendingRef.current.push({ src, when: whenSec })
     },
     [ensureAudioCtx, metroVol]
   )
@@ -144,27 +193,37 @@ export function useMetronome({
   }, [metroOn, ensureAudioCtx])
 
   const resetMetroPhase = useCallback(() => {
-    const beatMs = 60000 / Math.max(1, bpm)
+    cancelPendingClicks(ensureAudioCtx())
     const nowSong = getCurrentPlayheadMs()
-    const rel = nowSong - offsetMs
+    const segIdx = segmentIndexAt(segments, nowSong)
+    segmentIndexRef.current = segIdx
+    const seg = segments[segIdx]
+    if (!seg) {
+      nextBeatIndexRef.current = 0
+      return
+    }
+    const beatMs = 60000 / Math.max(1, seg.bpm)
+    const rel = nowSong - seg.time
     nextBeatIndexRef.current = rel <= 0 ? 0 : Math.ceil(rel / beatMs)
-  }, [bpm, offsetMs, getCurrentPlayheadMs])
+    lastClickWhenRef.current = -Infinity
+  }, [segments, getCurrentPlayheadMs, ensureAudioCtx, cancelPendingClicks])
 
   const stopMetro = useCallback(() => {
     if (schedulerRef.current) {
       window.clearInterval(schedulerRef.current)
       schedulerRef.current = null
     }
-  }, [])
+    cancelPendingClicks(ensureAudioCtx())
+  }, [ensureAudioCtx, cancelPendingClicks])
 
   const startMetro = useCallback(() => {
-    if (!metroOn || !isPlaying) return
+    if (!metroOn || !isPlaying || segments.length === 0) return
     if (!soundsRef.current) {
       const ctx = ensureAudioCtx()
       void loadMetronomeSounds(ctx)
         .then((sounds) => {
           soundsRef.current = sounds
-          if (metroOn && isPlaying) startMetro()
+          if (metroOn && isPlaying) startMetroRef.current()
         })
         .catch((err: unknown) => {
           console.error('Metronome sound loading failed.', err)
@@ -178,30 +237,53 @@ export function useMetronome({
 
     schedulerRef.current = window.setInterval(() => {
       if (!metroOn || !isPlaying) return
-      const beatMs = 60000 / Math.max(1, bpm)
       const nowCtx = ctx.currentTime
       const nowSong = getCurrentPlayheadMs()
 
-      for (;;) {
-        const i = nextBeatIndexRef.current
-        const songT = offsetMs + i * beatMs
+      const trackedSeg = segments[segmentIndexRef.current]
+      if (trackedSeg) {
+        const trackedBeatMs = 60000 / Math.max(1, trackedSeg.bpm)
+        const trackedSongT = trackedSeg.time + nextBeatIndexRef.current * trackedBeatMs
+        if (Math.abs(trackedSongT - nowSong) > trackedBeatMs * 2) {
+          resetMetroPhase()
+        }
+      }
+
+      const MAX_BEATS_PER_TICK = 16
+      const MIN_CLICK_GAP_SEC = 0.03
+      for (let guard = 0; guard < MAX_BEATS_PER_TICK; guard++) {
+        const seg = segments[segmentIndexRef.current]
+        if (!seg) break
+        const beatMs = 60000 / Math.max(1, seg.bpm)
+        const songT = seg.time + nextBeatIndexRef.current * beatMs
+
+        const nextSeg = segments[segmentIndexRef.current + 1]
+        if (nextSeg && songT >= nextSeg.time) {
+          segmentIndexRef.current += 1
+          nextBeatIndexRef.current = 0
+          continue
+        }
+
         const when = songMsToCtxTime(songT)
         if (when - nowCtx <= SCHEDULE_AHEAD_SEC) {
           if (songT >= nowSong - 10) {
-            const strong = i % METER_BEATS === 0
-            clickSound(Math.max(nowCtx, when), strong)
+            const clampedWhen = Math.max(nowCtx, when)
+            if (clampedWhen - lastClickWhenRef.current >= MIN_CLICK_GAP_SEC) {
+              const strong = nextBeatIndexRef.current % METER_BEATS === 0
+              clickSound(clampedWhen, strong)
+              lastClickWhenRef.current = clampedWhen
+            }
           }
-          nextBeatIndexRef.current = i + 1
+          nextBeatIndexRef.current += 1
         } else break
       }
     }, LOOK_AHEAD_MS) as unknown as number
   }, [
-    bpm,
+    segments,
     ensureAudioCtx,
     getCurrentPlayheadMs,
     isPlaying,
     metroOn,
-    offsetMs,
     songMsToCtxTime,
     stopMetro,
     clickSound,
@@ -209,17 +291,14 @@ export function useMetronome({
   ])
 
   useEffect(() => {
+    startMetroRef.current = startMetro
+  }, [startMetro])
+
+  useEffect(() => {
     if (metroOn && isPlaying) startMetro()
     else stopMetro()
     return () => stopMetro()
   }, [metroOn, isPlaying, startMetro, stopMetro])
-
-  useEffect(() => {
-    if (metroOn && isPlaying) {
-      resetMetroPhase()
-      startMetro()
-    }
-  }, [bpm, offsetMs, metroOn, isPlaying, resetMetroPhase, startMetro])
 
   useEffect(() => {
     return () => {

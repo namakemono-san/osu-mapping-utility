@@ -10,6 +10,7 @@ using System.Diagnostics;
 using System.IO.Compression;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 
 namespace MappingUtility.Server.Hubs;
 
@@ -27,6 +28,77 @@ public class BeatmapsetHub : Hub
     private static string[]? _folderList;
     private static readonly object _folderLock = new();
     private static readonly ConcurrentDictionary<string, BeatmapsetInfo> _infoCache = new(StringComparer.OrdinalIgnoreCase);
+
+    private static IHubContext<BeatmapsetHub>? _hubContext;
+    private static FileSystemWatcher? _watcher;
+    private static Timer? _watcherDebounce;
+    private static readonly object _watcherLock = new();
+
+    public static void Initialize(IHubContext<BeatmapsetHub> hubContext) => _hubContext = hubContext;
+
+    private static void EnsureWatcher(string path)
+    {
+        lock (_watcherLock)
+        {
+            if (_watcher is not null && _watcher.Path.Equals(path, StringComparison.OrdinalIgnoreCase))
+                return;
+
+            _watcher?.Dispose();
+            _watcher = new FileSystemWatcher(path)
+            {
+                NotifyFilter = NotifyFilters.DirectoryName,
+                IncludeSubdirectories = false
+            };
+            _watcher.Created += OnSongsFolderChanged;
+            _watcher.Deleted += OnSongsFolderChanged;
+            _watcher.Renamed += OnSongsFolderChanged;
+            _watcher.Error += (_, e) =>
+                Trace.TraceWarning($"Songs folder watcher error: {e.GetException().Message}");
+            _watcher.EnableRaisingEvents = true;
+        }
+    }
+
+    private static void OnSongsFolderChanged(object sender, FileSystemEventArgs e)
+    {
+        lock (_watcherLock)
+        {
+            _watcherDebounce?.Dispose();
+            _watcherDebounce = new Timer(_ => ReconcileFolderList(), null, 1500, Timeout.Infinite);
+        }
+    }
+
+    private static void ReconcileFolderList()
+    {
+        string path;
+        lock (_folderLock)
+        {
+            if (_songsPath is null || _folderList is null) return;
+            path = _songsPath;
+        }
+
+        string[] dirs;
+        try { dirs = Directory.GetDirectories(path); }
+        catch (Exception ex)
+        {
+            Trace.TraceWarning($"Failed to re-scan songs folder '{path}': {ex.Message}");
+            return;
+        }
+
+        lock (_folderLock)
+        {
+            if (_folderList is null || _folderList.Length == dirs.Length &&
+                _folderList.OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
+                    .SequenceEqual(dirs.OrderBy(f => f, StringComparer.OrdinalIgnoreCase), StringComparer.OrdinalIgnoreCase))
+                return;
+
+            var removed = _folderList.Except(dirs, StringComparer.OrdinalIgnoreCase);
+            foreach (var dir in removed) _infoCache.TryRemove(dir, out _);
+
+            _folderList = dirs.OrderByDescending(Directory.GetLastWriteTimeUtc).ToArray();
+        }
+
+        _ = _hubContext?.Clients.All.SendAsync("BeatmapsetsListChanged");
+    }
 
     public Task<string?> GetSongsPath() => Task.FromResult(_songsPath ?? DetectSongsPath());
 
@@ -71,6 +143,8 @@ public class BeatmapsetHub : Hub
                 }
                 folders = _folderList;
             }
+
+            EnsureWatcher(path);
 
             await Clients.Caller.SendAsync("BeatmapsetsTotalCount", folders.Length);
 

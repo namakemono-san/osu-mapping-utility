@@ -134,6 +134,12 @@ export async function getSongsPath(): Promise<string | null> {
   return connection.invoke<string | null>('GetSongsPath')
 }
 
+export function onBeatmapsetsListChanged(cb: () => void): () => void {
+  const handler: EventHandler = () => cb()
+  connection.on('BeatmapsetsListChanged', handler)
+  return () => connection.off('BeatmapsetsListChanged', handler)
+}
+
 export type CurrentBeatmapResult = {
   status: string
   message: string | null
@@ -246,10 +252,14 @@ export function cloneBeatmap(req: CloneRequest): Promise<string> {
   return connection.invoke<string>('CloneBeatmap', req)
 }
 
+export type TimingPointInfo = {
+  time: number
+  bpm: number
+}
+
 export type TimingInfo = {
   version: string
-  bpm: number
-  offsetMs: number
+  points: TimingPointInfo[]
 }
 
 export async function getTimingInfo(folderPath: string): Promise<TimingInfo[]> {

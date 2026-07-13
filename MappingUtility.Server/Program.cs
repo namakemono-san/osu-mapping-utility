@@ -1,6 +1,7 @@
 using MappingUtility.Logging;
 using MappingUtility.Parser;
 using MappingUtility.Server.Hubs;
+using Microsoft.AspNetCore.SignalR;
 using System.Diagnostics;
 using System.Text;
 
@@ -26,6 +27,7 @@ builder.Services.AddCors(options =>
               .AllowCredentials()));
 
 var app = builder.Build();
+BeatmapsetHub.Initialize(app.Services.GetRequiredService<IHubContext<BeatmapsetHub>>());
 app.UseCors();
 app.MapGet("/health", () => Results.Ok());
 StarRatingCalculator.Warmup();

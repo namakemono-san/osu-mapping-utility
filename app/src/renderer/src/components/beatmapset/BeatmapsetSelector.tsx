@@ -6,6 +6,7 @@ import {
   fetchBeatmapsets,
   getCurrentBeatmap,
   searchBeatmapsets,
+  onBeatmapsetsListChanged,
   type Beatmapset,
   type CurrentBeatmapResult
 } from '../../utils/signalr'
@@ -158,6 +159,19 @@ export function BeatmapsetSelector({
     loadBeatmapsets(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [songsPath])
+
+  const isRefreshingRef = useRef(isRefreshing)
+  useEffect(() => {
+    isRefreshingRef.current = isRefreshing
+  }, [isRefreshing])
+
+  useEffect(() => {
+    if (connectionState !== 'connected') return
+    return onBeatmapsetsListChanged(() => {
+      if (isRefreshingRef.current) return
+      loadBeatmapsets(true)
+    })
+  }, [connectionState, loadBeatmapsets])
 
   useEffect(() => {
     const container = scrollRef.current

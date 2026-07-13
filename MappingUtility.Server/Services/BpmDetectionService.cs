@@ -262,7 +262,7 @@ public static class BpmDetectionService
         }
 
         double a = Math.Max(40, loInit), bVal = Math.Min(260, hiInit);
-        const double gr = 0.6180339887; // (sqrt(5)-1)/2
+        const double gr = 0.6180339887;
         var c = bVal - gr * (bVal - a); var d = a + gr * (bVal - a);
         var fc = F(c); var fd = F(d);
 

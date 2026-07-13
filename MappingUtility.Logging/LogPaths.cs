@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Text;
+using System.Threading;
 
 namespace MappingUtility.Logging;
 
@@ -21,7 +22,23 @@ public static class LogPaths
         lock (gate)
         {
             System.IO.Directory.CreateDirectory(Directory);
-            File.AppendAllText(path, line + Environment.NewLine, new UTF8Encoding(false));
+
+            for (var attempt = 0; attempt < 3; attempt++)
+            {
+                try
+                {
+                    File.AppendAllText(path, line + Environment.NewLine, new UTF8Encoding(false));
+                    return;
+                }
+                catch (IOException) when (attempt < 2)
+                {
+                    Thread.Sleep(20);
+                }
+                catch (IOException)
+                {
+                    Console.Error.WriteLine($"[LogPaths] Failed to write to '{path}': {line}");
+                }
+            }
         }
     }
 }
