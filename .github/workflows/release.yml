@@ -90,6 +90,10 @@ jobs:
         if: steps.check.outputs.skip == 'false'
         run: pnpm install --frozen-lockfile
 
+      - name: Sync manifests
+        if: steps.check.outputs.skip == 'false'
+        run: node .github/scripts/sync-version.mjs
+
       - name: Swap canary icon
         if: steps.check.outputs.skip == 'false' && steps.tag.outputs.prerelease == 'true'
         shell: pwsh
