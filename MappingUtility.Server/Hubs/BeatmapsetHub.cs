@@ -136,7 +136,7 @@ public class BeatmapsetHub : Hub
             {
                 if (forceRefresh || _songsPath != path || _folderList is null)
                 {
-                    if (_songsPath != path) _infoCache.Clear();
+                    if (forceRefresh || _songsPath != path) _infoCache.Clear();
                     var dirs = Directory.GetDirectories(path);
                     _folderList = dirs.OrderByDescending(Directory.GetLastWriteTimeUtc).ToArray();
                     _songsPath = path;
