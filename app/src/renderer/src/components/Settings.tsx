@@ -8,10 +8,10 @@ import {
   IconChevronDown
 } from '@tabler/icons-react'
 import { jsonCodec, stringCodec, useLocalStorage } from '../utils/useLocalStorage'
+import type { AutoUpdaterState } from '../hooks/useAutoUpdater'
 import { Toggle } from './Toggle'
 
 type Lang = 'en' | 'ja'
-type UpdateStatus = 'idle' | 'checking' | 'available' | 'upToDate' | 'error'
 
 interface SettingsProps {
   isOpen: boolean
@@ -19,6 +19,7 @@ interface SettingsProps {
   songsFolder: string | null
   onSongsFolder: (path: string) => void
   onOpen?: () => void
+  updater: AutoUpdaterState
 }
 
 function Label({ children }: { children: React.ReactNode }): React.JSX.Element {
@@ -61,14 +62,15 @@ export function Settings({
   onClose,
   songsFolder,
   onSongsFolder,
-  onOpen
+  onOpen,
+  updater
 }: SettingsProps): React.JSX.Element | null {
   const [mounted, setMounted] = useState(false)
   const [animateOut, setAnimateOut] = useState(false)
   const [isChangingFolder, setIsChangingFolder] = useState(false)
   const [lang, setLang] = useLocalStorage<Lang>('lang', 'ja', stringCodec())
   const version = import.meta.env.VITE_APP_VERSION as string
-  const [updateStatus, setUpdateStatus] = useState<UpdateStatus>('idle')
+  const updateStatus = updater.status
   const [receiveCanary, setReceiveCanary] = useLocalStorage(
     'receiveCanary',
     false,
@@ -113,12 +115,6 @@ export function Settings({
     }
   }
 
-  const handleCheckUpdate = async (): Promise<void> => {
-    setUpdateStatus('checking')
-    const result = await window.api.updater.check(receiveCanary)
-    setUpdateStatus(result)
-  }
-
   if (!mounted) return null
 
   const backdropCls = animateOut ? 'settings-backdrop-out' : 'settings-backdrop-in'
@@ -131,9 +127,13 @@ export function Settings({
         ? 'Update available'
         : updateStatus === 'upToDate'
           ? 'Up to date'
-          : updateStatus === 'error'
-            ? 'Check failed'
-            : null
+          : updateStatus === 'downloading'
+            ? 'Downloading...'
+            : updateStatus === 'downloaded'
+              ? 'Restarting...'
+              : updateStatus === 'error'
+                ? 'Check failed'
+                : null
 
   const updateStatusColor =
     updateStatus === 'available'
@@ -217,7 +217,7 @@ export function Settings({
               </p>
             </div>
             <Btn
-              onClick={handleCheckUpdate}
+              onClick={updater.checkNow}
               disabled={updateStatus === 'checking'}
               leftIcon={
                 <IconRefresh

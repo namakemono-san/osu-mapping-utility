@@ -179,13 +179,55 @@ if (gotSingleInstanceLock) {
     ipcMain.handle('app:user-data-path', () => app.getPath('userData'))
     ipcMain.handle('app:logs-path', () => logsDir)
 
+    autoUpdater.autoDownload = false
+    autoUpdater.autoInstallOnAppQuit = false
+
+    autoUpdater.on('download-progress', (progress) => {
+      mainWindow?.webContents.send('updater:download-progress', {
+        percent: progress.percent,
+        transferred: progress.transferred,
+        total: progress.total
+      })
+    })
+    autoUpdater.on('update-downloaded', () => {
+      mainWindow?.webContents.send('updater:downloaded')
+      setTimeout(() => autoUpdater.quitAndInstall(), 1000)
+    })
+    autoUpdater.on('error', (err) => {
+      mainWindow?.webContents.send('updater:error', err.message)
+    })
+
     ipcMain.handle('updater:check', async (_, allowPrerelease: boolean) => {
       try {
         autoUpdater.allowPrerelease = allowPrerelease
         const result = await autoUpdater.checkForUpdates()
-        return result?.updateInfo ? 'available' : 'upToDate'
+        if (!result?.isUpdateAvailable) return { status: 'upToDate' as const }
+        const info = result.updateInfo
+        const notes =
+          typeof info.releaseNotes === 'string'
+            ? info.releaseNotes
+            : (info.releaseNotes?.map((n) => n.note).join('\n\n') ?? null)
+        return {
+          status: 'available' as const,
+          version: info.version,
+          releaseDate: info.releaseDate,
+          releaseNotes: notes
+        }
       } catch {
-        return 'error'
+        return { status: 'error' as const }
+      }
+    })
+
+    ipcMain.handle('updater:download', async () => {
+      try {
+        await autoUpdater.downloadUpdate()
+        return true
+      } catch (err) {
+        mainWindow?.webContents.send(
+          'updater:error',
+          err instanceof Error ? err.message : String(err)
+        )
+        return false
       }
     })
 

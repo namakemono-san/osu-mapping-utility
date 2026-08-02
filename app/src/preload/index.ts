@@ -22,8 +22,35 @@ const api = {
   getUserDataPath: (): Promise<string> => ipcRenderer.invoke('app:user-data-path'),
   getLogsPath: (): Promise<string> => ipcRenderer.invoke('app:logs-path'),
   updater: {
-    check: (allowPrerelease: boolean): Promise<'available' | 'upToDate' | 'error'> =>
-      ipcRenderer.invoke('updater:check', allowPrerelease)
+    check: (
+      allowPrerelease: boolean
+    ): Promise<{
+      status: 'available' | 'upToDate' | 'error'
+      version?: string
+      releaseDate?: string
+      releaseNotes?: string | null
+    }> => ipcRenderer.invoke('updater:check', allowPrerelease),
+    download: (): Promise<boolean> => ipcRenderer.invoke('updater:download'),
+    onDownloadProgress: (
+      cb: (progress: { percent: number; transferred: number; total: number }) => void
+    ): (() => void) => {
+      const listener = (
+        _: Electron.IpcRendererEvent,
+        progress: { percent: number; transferred: number; total: number }
+      ): void => cb(progress)
+      ipcRenderer.on('updater:download-progress', listener)
+      return () => ipcRenderer.removeListener('updater:download-progress', listener)
+    },
+    onDownloaded: (cb: () => void): (() => void) => {
+      const listener = (): void => cb()
+      ipcRenderer.on('updater:downloaded', listener)
+      return () => ipcRenderer.removeListener('updater:downloaded', listener)
+    },
+    onError: (cb: (message: string) => void): (() => void) => {
+      const listener = (_: Electron.IpcRendererEvent, message: string): void => cb(message)
+      ipcRenderer.on('updater:error', listener)
+      return () => ipcRenderer.removeListener('updater:error', listener)
+    }
   },
   dialog: {
     pickFolder: (): Promise<string | null> => ipcRenderer.invoke('dialog:pick-folder'),

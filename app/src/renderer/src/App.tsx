@@ -11,6 +11,8 @@ import { OffsetCalibrator } from './pages/OffsetCalibrator'
 import { Home } from './pages/Home'
 import { Sidebar, type SidebarKey } from './components/Sidebar'
 import { Settings } from './components/Settings'
+import { UpdateModal } from './components/UpdateModal'
+import { useAutoUpdater } from './hooks/useAutoUpdater'
 import type { Beatmapset } from './utils/signalr'
 import { getSongsPath } from './utils/signalr'
 
@@ -22,6 +24,7 @@ function App(): React.JSX.Element {
   const [songsFolder, setSongsFolder] = useState<string | null>(() =>
     localStorage.getItem('songsFolder')
   )
+  const updater = useAutoUpdater()
 
   const handleToolChange = (tool: SidebarKey): void => {
     setActiveTool(tool)
@@ -84,7 +87,9 @@ function App(): React.JSX.Element {
                 console.error('Failed to detect osu! Songs folder:', e)
               })
         }}
+        updater={updater}
       />
+      <UpdateModal state={updater} />
     </>
   )
 }

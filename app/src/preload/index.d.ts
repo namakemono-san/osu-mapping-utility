@@ -24,7 +24,18 @@ declare global {
       getUserDataPath: () => Promise<string>
       getLogsPath: () => Promise<string>
       updater: {
-        check: (allowPrerelease: boolean) => Promise<'available' | 'upToDate' | 'error'>
+        check: (allowPrerelease: boolean) => Promise<{
+          status: 'available' | 'upToDate' | 'error'
+          version?: string
+          releaseDate?: string
+          releaseNotes?: string | null
+        }>
+        download: () => Promise<boolean>
+        onDownloadProgress: (
+          cb: (progress: { percent: number; transferred: number; total: number }) => void
+        ) => () => void
+        onDownloaded: (cb: () => void) => () => void
+        onError: (cb: (message: string) => void) => () => void
       }
       bgSetter: {
         open: (data: string) => Promise<void>
