@@ -18,6 +18,7 @@ builder.Services.AddSignalR(options =>
 {
     options.ClientTimeoutInterval = TimeSpan.FromHours(1);
     options.KeepAliveInterval = TimeSpan.FromSeconds(15);
+    options.MaximumParallelInvocationsPerClient = 4;
 });
 builder.Services.AddCors(options =>
     options.AddDefaultPolicy(policy =>

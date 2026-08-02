@@ -108,17 +108,18 @@ internal static class ProcessRunner
         using var _ = proc;
         using var __ = registration;
 
-        var outTask = ReadLinesAsync(proc.StandardOutput, onStdout);
-        var errTask = ReadLinesAsync(proc.StandardError, onStderr);
-        await Task.WhenAll(outTask, errTask);
+        var outTask = ReadLinesAsync(proc.StandardOutput, onStdout, ct);
+        var errTask = ReadLinesAsync(proc.StandardError, onStderr, ct);
+        try { await Task.WhenAll(outTask, errTask); }
+        catch (OperationCanceledException) { return -1; }
         try { await proc.WaitForExitAsync(ct); }
         catch (OperationCanceledException) { return -1; }
         return proc.ExitCode;
     }
 
-    private static async Task ReadLinesAsync(StreamReader reader, Action<string> onLine)
+    private static async Task ReadLinesAsync(StreamReader reader, Action<string> onLine, CancellationToken ct)
     {
-        while (await reader.ReadLineAsync() is { } line)
+        while (await reader.ReadLineAsync(ct) is { } line)
             onLine(line);
     }
 }
