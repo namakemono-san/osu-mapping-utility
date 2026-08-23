@@ -1,13 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 export type UpdaterStatus =
-  | 'idle'
-  | 'checking'
-  | 'available'
-  | 'upToDate'
-  | 'downloading'
-  | 'downloaded'
-  | 'error'
+  'idle' | 'checking' | 'available' | 'upToDate' | 'downloading' | 'downloaded' | 'error'
 
 export interface UpdaterInfo {
   version?: string

@@ -1,10 +1,5 @@
 export type MetadataFieldKey =
-  | 'artistUnicode'
-  | 'artist'
-  | 'titleUnicode'
-  | 'title'
-  | 'source'
-  | 'tags'
+  'artistUnicode' | 'artist' | 'titleUnicode' | 'title' | 'source' | 'tags'
 
 export type MetadataFields = Record<MetadataFieldKey, string>
 

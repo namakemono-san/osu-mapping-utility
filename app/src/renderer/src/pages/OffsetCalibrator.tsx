@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import {
+  IconChevronDown,
+  IconChevronLeft,
+  IconChevronRight,
   IconHeadphones,
   IconMaximize,
   IconPlayerPause,
@@ -36,7 +39,7 @@ interface OffsetCalibratorProps {
 }
 
 const STEPS = [-10, -5, -2, -1, 1, 2, 5, 10] as const
-const BEAT_COUNT = 6
+const BEAT_COUNT = 5
 const BEAT_BEFORE_MS = 100
 const BEAT_AFTER_MS = 100
 
@@ -100,17 +103,24 @@ function getBeatWaveform(
   return out
 }
 
+function segmentIndexAt(segments: { time: number; bpm: number }[], songMs: number): number {
+  let idx = 0
+  for (let i = 0; i < segments.length; i++) {
+    if (segments[i].time <= songMs) idx = i
+    else break
+  }
+  return idx
+}
+
 function BeatWaveformList({
   audioBuffer,
-  bpm,
-  offsetMs,
+  segments,
   isPlaying,
   getCurrentPlayheadMs,
   numBeats = BEAT_COUNT
 }: {
   audioBuffer: AudioBuffer | null
-  bpm: number
-  offsetMs: number
+  segments: { time: number; bpm: number }[]
   isPlaying: boolean
   getCurrentPlayheadMs: () => number
   numBeats?: number
@@ -130,16 +140,33 @@ function BeatWaveformList({
   }, [isPlaying, getCurrentPlayheadMs])
 
   const beatRows = useMemo(() => {
-    if (bpm <= 0) return []
-    const beatMs = 60000 / bpm
-    const current = isPlaying ? playheadMs : Math.max(0, offsetMs)
-    const currentIndex = Math.max(0, Math.floor((current - offsetMs) / beatMs))
-    const startIndex = Math.max(0, currentIndex)
-    return Array.from({ length: numBeats }, (_, i) => {
-      const beatIndex = startIndex + i
-      return { beatIndex, beatStartMs: offsetMs + beatIndex * beatMs }
-    })
-  }, [bpm, isPlaying, playheadMs, offsetMs, numBeats])
+    if (segments.length === 0) return []
+    const current = isPlaying ? playheadMs : Math.max(0, segments[0].time)
+
+    let segIdx = segmentIndexAt(segments, current)
+    let seg = segments[segIdx]
+    let beatMs = 60000 / Math.max(1, seg.bpm)
+    const rel = current - seg.time
+    let beatIndex = rel <= 0 ? 0 : Math.ceil(rel / beatMs)
+
+    const rows: { beatIndex: number; beatStartMs: number; beatMs: number }[] = []
+    let guard = 0
+    while (rows.length < numBeats && guard < numBeats * 50) {
+      guard++
+      const songT = seg.time + beatIndex * beatMs
+      const nextSeg = segments[segIdx + 1]
+      if (nextSeg && songT >= nextSeg.time) {
+        segIdx += 1
+        seg = segments[segIdx]
+        beatMs = 60000 / Math.max(1, seg.bpm)
+        beatIndex = 0
+        continue
+      }
+      rows.push({ beatIndex, beatStartMs: songT, beatMs })
+      beatIndex += 1
+    }
+    return rows
+  }, [segments, isPlaying, playheadMs, numBeats])
 
   useEffect(() => {
     for (let i = 0; i < beatRows.length; i++) {
@@ -158,9 +185,8 @@ function BeatWaveformList({
       ctx.setTransform(1, 0, 0, 1, 0, 0)
       ctx.scale(dpr, dpr)
 
-      const beatMs = 60000 / Math.max(1, bpm)
       const active = isPlaying
-        ? playheadMs >= row.beatStartMs && playheadMs < row.beatStartMs + beatMs
+        ? playheadMs >= row.beatStartMs && playheadMs < row.beatStartMs + row.beatMs
         : row.beatIndex === 0
 
       ctx.fillStyle = active ? '#22c55e22' : '#18181b'
@@ -213,40 +239,41 @@ function BeatWaveformList({
         ctx.fillRect(x, y1, 1, h)
       }
     }
-  }, [audioBuffer, beatRows, bpm, isPlaying, playheadMs])
+  }, [audioBuffer, beatRows, isPlaying, playheadMs])
 
   return (
-    <div className="flex h-full min-w-56 flex-col gap-1.5 rounded-lg border border-border-subtle bg-surface-dark p-2">
-      <div className="px-1 text-[10px] text-text-muted">Beat Waveforms</div>
-      {beatRows.length === 0 ? (
-        <div className="flex flex-1 items-center justify-center text-xs text-text-dim">—</div>
-      ) : (
-        beatRows.map((row, i) => {
-          const beatInMeasure = (row.beatIndex % 4) + 1
-          const beatMs = 60000 / Math.max(1, bpm || 1)
-          const active = isPlaying
-            ? playheadMs >= row.beatStartMs && playheadMs < row.beatStartMs + beatMs
-            : row.beatIndex === 0
-          return (
-            <div
-              key={row.beatIndex}
-              className={`flex items-center gap-2 rounded-md border px-2 py-1 ${
-                active ? 'border-green-500/40 bg-green-500/10' : 'border-border-subtle bg-surface'
-              }`}
-            >
-              <div className="w-11 font-mono text-xs opacity-85">
-                {row.beatIndex + 1} ({beatInMeasure}/4)
+    <div className="flex h-full min-w-56 flex-col gap-1.5 overflow-hidden rounded-lg border border-border-subtle bg-surface-dark p-2">
+      <div className="shrink-0 px-1 text-[10px] text-text-muted">Beat Waveforms</div>
+      <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto">
+        {beatRows.length === 0 ? (
+          <div className="flex flex-1 items-center justify-center text-xs text-text-dim">—</div>
+        ) : (
+          beatRows.map((row, i) => {
+            const beatInMeasure = (row.beatIndex % 4) + 1
+            const active = isPlaying
+              ? playheadMs >= row.beatStartMs && playheadMs < row.beatStartMs + row.beatMs
+              : row.beatIndex === 0
+            return (
+              <div
+                key={i}
+                className={`flex shrink-0 items-center gap-2 rounded-md border px-2 py-1 ${
+                  active ? 'border-green-500/40 bg-green-500/10' : 'border-border-subtle bg-surface'
+                }`}
+              >
+                <div className="w-11 font-mono text-xs opacity-85">
+                  {row.beatIndex + 1} ({beatInMeasure}/4)
+                </div>
+                <canvas
+                  ref={(el) => {
+                    canvasRefs.current[i] = el
+                  }}
+                  className="h-9 w-full rounded-sm"
+                />
               </div>
-              <canvas
-                ref={(el) => {
-                  canvasRefs.current[i] = el
-                }}
-                className="h-9 w-full rounded-sm"
-              />
-            </div>
-          )
-        })
-      )}
+            )
+          })
+        )}
+      </div>
     </div>
   )
 }
@@ -603,6 +630,17 @@ export function OffsetCalibrator({ beatmapset }: OffsetCalibratorProps): React.J
   const currentTiming = timingInfos.find((t) => t.version === selectedVersion) ?? timingInfos[0]
   const currentPoint = currentTiming?.points[selectedPointIndex] ?? currentTiming?.points[0]
   const deltaMs = currentPoint != null ? offsetMs - Math.round(currentPoint.time) : null
+
+  const selectSection = useCallback(
+    (i: number): void => {
+      const p = currentTiming?.points[i]
+      if (!p) return
+      setSelectedPointIndex(i)
+      setBpm(Math.round(p.bpm))
+      setOffsetMs(Math.round(p.time))
+    },
+    [currentTiming]
+  )
   const effectiveBpm = ctrlBoost ? bpm * 2 : bpm
   const segments = useMemo(
     () =>
@@ -653,18 +691,13 @@ export function OffsetCalibrator({ beatmapset }: OffsetCalibratorProps): React.J
       }
       if (idx !== lastAutoSectionRef.current) {
         lastAutoSectionRef.current = idx
-        setSelectedPointIndex(idx)
-        const p = points[idx]
-        if (p) {
-          setBpm(Math.round(p.bpm))
-          setOffsetMs(Math.round(p.time))
-        }
+        selectSection(idx)
       }
       raf = requestAnimationFrame(tick)
     }
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
-  }, [playing, currentTiming, getCurrentPlayheadMs])
+  }, [playing, currentTiming, getCurrentPlayheadMs, selectSection])
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent): void => {
@@ -971,8 +1004,9 @@ export function OffsetCalibrator({ beatmapset }: OffsetCalibratorProps): React.J
   }
 
   const formatTime = (ms: number): string => {
-    const s = Math.floor(ms / 1000)
-    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+    const sign = ms < 0 ? '-' : ''
+    const s = Math.floor(Math.abs(ms) / 1000)
+    return `${sign}${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
   }
 
   if (!beatmapset) {
@@ -1161,25 +1195,41 @@ export function OffsetCalibrator({ beatmapset }: OffsetCalibratorProps): React.J
           </div>
 
           {currentTiming && currentTiming.points.length > 1 && (
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-2">
               <span className="text-xs text-text-muted">Section</span>
-              {currentTiming.points.map((p, i) => (
-                <button
-                  key={i}
-                  onClick={() => {
-                    setSelectedPointIndex(i)
-                    setBpm(Math.round(p.bpm))
-                    setOffsetMs(Math.round(p.time))
-                  }}
-                  className={`h-8 rounded-md px-2 font-mono text-xs transition-colors ${
-                    i === selectedPointIndex
-                      ? 'bg-primary text-white'
-                      : 'bg-surface-raised text-text-secondary hover:bg-surface-hover hover:text-text-primary'
-                  }`}
+              <button
+                onClick={() => selectSection(selectedPointIndex - 1)}
+                disabled={selectedPointIndex <= 0}
+                className={`${BTN} px-2`}
+              >
+                <IconChevronLeft size={14} stroke={1.5} />
+              </button>
+              <div className="relative">
+                <select
+                  value={selectedPointIndex}
+                  onChange={(e) => selectSection(Number(e.target.value))}
+                  className={`${INPUT} min-w-56 cursor-pointer appearance-none pr-7`}
                 >
-                  {i + 1}: {Math.round(p.bpm)} BPM @ {formatTime(p.time)}
-                </button>
-              ))}
+                  {currentTiming.points.map((p, i) => (
+                    <option key={i} value={i}>
+                      {i + 1}/{currentTiming.points.length}: {Math.round(p.bpm)} BPM @{' '}
+                      {formatTime(p.time)}
+                    </option>
+                  ))}
+                </select>
+                <IconChevronDown
+                  size={12}
+                  stroke={2}
+                  className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-text-dim"
+                />
+              </div>
+              <button
+                onClick={() => selectSection(selectedPointIndex + 1)}
+                disabled={selectedPointIndex >= currentTiming.points.length - 1}
+                className={`${BTN} px-2`}
+              >
+                <IconChevronRight size={14} stroke={1.5} />
+              </button>
             </div>
           )}
         </div>
@@ -1248,11 +1298,10 @@ export function OffsetCalibrator({ beatmapset }: OffsetCalibratorProps): React.J
             </div>
           </div>
 
-          <div className="w-full xl:w-64">
+          <div className="min-h-0 w-full xl:w-64">
             <BeatWaveformList
               audioBuffer={audioBuffer}
-              bpm={effectiveBpm}
-              offsetMs={offsetMs}
+              segments={segments}
               isPlaying={playing}
               getCurrentPlayheadMs={getCurrentPlayheadMs}
             />
