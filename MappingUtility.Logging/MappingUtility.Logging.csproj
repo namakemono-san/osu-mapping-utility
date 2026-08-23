@@ -6,7 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>MappingUtility.Logging</AssemblyName>
     <RootNamespace>MappingUtility.Logging</RootNamespace>
-    <Version>2.0.0-canary.3</Version>
+    <Version>2.0.0-canary.4</Version>
   </PropertyGroup>
 
   <ItemGroup>
