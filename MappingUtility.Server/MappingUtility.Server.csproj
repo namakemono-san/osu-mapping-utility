@@ -7,7 +7,7 @@
     <AssemblyName>MappingUtility.Server</AssemblyName>
     <RootNamespace>MappingUtility.Server</RootNamespace>
     <!-- Kept in sync with the root package.json version by .github/scripts/sync-version.mjs -->
-    <Version>2.0.0-canary.3</Version>
+    <Version>2.0.0-canary.5</Version>
     <!--
       CA1416: this app targets Windows only (see .vscode/launch.json, WinExe packaging), so
       platform-compatibility warnings for Windows-only APIs (e.g. Registry access in
