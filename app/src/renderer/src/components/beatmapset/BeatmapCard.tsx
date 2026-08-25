@@ -1,5 +1,6 @@
 import { memo } from 'react'
-import type { Beatmapset } from '../../utils/signalr'
+import type { Beatmapset } from '../../services'
+import { assetUrl } from '../../utils/paths'
 
 export const CARD_HEIGHT = 100
 export const GAP = 10
@@ -18,9 +19,7 @@ export const BeatmapCard = memo(function BeatmapCard({
   onClick,
   onContextMenu
 }: BeatmapCardProps): React.JSX.Element {
-  const bgUrl = data.backgroundFile
-    ? `asset:///${data.folderPath.replace(/\\/g, '/')}/${data.backgroundFile}`
-    : null
+  const bgUrl = assetUrl(data.folderPath, data.backgroundFile)
 
   return (
     <div

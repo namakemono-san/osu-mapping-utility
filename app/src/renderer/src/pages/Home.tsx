@@ -55,8 +55,10 @@ function loadEntries(): ChangelogEntry[] {
     .sort((a, b) => compareSemverDesc(a.version, b.version))
 }
 
+const ENTRIES = loadEntries()
+
 export function Home(): React.JSX.Element {
-  const entries = loadEntries()
+  const entries = ENTRIES
   const [expanded, setExpanded] = useState<Set<string>>(
     () => new Set(entries[0] ? [entries[0].version] : [])
   )

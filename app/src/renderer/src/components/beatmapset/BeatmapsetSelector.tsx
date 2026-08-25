@@ -7,17 +7,27 @@ import {
   getCurrentBeatmap,
   searchBeatmapsets,
   onBeatmapsetsListChanged,
+  onBeatmapsetChanged,
   type Beatmapset,
   type CurrentBeatmapResult
-} from '../../utils/signalr'
+} from '../../services'
+import { samePath } from '../../utils/paths'
 import { BeatmapCard, PlaceholderCard, ITEM_HEIGHT, GAP } from './BeatmapCard'
 import { BeatmapContextMenu } from './BeatmapContextMenu'
 
 const PADDING = 8
 const BUFFER = 3
 const PAGE_SIZE = 100
+const SEARCH_DEBOUNCE_MS = 150
+const CURRENT_BEATMAP_POLL_MS = 2000
 
 type ConnectionState = 'connecting' | 'connected' | 'error'
+
+type LoadOptions = {
+  forceRefresh?: boolean
+  keepScroll?: boolean
+  overridePath?: string
+}
 
 interface ContextMenuState {
   visible: boolean
@@ -62,10 +72,11 @@ export function BeatmapsetSelector({
   const loadingPages = useRef<Set<number>>(new Set())
   const searchAbort = useRef<AbortController | null>(null)
   const initialMount = useRef(true)
+  const isRefreshingRef = useRef(false)
 
   useEffect(() => {
-    const t = setTimeout(() => setSearch(searchInput), 150)
-    return () => clearTimeout(t)
+    const timer = setTimeout(() => setSearch(searchInput), SEARCH_DEBOUNCE_MS)
+    return () => clearTimeout(timer)
   }, [searchInput])
 
   useEffect(() => {
@@ -83,14 +94,15 @@ export function BeatmapsetSelector({
   }, [])
 
   const loadBeatmapsets = useCallback(
-    async (forceRefresh = false, overridePath?: string) => {
+    async ({ forceRefresh = false, keepScroll = false, overridePath }: LoadOptions = {}) => {
+      isRefreshingRef.current = true
       setIsRefreshing(true)
       setTotalCount(0)
       setLoadedData(new Map())
       setScanError(null)
       loadedPages.current.clear()
       loadingPages.current.clear()
-      scrollToTop()
+      if (!keepScroll) scrollToTop()
 
       await scanBeatmapsets(
         (count) => setTotalCount(count),
@@ -108,6 +120,7 @@ export function BeatmapsetSelector({
         setScanError(e instanceof Error ? e.message : 'Failed to scan beatmapsets.')
       })
 
+      isRefreshingRef.current = false
       setIsRefreshing(false)
     },
     [scrollToTop, songsPath]
@@ -143,7 +156,7 @@ export function BeatmapsetSelector({
     }
 
     poll()
-    const id = setInterval(poll, 2000)
+    const id = setInterval(poll, CURRENT_BEATMAP_POLL_MS)
     return () => {
       cancelled = true
       clearInterval(id)
@@ -156,22 +169,44 @@ export function BeatmapsetSelector({
       return
     }
     if (connectionState !== 'connected') return
-    loadBeatmapsets(true)
+    loadBeatmapsets({ forceRefresh: true })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [songsPath])
-
-  const isRefreshingRef = useRef(isRefreshing)
-  useEffect(() => {
-    isRefreshingRef.current = isRefreshing
-  }, [isRefreshing])
 
   useEffect(() => {
     if (connectionState !== 'connected') return
     return onBeatmapsetsListChanged(() => {
       if (isRefreshingRef.current) return
-      loadBeatmapsets(true)
+      loadBeatmapsets({ keepScroll: true })
     })
   }, [connectionState, loadBeatmapsets])
+
+  useEffect(() => {
+    return onBeatmapsetChanged((folderPath, updated) => {
+      if (!updated) return
+      setLoadedData((prev) => {
+        for (const [index, item] of prev) {
+          if (!samePath(item.folderPath, folderPath)) continue
+          const next = new Map(prev)
+          next.set(index, updated)
+          return next
+        }
+        return prev
+      })
+      setSearchResults((prev) => {
+        const index = prev.findIndex((item) => samePath(item.folderPath, folderPath))
+        if (index < 0) return prev
+        const next = [...prev]
+        next[index] = updated
+        return next
+      })
+      setCurrentBeatmap((prev) =>
+        prev?.beatmapset && samePath(prev.beatmapset.folderPath, folderPath)
+          ? { ...prev, beatmapset: updated }
+          : prev
+      )
+    })
+  }, [])
 
   useEffect(() => {
     const container = scrollRef.current
@@ -306,7 +341,7 @@ export function BeatmapsetSelector({
           )}
         </div>
         <button
-          onClick={() => loadBeatmapsets(true)}
+          onClick={() => loadBeatmapsets({ forceRefresh: true })}
           disabled={isRefreshing || connectionState !== 'connected'}
           className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-surface text-text-dim transition-colors hover:bg-surface-raised hover:text-text-primary disabled:opacity-50"
         >

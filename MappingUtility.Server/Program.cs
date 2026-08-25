@@ -1,7 +1,7 @@
 using MappingUtility.Logging;
 using MappingUtility.Parser;
 using MappingUtility.Server.Hubs;
-using Microsoft.AspNetCore.SignalR;
+using MappingUtility.Server.Services;
 using System.Diagnostics;
 using System.Text;
 
@@ -20,6 +20,7 @@ builder.Services.AddSignalR(options =>
     options.KeepAliveInterval = TimeSpan.FromSeconds(15);
     options.MaximumParallelInvocationsPerClient = 4;
 });
+builder.Services.AddSingleton<BeatmapsetLibrary>();
 builder.Services.AddCors(options =>
     options.AddDefaultPolicy(policy =>
         policy.SetIsOriginAllowed(IsAllowedOrigin)
@@ -28,7 +29,7 @@ builder.Services.AddCors(options =>
               .AllowCredentials()));
 
 var app = builder.Build();
-BeatmapsetHub.Initialize(app.Services.GetRequiredService<IHubContext<BeatmapsetHub>>());
+app.Services.GetRequiredService<BeatmapsetLibrary>();
 app.UseCors();
 app.MapGet("/health", () => Results.Ok());
 StarRatingCalculator.Warmup();

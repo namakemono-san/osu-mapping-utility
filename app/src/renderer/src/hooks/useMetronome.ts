@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react'
+import { beatLengthMs, segmentIndexAt, type TimingSegment } from '../utils/timing'
 
 const METER_BEATS = 4
 const LOOK_AHEAD_MS = 25
@@ -14,10 +15,7 @@ interface MetronomeSounds {
   tickDownbeat: AudioBuffer
 }
 
-export interface MetronomeSegment {
-  time: number
-  bpm: number
-}
+export type MetronomeSegment = TimingSegment
 
 let cachedMetronomeSounds: MetronomeSounds | null = null
 let loadingPromise: Promise<MetronomeSounds> | null = null
@@ -111,15 +109,6 @@ function playMetronomeSound(
   return src
 }
 
-function segmentIndexAt(segments: readonly MetronomeSegment[], songMs: number): number {
-  let idx = 0
-  for (let i = 0; i < segments.length; i++) {
-    if (segments[i].time <= songMs) idx = i
-    else break
-  }
-  return idx
-}
-
 export interface UseMetronomeOptions {
   segments: MetronomeSegment[]
   metroOn: boolean
@@ -202,7 +191,7 @@ export function useMetronome({
       nextBeatIndexRef.current = 0
       return
     }
-    const beatMs = 60000 / Math.max(1, seg.bpm)
+    const beatMs = beatLengthMs(seg.bpm)
     const rel = nowSong - seg.time
     nextBeatIndexRef.current = rel <= 0 ? 0 : Math.ceil(rel / beatMs)
     lastClickWhenRef.current = -Infinity
@@ -242,7 +231,7 @@ export function useMetronome({
 
       const trackedSeg = segments[segmentIndexRef.current]
       if (trackedSeg) {
-        const trackedBeatMs = 60000 / Math.max(1, trackedSeg.bpm)
+        const trackedBeatMs = beatLengthMs(trackedSeg.bpm)
         const trackedSongT = trackedSeg.time + nextBeatIndexRef.current * trackedBeatMs
         if (Math.abs(trackedSongT - nowSong) > trackedBeatMs * 2) {
           resetMetroPhase()
@@ -254,7 +243,7 @@ export function useMetronome({
       for (let guard = 0; guard < MAX_BEATS_PER_TICK; guard++) {
         const seg = segments[segmentIndexRef.current]
         if (!seg) break
-        const beatMs = 60000 / Math.max(1, seg.bpm)
+        const beatMs = beatLengthMs(seg.bpm)
         const songT = seg.time + nextBeatIndexRef.current * beatMs
 
         const nextSeg = segments[segmentIndexRef.current + 1]

@@ -11,7 +11,7 @@
     <!--
       CA1416: this app targets Windows only (see .vscode/launch.json, WinExe packaging), so
       platform-compatibility warnings for Windows-only APIs (e.g. Registry access in
-      BeatmapsetHub.DetectSongsPath) are not actionable.
+      BeatmapsetLibrary.DetectSongsPath) are not actionable.
       NU1902/NU1903: the only vulnerable advisories currently reported (AutoMapper,
       MessagePack, SharpCompress) come transitively from ppy.osu.Game, used solely for
       StarRatingCalculator's difficulty calculation. Our code never touches osu!'s

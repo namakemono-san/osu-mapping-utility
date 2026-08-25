@@ -1,4 +1,5 @@
-import type { Beatmapset } from '../../utils/signalr'
+import type { Beatmapset } from '../../services'
+import { assetUrl } from '../../utils/paths'
 
 interface BeatmapsetHeaderProps {
   beatmapset: Beatmapset
@@ -11,9 +12,7 @@ export function BeatmapsetHeader({
   action,
   children
 }: BeatmapsetHeaderProps): React.JSX.Element {
-  const bgUrl = beatmapset.backgroundFile
-    ? `asset:///${beatmapset.folderPath.replace(/\\/g, '/')}/${beatmapset.backgroundFile}`
-    : null
+  const bgUrl = assetUrl(beatmapset.folderPath, beatmapset.backgroundFile)
 
   return (
     <div

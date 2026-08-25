@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { IconPhoto, IconSettings } from '@tabler/icons-react'
 import { DiffPills } from '../components/beatmapset/DiffPills'
 import { BeatmapsetHeader } from '../components/beatmapset/BeatmapsetHeader'
+import { EmptyState } from '../components/EmptyState'
+import { useBeatmapsetRevision } from '../hooks/useBeatmapsetRevision'
 import {
   applyMetadata,
   getBeatmapsetMetadata,
@@ -10,7 +12,7 @@ import {
   type DiffBackground,
   type DiffMetadata,
   type MetadataUpdate
-} from '../utils/signalr'
+} from '../services'
 import {
   applyMetadataFieldChange,
   asciiOnly,
@@ -40,6 +42,33 @@ function uniqueValues(diffs: DiffMetadata[], key: MetadataFieldKey): string[] {
   return [...new Set(diffs.map((d) => d[key]))]
 }
 
+function toFields(diffs: DiffMetadata[]): MetadataFields {
+  const artistUnicode = mostCommon(diffs.map((d) => d.artistUnicode))
+  const titleUnicode = mostCommon(diffs.map((d) => d.titleUnicode))
+  const artist = mostCommon(diffs.map((d) => d.artist))
+  const title = mostCommon(diffs.map((d) => d.title))
+  return {
+    artistUnicode,
+    artist: artist || asciiOnly(artistUnicode),
+    titleUnicode,
+    title: title || asciiOnly(titleUnicode),
+    source: mostCommon(diffs.map((d) => d.source)),
+    tags: mostCommon(diffs.map((d) => d.tags))
+  }
+}
+
+function toBgFields(diffs: DiffMetadata[]): Record<string, BgField> {
+  const result: Record<string, BgField> = {}
+  for (const d of diffs) {
+    result[d.version] = {
+      file: d.backgroundFile,
+      offsetX: d.backgroundOffsetX,
+      offsetY: d.backgroundOffsetY
+    }
+  }
+  return result
+}
+
 function bgOffsetConflicts(diffs: DiffMetadata[], bgFields: Record<string, BgField>): Set<string> {
   const byFile: Record<string, { version: string; offsetX: number; offsetY: number }[]> = {}
   for (const d of diffs) {
@@ -65,41 +94,32 @@ export function MetadataEditor({ beatmapset }: MetadataEditorProps): React.JSX.E
   const [bgFields, setBgFields] = useState<Record<string, BgField>>({})
   const [applying, setApplying] = useState(false)
 
-  const loadData = (folderPath: string, isCancelled: () => boolean = () => false): Promise<void> =>
-    getBeatmapsetMetadata(folderPath).then((data) => {
-      if (isCancelled()) return
-      setDiffs(data)
-      const artistUnicode = mostCommon(data.map((d) => d.artistUnicode))
-      const titleUnicode = mostCommon(data.map((d) => d.titleUnicode))
-      const artist = mostCommon(data.map((d) => d.artist))
-      const title = mostCommon(data.map((d) => d.title))
-      setFields({
-        artistUnicode,
-        artist: artist || asciiOnly(artistUnicode),
-        titleUnicode,
-        title: title || asciiOnly(titleUnicode),
-        source: mostCommon(data.map((d) => d.source)),
-        tags: mostCommon(data.map((d) => d.tags))
-      })
-      const newBg: Record<string, BgField> = {}
-      for (const d of data) {
-        newBg[d.version] = {
-          file: d.backgroundFile,
-          offsetX: d.backgroundOffsetX,
-          offsetY: d.backgroundOffsetY
-        }
-      }
-      setBgFields(newBg)
-    })
+  const dirtyRef = useRef(false)
+  const folderPath = beatmapset?.folderPath
+  const revision = useBeatmapsetRevision(folderPath)
+
+  const loadData = useCallback(
+    (path: string, isCancelled: () => boolean = () => false): Promise<void> =>
+      getBeatmapsetMetadata(path).then((data) => {
+        if (isCancelled()) return
+        setDiffs(data)
+        setFields(toFields(data))
+        setBgFields(toBgFields(data))
+        dirtyRef.current = false
+      }),
+    []
+  )
 
   useEffect(() => {
     setDiffs([])
     setFields(EMPTY_METADATA_FIELDS)
     setBgFields({})
-    if (!beatmapset?.folderPath) return
+    dirtyRef.current = false
+    if (!folderPath) return
+
     let cancelled = false
     setLoading(true)
-    loadData(beatmapset.folderPath, () => cancelled)
+    loadData(folderPath, () => cancelled)
       .catch(() => {})
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -107,17 +127,21 @@ export function MetadataEditor({ beatmapset }: MetadataEditorProps): React.JSX.E
     return () => {
       cancelled = true
     }
-  }, [beatmapset?.folderPath])
+  }, [folderPath, loadData])
+
+  useEffect(() => {
+    if (!folderPath || revision === 0 || dirtyRef.current) return
+    let cancelled = false
+    loadData(folderPath, () => cancelled).catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [folderPath, revision, loadData])
 
   useEffect(() => {
     return window.api.bgSetter.onSaved((raw) => {
       try {
-        const bg = JSON.parse(raw) as {
-          version: string
-          filename: string
-          offsetX: number
-          offsetY: number
-        }
+        const bg = JSON.parse(raw) as DiffBackground
         setBgFields((prev) => ({
           ...prev,
           [bg.version]: { file: bg.filename, offsetX: bg.offsetX, offsetY: bg.offsetY }
@@ -128,35 +152,57 @@ export function MetadataEditor({ beatmapset }: MetadataEditorProps): React.JSX.E
     })
   }, [])
 
-  if (!beatmapset) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <div className="flex flex-col items-center gap-2 text-text-muted">
-          <IconSettings size={36} stroke={1} className="opacity-30" />
-          <p className="text-sm">Select a beatmapset</p>
-        </div>
-      </div>
-    )
-  }
+  if (!beatmapset) return <EmptyState icon={IconSettings} message="Select a beatmapset" />
 
   const handleFieldChange = (key: MetadataFieldKey, value: string): void => {
+    dirtyRef.current = true
     setFields((prev) => applyMetadataFieldChange(prev, key, value))
   }
 
-  const openBgSetter = (version: string): void => {
-    if (!beatmapset) return
-    const data = JSON.stringify({
-      folderPath: beatmapset.folderPath,
-      version,
-      diffs: diffs.map((d) => ({
-        version: d.version,
-        file: bgFields[d.version]?.file ?? d.backgroundFile,
-        offsetX: bgFields[d.version]?.offsetX ?? d.backgroundOffsetX,
-        offsetY: bgFields[d.version]?.offsetY ?? d.backgroundOffsetY
-      }))
-    })
-    window.api.bgSetter.open(encodeURIComponent(data))
+  const pickConflictValue = (key: MetadataFieldKey, value: string): void => {
+    dirtyRef.current = true
+    setFields((prev) => ({ ...prev, [key]: value }))
   }
+
+  const openBgSetter = (version: string): void => {
+    window.api.bgSetter.open(
+      JSON.stringify({
+        folderPath: beatmapset.folderPath,
+        version,
+        diffs: diffs.map((d) => ({
+          version: d.version,
+          file: bgFields[d.version]?.file ?? d.backgroundFile,
+          offsetX: bgFields[d.version]?.offsetX ?? d.backgroundOffsetX,
+          offsetY: bgFields[d.version]?.offsetY ?? d.backgroundOffsetY
+        }))
+      })
+    )
+  }
+
+  const handleApply = (): void => {
+    setApplying(true)
+    const backgrounds: DiffBackground[] = diffs.map((d) => ({
+      version: d.version,
+      filename: bgFields[d.version]?.file ?? '',
+      offsetX: bgFields[d.version]?.offsetX ?? 0,
+      offsetY: bgFields[d.version]?.offsetY ?? 0
+    }))
+    const update: MetadataUpdate = { ...fields, backgrounds }
+    const promise = applyMetadata(
+      beatmapset.folderPath,
+      diffs.map((d) => d.version),
+      update
+    )
+      .then(() => loadData(beatmapset.folderPath))
+      .finally(() => setApplying(false))
+    toast.promise(promise, {
+      loading: 'Applying metadata...',
+      success: 'Metadata applied!',
+      error: (e: Error) => e.message
+    })
+  }
+
+  const conflictingBgVersions = bgOffsetConflicts(diffs, bgFields)
 
   return (
     <div className="flex h-full flex-col">
@@ -176,6 +222,23 @@ export function MetadataEditor({ beatmapset }: MetadataEditorProps): React.JSX.E
             const values = uniqueValues(diffs, key)
             const hasConflict = values.length > 1
             const disabled = isRomanisedFieldDisabled(fields, key)
+            const conflictPicker = (
+              <div className={`mt-1.5 flex flex-wrap gap-1 ${textarea ? '' : 'pl-35'}`}>
+                {values.map((v) => (
+                  <button
+                    key={v}
+                    onClick={() => pickConflictValue(key, v)}
+                    className={`max-w-xs truncate rounded px-2 py-0.5 text-[11px] transition-colors ${
+                      fields[key] === v
+                        ? 'bg-primary/20 text-primary'
+                        : 'bg-surface-raised text-text-secondary hover:opacity-80'
+                    }`}
+                  >
+                    {v || '(empty)'}
+                  </button>
+                ))}
+              </div>
+            )
             return (
               <div
                 key={key}
@@ -199,23 +262,7 @@ export function MetadataEditor({ beatmapset }: MetadataEditorProps): React.JSX.E
                       className="mt-1.5 w-full resize-y bg-transparent text-sm text-text-primary outline-none placeholder:text-text-muted"
                       placeholder="space-separated tags"
                     />
-                    {hasConflict && (
-                      <div className="mt-1.5 flex flex-wrap gap-1">
-                        {values.map((v) => (
-                          <button
-                            key={v}
-                            onClick={() => setFields((prev) => ({ ...prev, [key]: v }))}
-                            className={`max-w-xs truncate rounded px-2 py-0.5 text-[11px] transition-colors ${
-                              fields[key] === v
-                                ? 'bg-primary/20 text-primary'
-                                : 'bg-surface-raised text-text-secondary hover:opacity-80'
-                            }`}
-                          >
-                            {v || '(empty)'}
-                          </button>
-                        ))}
-                      </div>
-                    )}
+                    {hasConflict && conflictPicker}
                   </>
                 ) : (
                   <>
@@ -236,23 +283,7 @@ export function MetadataEditor({ beatmapset }: MetadataEditorProps): React.JSX.E
                         </span>
                       ) : null}
                     </div>
-                    {!disabled && hasConflict && (
-                      <div className="mt-1.5 flex flex-wrap gap-1 pl-35">
-                        {values.map((v) => (
-                          <button
-                            key={v}
-                            onClick={() => setFields((prev) => ({ ...prev, [key]: v }))}
-                            className={`rounded px-2 py-0.5 text-[11px] transition-colors ${
-                              fields[key] === v
-                                ? 'bg-primary/20 text-primary'
-                                : 'bg-surface-raised text-text-secondary hover:opacity-80'
-                            }`}
-                          >
-                            {v || '(empty)'}
-                          </button>
-                        ))}
-                      </div>
-                    )}
+                    {!disabled && hasConflict && conflictPicker}
                   </>
                 )}
               </div>
@@ -267,37 +298,34 @@ export function MetadataEditor({ beatmapset }: MetadataEditorProps): React.JSX.E
               <span className="text-xs text-text-muted">Background</span>
             </div>
             <div className="grid grid-cols-3 gap-1">
-              {(() => {
-                const conflicts = bgOffsetConflicts(diffs, bgFields)
-                return diffs.map((d) => {
-                  const bg = bgFields[d.version] ?? EMPTY_BG
-                  const hasConflict = conflicts.has(d.version)
-                  return (
-                    <button
-                      key={d.version}
-                      onClick={() => openBgSetter(d.version)}
-                      className="rounded-lg bg-surface-dark px-3 py-2.5 text-left transition-colors hover:bg-surface-raised"
-                    >
-                      <div className="flex items-center justify-between gap-1">
-                        <span className="truncate text-xs font-medium text-text-secondary">
-                          {d.version}
+              {diffs.map((d) => {
+                const bg = bgFields[d.version] ?? EMPTY_BG
+                const hasConflict = conflictingBgVersions.has(d.version)
+                return (
+                  <button
+                    key={d.version}
+                    onClick={() => openBgSetter(d.version)}
+                    className="rounded-lg bg-surface-dark px-3 py-2.5 text-left transition-colors hover:bg-surface-raised"
+                  >
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="truncate text-xs font-medium text-text-secondary">
+                        {d.version}
+                      </span>
+                      {hasConflict && (
+                        <span className="shrink-0 rounded-full bg-yellow-500/20 px-1.5 py-0.5 text-[10px] text-yellow-400">
+                          conflict
                         </span>
-                        {hasConflict && (
-                          <span className="shrink-0 rounded-full bg-yellow-500/20 px-1.5 py-0.5 text-[10px] text-yellow-400">
-                            conflict
-                          </span>
-                        )}
-                      </div>
-                      <div className="mt-0.5 flex items-baseline justify-between gap-2 text-[10px] text-text-muted">
-                        <span className="truncate">{bg.file || '(no file)'}</span>
-                        <span className="shrink-0 tabular-nums opacity-60">
-                          ({bg.offsetX}, {bg.offsetY})
-                        </span>
-                      </div>
-                    </button>
-                  )
-                })
-              })()}
+                      )}
+                    </div>
+                    <div className="mt-0.5 flex items-baseline justify-between gap-2 text-[10px] text-text-muted">
+                      <span className="truncate">{bg.file || '(no file)'}</span>
+                      <span className="shrink-0 tabular-nums opacity-60">
+                        ({bg.offsetX}, {bg.offsetY})
+                      </span>
+                    </div>
+                  </button>
+                )
+              })}
             </div>
           </div>
         )}
@@ -307,29 +335,7 @@ export function MetadataEditor({ beatmapset }: MetadataEditorProps): React.JSX.E
         <div className="flex items-center justify-end">
           <button
             disabled={diffs.length === 0 || applying}
-            onClick={() => {
-              if (!beatmapset) return
-              setApplying(true)
-              const backgrounds: DiffBackground[] = diffs.map((d) => ({
-                version: d.version,
-                filename: bgFields[d.version]?.file ?? '',
-                offsetX: bgFields[d.version]?.offsetX ?? 0,
-                offsetY: bgFields[d.version]?.offsetY ?? 0
-              }))
-              const update: MetadataUpdate = { ...fields, backgrounds }
-              const promise = applyMetadata(
-                beatmapset.folderPath,
-                diffs.map((d) => d.version),
-                update
-              )
-                .then(() => loadData(beatmapset.folderPath))
-                .finally(() => setApplying(false))
-              toast.promise(promise, {
-                loading: 'Applying metadata...',
-                success: 'Metadata applied!',
-                error: (e: Error) => e.message
-              })
-            }}
+            onClick={handleApply}
             className="rounded-lg bg-primary px-8 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-30"
           >
             {applying ? 'Applying...' : 'Apply'}

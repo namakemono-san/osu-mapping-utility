@@ -14,10 +14,11 @@ import {
 } from '@tabler/icons-react'
 import { DiffPills } from '../components/beatmapset/DiffPills'
 import { BeatmapsetHeader } from '../components/beatmapset/BeatmapsetHeader'
+import { EmptyState } from '../components/EmptyState'
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { applyTransforms } from '../utils/signalr'
-import type { Beatmapset } from '../utils/signalr'
+import { applyTransforms } from '../services'
+import type { Beatmapset } from '../services'
 import { GameModeIcon } from '../components/icons/GameModeIcon'
 import { useLocalStorage, type Codec } from '../utils/useLocalStorage'
 
@@ -100,17 +101,25 @@ export function MapsetTweaker({ beatmapset }: MapsetTweakerProps): React.JSX.Ele
   const [selectedMode, setSelectedMode] = useState<number>(
     () => [...new Set((beatmapset?.difficulties ?? []).map((d) => d.mode))][0] ?? 0
   )
-  const [trackedPath, setTrackedPath] = useState(beatmapset?.folderPath)
+  const [trackedKey, setTrackedKey] = useState<string | null>(null)
   const [backup, setBackup] = useState(true)
   const [applying, setApplying] = useState(false)
 
   const diffs = beatmapset?.difficulties ?? []
   const presentModes = [...new Set(diffs.map((d) => d.mode))]
 
-  if (trackedPath !== beatmapset?.folderPath) {
-    setTrackedPath(beatmapset?.folderPath)
-    setSelectedDiffs(new Set(diffs.map((d) => d.version)))
-    setSelectedMode(presentModes[0] ?? 0)
+  const folderPath = beatmapset?.folderPath ?? ''
+  const diffKey = `${folderPath}|${JSON.stringify(diffs.map((d) => d.version))}`
+
+  if (trackedKey !== diffKey) {
+    const folderChanged = trackedKey === null || !trackedKey.startsWith(`${folderPath}|`)
+    setTrackedKey(diffKey)
+    setSelectedDiffs((prev) =>
+      folderChanged
+        ? new Set(diffs.map((d) => d.version))
+        : new Set(diffs.map((d) => d.version).filter((v) => prev.has(v)))
+    )
+    if (folderChanged || !presentModes.includes(selectedMode)) setSelectedMode(presentModes[0] ?? 0)
   }
 
   const visibleDiffs = diffs.filter((d) => d.mode === selectedMode)
@@ -135,16 +144,7 @@ export function MapsetTweaker({ beatmapset }: MapsetTweakerProps): React.JSX.Ele
 
   const canApply = enabledTransforms.size > 0 && selectedDiffs.size > 0
 
-  if (!beatmapset) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <div className="flex flex-col items-center gap-2 text-text-muted">
-          <IconAdjustments size={36} stroke={1} className="opacity-30" />
-          <p className="text-sm">Select a beatmapset</p>
-        </div>
-      </div>
-    )
-  }
+  if (!beatmapset) return <EmptyState icon={IconAdjustments} message="Select a beatmapset" />
 
   const modeSelector =
     presentModes.length > 0 ? (

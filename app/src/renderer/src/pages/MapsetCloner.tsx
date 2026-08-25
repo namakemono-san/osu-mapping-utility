@@ -4,7 +4,8 @@ import { IconCopy } from '@tabler/icons-react'
 import { DiffPills } from '../components/beatmapset/DiffPills'
 import { GameModeIcon } from '../components/icons/GameModeIcon'
 import { BeatmapsetHeader } from '../components/beatmapset/BeatmapsetHeader'
-import { cloneBeatmap, getBeatmapsetMetadata, type Beatmapset } from '../utils/signalr'
+import { EmptyState } from '../components/EmptyState'
+import { cloneBeatmap, getBeatmapsetMetadata, type Beatmapset } from '../services'
 import {
   applyMetadataFieldChange,
   EMPTY_METADATA_FIELDS,
@@ -54,8 +55,7 @@ export function MapsetCloner({ beatmapset }: MapsetClonerProps): React.JSX.Eleme
   useEffect(() => {
     if (!beatmapset) return
     let cancelled = false
-    const firstDiff = beatmapset.difficulties.at(-1)
-    setTemplateVersion(firstDiff?.version ?? '')
+    setTemplateVersion(beatmapset.difficulties.at(-1)?.version ?? '')
     setGameMode(1)
     getBeatmapsetMetadata(beatmapset.folderPath)
       .then((diffs) => {
@@ -85,7 +85,8 @@ export function MapsetCloner({ beatmapset }: MapsetClonerProps): React.JSX.Eleme
     return () => {
       cancelled = true
     }
-  }, [beatmapset])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [beatmapset?.folderPath])
 
   const handleFieldChange = (key: MetadataFieldKey, value: string): void => {
     setMeta((prev) => applyMetadataFieldChange(prev, key, value))
@@ -115,16 +116,7 @@ export function MapsetCloner({ beatmapset }: MapsetClonerProps): React.JSX.Eleme
     }
   }, [beatmapset, templateVersion, gameMode, meta, options, busy])
 
-  if (!beatmapset) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <div className="flex flex-col items-center gap-2 text-text-muted">
-          <IconCopy size={36} stroke={1} className="opacity-30" />
-          <p className="text-sm">Select a beatmapset</p>
-        </div>
-      </div>
-    )
-  }
+  if (!beatmapset) return <EmptyState icon={IconCopy} message="Select a beatmapset" />
 
   const modeSelector = (
     <div className="flex shrink-0 items-center gap-0.5 rounded-lg bg-[hsl(200deg_10%_10%/50%)] p-1">

@@ -2,6 +2,7 @@ import { app, shell, BrowserWindow, ipcMain, nativeImage, protocol, net, dialog 
 import { autoUpdater } from 'electron-updater'
 import { join } from 'path'
 import { existsSync } from 'fs'
+import { pathToFileURL } from 'url'
 import { spawn, ChildProcess } from 'child_process'
 import { request } from 'http'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
@@ -120,6 +121,10 @@ function createWindow(): void {
     mainWindow!.show()
   })
 
+  mainWindow.on('closed', () => {
+    mainWindow = null
+  })
+
   mainWindow.on('maximize', () => {
     mainWindow!.webContents.send('window:maximize-changed', true)
   })
@@ -152,12 +157,12 @@ if (gotSingleInstanceLock) {
     electronApp.setAppUserModelId('moe.nmkmn.osu-mapping-utility')
 
     protocol.handle('asset', async (request) => {
-      const path = decodeURIComponent(request.url.slice('asset:///'.length))
       try {
+        const filePath = decodeURIComponent(request.url.slice('asset:///'.length))
         const headers: Record<string, string> = {}
         const range = request.headers.get('Range')
         if (range) headers['Range'] = range
-        return await net.fetch(`file:///${encodeURI(path)}`, { headers })
+        return await net.fetch(pathToFileURL(filePath).toString(), { headers })
       } catch {
         return new Response(null, { status: 404 })
       }
@@ -279,10 +284,9 @@ if (gotSingleInstanceLock) {
       bgSetterWindow.on('closed', () => {
         bgSetterWindow = null
       })
-      const encodedData = encodeURIComponent(data)
       if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
         bgSetterWindow.loadURL(
-          `${process.env['ELECTRON_RENDERER_URL']}?bgsetter=1&data=${encodedData}`
+          `${process.env['ELECTRON_RENDERER_URL']}?bgsetter=1&data=${encodeURIComponent(data)}`
         )
       } else {
         bgSetterWindow.loadFile(join(__dirname, '../renderer/index.html'), {
@@ -302,6 +306,8 @@ if (gotSingleInstanceLock) {
       if (BrowserWindow.getAllWindows().length === 0) createWindow()
     })
   })
+
+  app.on('before-quit', stopServer)
 
   app.on('window-all-closed', () => {
     stopServer()

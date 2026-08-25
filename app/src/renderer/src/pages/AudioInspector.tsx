@@ -8,13 +8,8 @@ import {
 } from '@tabler/icons-react'
 import { BeatmapsetHeader } from '../components/beatmapset/BeatmapsetHeader'
 import { DiffPills } from '../components/beatmapset/DiffPills'
-import {
-  analyzeAudio,
-  getSpectrogram,
-  startAudioConnection,
-  type AudioGroup,
-  type Beatmapset
-} from '../utils/signalr'
+import { EmptyState } from '../components/EmptyState'
+import { analyzeAudio, getSpectrogram, type AudioGroup, type Beatmapset } from '../services'
 
 type AudioInspectorProps = {
   beatmapset: Beatmapset | null
@@ -60,28 +55,30 @@ function SpectrogramView({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const { audioFilename, cutoffHz } = group
+
   useEffect(() => {
+    let cancelled = false
     setSrc(null)
     setError(null)
     setLoading(true)
 
-    startAudioConnection().then((ok) => {
-      if (!ok) {
-        setError('Could not connect to server.')
+    getSpectrogram(folderPath, audioFilename, cutoffHz ?? 0)
+      .then((b64) => {
+        if (cancelled) return
+        setSrc(`data:image/png;base64,${b64}`)
         setLoading(false)
-        return
-      }
-      getSpectrogram(folderPath, group.audioFilename, group.cutoffHz ?? 0)
-        .then((b64) => {
-          setSrc(`data:image/png;base64,${b64}`)
-          setLoading(false)
-        })
-        .catch((e: unknown) => {
-          setError(e instanceof Error ? e.message : 'Failed to generate spectrogram.')
-          setLoading(false)
-        })
-    })
-  }, [folderPath, group.audioFilename])
+      })
+      .catch((e: unknown) => {
+        if (cancelled) return
+        setError(e instanceof Error ? e.message : 'Failed to generate spectrogram.')
+        setLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [folderPath, audioFilename, cutoffHz])
 
   const handleDownload = (): void => {
     if (!src) return
@@ -167,8 +164,10 @@ export function AudioInspector({ beatmapset }: AudioInspectorProps): React.JSX.E
   const [error, setError] = useState<string | null>(null)
   const [selected, setSelected] = useState(0)
 
+  const folderPath = beatmapset?.folderPath
+
   useEffect(() => {
-    if (!beatmapset) return
+    if (!folderPath) return
 
     let cancelled = false
     setGroups([])
@@ -176,40 +175,24 @@ export function AudioInspector({ beatmapset }: AudioInspectorProps): React.JSX.E
     setLoading(true)
     setSelected(0)
 
-    startAudioConnection().then((ok) => {
-      if (cancelled) return
-      if (!ok) {
-        setError('Could not connect to server.')
+    analyzeAudio(folderPath)
+      .then((result) => {
+        if (cancelled) return
+        setGroups(result)
         setLoading(false)
-        return
-      }
-      analyzeAudio(beatmapset.folderPath)
-        .then((result) => {
-          if (cancelled) return
-          setGroups(result)
-          setLoading(false)
-        })
-        .catch((e: unknown) => {
-          if (cancelled) return
-          setError(e instanceof Error ? e.message : 'Analysis failed.')
-          setLoading(false)
-        })
-    })
+      })
+      .catch((e: unknown) => {
+        if (cancelled) return
+        setError(e instanceof Error ? e.message : 'Analysis failed.')
+        setLoading(false)
+      })
 
     return () => {
       cancelled = true
     }
-  }, [beatmapset?.folderPath])
+  }, [folderPath])
 
-  if (!beatmapset)
-    return (
-      <div className="flex h-full items-center justify-center">
-        <div className="flex flex-col items-center gap-2 text-text-muted">
-          <IconHeadphones size={36} stroke={1} className="opacity-30" />
-          <p className="text-sm">Select a beatmapset</p>
-        </div>
-      </div>
-    )
+  if (!beatmapset) return <EmptyState icon={IconHeadphones} message="Select a beatmapset" />
 
   const activeGroup = groups[selected] ?? null
 

@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.SignalR;
 using MappingUtility.Server.Services;
@@ -9,11 +8,6 @@ namespace MappingUtility.Server.Hubs;
 
 public class AudioHub(ILogger<AudioHub> logger) : Hub
 {
-    private static readonly JsonSerializerOptions CamelCase = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-    };
-
     public async Task<string> AnalyzeBpm(string folderPath, string audioFilename)
     {
         var (_, samples, targetSr, durationMs) =
@@ -21,7 +15,7 @@ public class AudioHub(ILogger<AudioHub> logger) : Hub
         var defaultBpm = 120;
         var result = BpmDetectionService.AnalyzeBpm(samples, targetSr, defaultBpm);
         var offsetMs = BpmDetectionService.AnalyzeOffset(samples, targetSr, result.Bpm, durationMs);
-        return JsonSerializer.Serialize(new { bpm = result.Bpm, candidates = result.Candidates, offsetMs }, CamelCase);
+        return Json.Serialize(new { bpm = result.Bpm, candidates = result.Candidates, offsetMs });
     }
 
     public async Task<string> AnalyzeOffset(string folderPath, string audioFilename, double bpm)
@@ -29,7 +23,7 @@ public class AudioHub(ILogger<AudioHub> logger) : Hub
         var (_, samples, targetSr, durationMs) =
             await LoadSamplesAsync(folderPath, audioFilename, 48000, Context.ConnectionAborted);
         var offsetMs = BpmDetectionService.AnalyzeOffset(samples, targetSr, bpm, durationMs);
-        return JsonSerializer.Serialize(new { offsetMs }, CamelCase);
+        return Json.Serialize(new { offsetMs });
     }
 
     private async Task<(string AudioPath, float[] Samples, int SampleRate, double DurationMs)> LoadSamplesAsync(
@@ -68,7 +62,7 @@ public class AudioHub(ILogger<AudioHub> logger) : Hub
     public async Task<string> AnalyzeAudio(string folderPath)
     {
         var results = await AudioAnalysisService.AnalyzeAsync(folderPath, Context.ConnectionAborted);
-        return JsonSerializer.Serialize(results, CamelCase);
+        return Json.Serialize(results);
     }
 
     private static string StripFolderPrefix(string folder)

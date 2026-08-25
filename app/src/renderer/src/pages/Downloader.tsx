@@ -15,8 +15,9 @@ import {
   cancelDownload,
   onDownloadProgress,
   type MediaDownloadOptions
-} from '../utils/signalr'
+} from '../services'
 import { jsonCodec, stringCodec, useLocalStorage } from '../utils/useLocalStorage'
+import { assetUrl } from '../utils/paths'
 import { Toggle } from '../components/Toggle'
 
 const LS = {
@@ -110,7 +111,7 @@ export function Downloader(): React.JSX.Element {
   const pickFolder = useCallback(async () => {
     const dir = await window.api.dialog.pickFolder()
     if (dir) setOutDir(dir)
-  }, [])
+  }, [setOutDir])
 
   const pickImageFile = useCallback(() => {
     const input = document.createElement('input')
@@ -171,7 +172,7 @@ export function Downloader(): React.JSX.Element {
 
   const canStart =
     (mode === 'media' ? !!url : !!(imageFile || url)) && !!outDir && !busy && !connectionError
-  const previewUrl = previewPath ? `asset:///${previewPath.replace(/\\/g, '/')}` : null
+  const previewUrl = assetUrl(previewPath)
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-surface-dark">

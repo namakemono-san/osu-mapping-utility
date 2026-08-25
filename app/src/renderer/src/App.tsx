@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Toaster } from 'sonner'
 import { TitleBar } from './components/TitleBar'
 import { BeatmapsetSelector } from './components/beatmapset/BeatmapsetSelector'
@@ -13,18 +13,33 @@ import { Sidebar, type SidebarKey } from './components/Sidebar'
 import { Settings } from './components/Settings'
 import { UpdateModal } from './components/UpdateModal'
 import { useAutoUpdater } from './hooks/useAutoUpdater'
-import type { Beatmapset } from './utils/signalr'
-import { getSongsPath } from './utils/signalr'
+import { getSongsPath, onBeatmapsetChanged, type Beatmapset } from './services'
+import { samePath } from './utils/paths'
+import { useLocalStorage, type Codec } from './utils/useLocalStorage'
+
+const songsFolderCodec: Codec<string | null> = {
+  serialize: (value) => value ?? '',
+  deserialize: (raw) => raw || null
+}
 
 function App(): React.JSX.Element {
   const [selectedBeatmap, setSelectedBeatmap] = useState<Beatmapset | null>(null)
   const [activeTool, setActiveTool] = useState<SidebarKey>('mapset_tweaker')
   const [interacted, setInteracted] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [songsFolder, setSongsFolder] = useState<string | null>(() =>
-    localStorage.getItem('songsFolder')
+  const [songsFolder, setSongsFolder] = useLocalStorage<string | null>(
+    'songsFolder',
+    null,
+    songsFolderCodec
   )
   const updater = useAutoUpdater()
+
+  useEffect(() => {
+    return onBeatmapsetChanged((folderPath, updated) => {
+      if (!updated) return
+      setSelectedBeatmap((prev) => (prev && samePath(prev.folderPath, folderPath) ? updated : prev))
+    })
+  }, [])
 
   const handleToolChange = (tool: SidebarKey): void => {
     setActiveTool(tool)
@@ -35,6 +50,17 @@ function App(): React.JSX.Element {
     setSelectedBeatmap(beatmapset)
     if (beatmapset) setInteracted(true)
   }
+
+  const handleSettingsOpen = useCallback(() => {
+    if (songsFolder) return
+    getSongsPath()
+      .then((path) => {
+        if (path) setSongsFolder(path)
+      })
+      .catch((e: unknown) => {
+        console.error('Failed to detect osu! Songs folder:', e)
+      })
+  }, [songsFolder, setSongsFolder])
 
   const renderTool = (): React.ReactNode => {
     if (!interacted && !selectedBeatmap && activeTool !== 'media_downloader') return <Home />
@@ -73,20 +99,8 @@ function App(): React.JSX.Element {
         isOpen={settingsOpen}
         onClose={() => setSettingsOpen(false)}
         songsFolder={songsFolder}
-        onSongsFolder={(p) => {
-          setSongsFolder(p)
-          localStorage.setItem('songsFolder', p)
-        }}
-        onOpen={() => {
-          if (!songsFolder)
-            getSongsPath()
-              .then((p) => {
-                if (p) setSongsFolder(p)
-              })
-              .catch((e: unknown) => {
-                console.error('Failed to detect osu! Songs folder:', e)
-              })
-        }}
+        onSongsFolder={setSongsFolder}
+        onOpen={handleSettingsOpen}
         updater={updater}
       />
       <UpdateModal state={updater} />
